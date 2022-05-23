@@ -3,11 +3,10 @@ import nanome
 from nanome.api.ui import Menu
 from nanome.util import Logs, enums
 from nanome.api.shapes import Shape, Mesh
-# from nanome.util import async_callback, enums, Logs, Process, Color
 import mrcfile
 import mcubes
-import open3d as o3d
 import numpy as np
+import pyfqmr
 
 class CryoEM(nanome.PluginInstance):
     def start(self):
@@ -38,27 +37,30 @@ class CryoEM(nanome.PluginInstance):
             self._map_data = mrc.data
             self.generate_isosurface(0.32)
     
-    def generate_isosurface(self, iso):
+    def generate_isosurface(self, iso, decimation_factor=10):
         Logs.message("Generating iso-surface for iso-value "+str(iso))
         self.iso_value = iso
 
         #Compute iso-surface with marching cubes algorithm
         vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
 
-        o3dmesh = o3d.geometry.TriangleMesh()
-        o3dmesh.vertices = o3d.utility.Vector3dVector(vertices)
-        o3dmesh.triangles = o3d.utility.Vector3iVector(triangles)
-        if not o3dmesh.has_vertex_normals():            
-            o3dmesh.compute_vertex_normals()
+        target = max(100, len(triangles)/decimation_factor)
+
+        mesh_simplifier = pyfqmr.Simplify()
+        mesh_simplifier.setMesh(np.asarray(vertices), np.asarray(triangles))
+        mesh_simplifier.simplify_mesh(target_count=target, aggressiveness=7, preserve_border=True)
+
+        vertices, triangles, normals = mesh_simplifier.getMesh()
 
         if self.nanome_mesh is not None:
             self.nanome_mesh.destroy()
         
         self.nanome_mesh = Mesh()
 
-        self.nanome_mesh.vertices = np.asarray(o3dmesh.vertices).flatten()
-        self.nanome_mesh.normals = np.asarray(o3dmesh.vertex_normals).flatten()
-        self.nanome_mesh.triangles = np.asarray(o3dmesh.triangles).flatten()
+        self.nanome_mesh.vertices = np.asarray(vertices).flatten()
+        self.nanome_mesh.normals = np.asarray(normals).flatten()
+        self.nanome_mesh.triangles = np.asarray(triangles).flatten()
+
         self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
         
         self.nanome_mesh.color = nanome.util.Color(255, 255, 255, 128)
