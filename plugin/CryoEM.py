@@ -130,28 +130,36 @@ class CryoEM(nanome.PluginInstance):
         self.update_menu(self.menu)
 
     def update_isosurface(self, iso):
-        self.label_iso.text = "Iso-value: " + str(round(iso.current_value, 3))
+        self.label_iso.text_value = "Iso-value: " + str(round(iso.current_value, 3))
         self.update_content(self.label_iso)
         if self._map_data is not None:
             self.generate_isosurface(iso.current_value)
         
     def update_limited_view_x(self, slider):
         self.limit_x = slider.current_value
+        self.label_limit_x.text_value = "Position.x: " + str(round(self.limit_x, 2))
+        self.update_content(self.label_limit_x)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
 
     def update_limited_view_y(self, slider):
         self.limit_y = slider.current_value
+        self.label_limit_y.text_value = "Position.y: " + str(round(self.limit_y, 2))
+        self.update_content(self.label_limit_y)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
 
     def update_limited_view_z(self, slider):
         self.limit_z = slider.current_value
+        self.label_limit_z.text_value = "Position.z: " + str(round(self.limit_z, 2))
+        self.update_content(self.label_limit_z)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
     
     def update_limited_view_range(self, slider):
         self.limited_view_range = slider.current_value
+        self.label_limit_range.text_value = "Size: " + str(round(self.limited_view_range, 2))
+        self.update_content(self.label_limit_range)
         self.update_mesh_limited_view()
 
     def update_mesh_limited_view(self):
@@ -167,7 +175,7 @@ class CryoEM(nanome.PluginInstance):
     def update_opacity(self, alpha):
 
         self.opacity = alpha.current_value
-        self.label_opac.text = "Opacity: " + str(round(self.opacity, 2))
+        self.label_opac.text_value = "Opacity: " + str(round(self.opacity, 2))
         self.update_content(self.label_opac)
 
         if self._map_data is not None and self.nanome_mesh:
