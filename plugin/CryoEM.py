@@ -1,6 +1,7 @@
 import nanome
 from nanome.api.ui import Menu
-from nanome.util import Logs, enums
+from nanome.api import structure
+from nanome.util import Logs, enums,  Color, Vector3
 from nanome.api.shapes import Shape, Mesh
 import mrcfile
 import gzip
@@ -10,13 +11,12 @@ import pyfqmr
 import json
 import requests
 import tempfile
+import matplotlib.pyplot as plt
 
 class CryoEM(nanome.PluginInstance):
+
     def start(self):
-        self.menu = Menu()
-        self.menu.title = 'Cryo-EM'
-        self.menu.width = 0.7
-        self.menu.height = 1
+        self.nanome_workspace = None
 
         self.map_file = None
         self._map_data = None
@@ -31,6 +31,74 @@ class CryoEM(nanome.PluginInstance):
         self.limited_view_pos = [0, 0, 0]
         self.limited_view_range = 30.0
         self.current_mesh = []
+
+        self.request_workspace(self.received_workspace_create_atom)
+        self.create_menu()
+
+    def received_workspace_create_atom(self, workspace):
+        self.nanome_workspace = workspace
+        self.create_atom()
+    
+    def received_workspace_update_index(self, workspace):
+        self.nanome_workspace = workspace
+        for c in reversed(self.nanome_workspace.complexes):
+            if "CryoEM_plugin" in c.name:
+                self.nanome_complex = c
+    
+    # def on_stop(self):
+    #     #Remove created complex
+    #     if self.nanome_workspace is not None:
+    #         self.nanome_workspace.complexes[:] = [c for c in self.nanome_workspace.complexes if not "CryoEM_plugin" in c.name]
+    #         self.update_workspace(self.nanome_workspace)
+            
+
+    def create_atom(self):
+        #First remove previous cryo-em plugin complexes 
+        if self.nanome_workspace is not None:
+            self.nanome_workspace.complexes[:] = [c for c in self.nanome_workspace.complexes if not "CryoEM_plugin" in c.name]
+
+        atm = structure.Atom()
+        atm.index = -1
+        atm.selected = False
+        atm.atom_mode = 1  # BALLSTICK
+        atm.atom_rendering = True
+        atm.symbol = "Carbon"
+        atm.serial = 0
+        atm.name = "cryoem_dummy"
+        atm.position = Vector3()
+        self.nanome_atom = atm
+
+        nanome_residue = structure.Residue()
+        nanome_residue._atoms = [atm]
+        nanome_residue.serial = 1
+
+        nanome_chain = structure.Chain()
+        nanome_chain.index = 1000
+        nanome_chain.name = "A"
+        nanome_chain._residues = [nanome_residue]
+
+        nanome_molecule = structure.Molecule()
+        nanome_molecule.index = 1000
+        nanome_molecule._chains = [nanome_chain]
+
+        self.nanome_complex = structure.Complex()
+        self.nanome_complex.index = -1
+        self.nanome_complex.name = "CryoEM_plugin"
+
+        self.nanome_complex._molecules = [nanome_molecule]
+
+        self.nanome_workspace.complexes.append(self.nanome_complex)
+        self.update_workspace(self.nanome_workspace)
+        self.request_workspace(self.received_workspace_update_index)
+
+    def create_menu(self):
+        self.menu = Menu()
+        self.menu.title = 'Cryo-EM'
+        self.menu.width = 0.7
+        self.menu.height = 1
+
+        node_image = self.menu.root.create_child_node()
+        self.histo_image = node_image.add_new_image()
         
         node_input = self.menu.root.create_child_node()
         text_input = node_input.add_new_text_input("PDBId")
@@ -108,7 +176,8 @@ class CryoEM(nanome.PluginInstance):
                             f.write(chunk)
                     self.map_file = map_tempfile
                     self.load_map()
-                    self.generate_isosurface(0.1)
+                    self.generate_histogram()
+                    self.generate_isosurface(self.iso_value)
             else:
                 Logs.message("No EM data found for", text_in.input_text)
                 
@@ -184,11 +253,10 @@ class CryoEM(nanome.PluginInstance):
             Logs.debug("Setting opacity to", int(self.opacity * 255))
 
     def limit_view(self, mesh, position, range):
+        if range <= 0:
+            return mesh
         vertices, normals, triangles = mesh
 
-        print("---- verts: ",vertices)
-        print("---- tris: ",triangles)
-        print("---- norms: ",normals)
         pos = np.asarray(position)
         idv = 0
         to_keep = []
@@ -248,10 +316,28 @@ class CryoEM(nanome.PluginInstance):
 
         self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
         
-        self.nanome_mesh.color = nanome.util.Color(255, 255, 255, int(self.opacity * 255))
+        self.nanome_mesh.color = Color(255, 255, 255, int(self.opacity * 255))
+
+        anchor = self.nanome_mesh.anchors[0]
+        # anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Atom
+        # anchor.target = self.nanome_atom.index
+        anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
+        anchor.target = self.nanome_complex.index
+        # anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
 
         Logs.message("Uploading iso-surface ("+str(len(self.nanome_mesh.vertices))+" vertices)")
         self.nanome_mesh.upload(self.done_updating)
+    
+    def generate_histogram(self):
+        flat = self._map_data.flatten()
+        histo, bins = np.histogram(flat, bins=20)
+        # plt.hist(histo, bins)
+        plt.hist(flat, bins=100)
+        plt.title("Iso-value distribution")
+        self.png_tempfile = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        plt.savefig(self.png_tempfile.name)
+        self.histo_image.file_path = self.png_tempfile.name
+        self.update_content(self.histo_image)
 
     def done_updating(self, m):
         Logs.message("Done updating mesh for iso-value "+str(round(self.iso_value, 3)))
