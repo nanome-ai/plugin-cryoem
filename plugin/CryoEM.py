@@ -29,11 +29,20 @@ class CryoEM(nanome.PluginInstance):
         self.limit_y = 0.0
         self.limit_z = 0.0
         self.limited_view_pos = [0, 0, 0]
-        self.limited_view_range = 30.0
+        self.limited_view_range = 50.0
         self.current_mesh = []
 
-        self.request_workspace(self.received_workspace_create_atom)
+        # self.request_workspace(self.received_workspace_create_atom)
         self.create_menu()
+        self.request_workspace(self.remove_existing_plugin_structure)
+
+    def remove_existing_plugin_structure(self, workspace):
+        self.nanome_workspace = workspace
+        #First remove previous cryo-em plugin complexes 
+        if self.nanome_workspace is not None:
+            self.nanome_workspace.complexes[:] = [c for c in self.nanome_workspace.complexes if not "CryoEM_plugin" in c.name]
+        
+        self.update_workspace(self.nanome_workspace)
 
     def received_workspace_create_atom(self, workspace):
         self.nanome_workspace = workspace
@@ -45,18 +54,7 @@ class CryoEM(nanome.PluginInstance):
             if "CryoEM_plugin" in c.name:
                 self.nanome_complex = c
     
-    # def on_stop(self):
-    #     #Remove created complex
-    #     if self.nanome_workspace is not None:
-    #         self.nanome_workspace.complexes[:] = [c for c in self.nanome_workspace.complexes if not "CryoEM_plugin" in c.name]
-    #         self.update_workspace(self.nanome_workspace)
-            
-
     def create_atom(self):
-        #First remove previous cryo-em plugin complexes 
-        if self.nanome_workspace is not None:
-            self.nanome_workspace.complexes[:] = [c for c in self.nanome_workspace.complexes if not "CryoEM_plugin" in c.name]
-
         atm = structure.Atom()
         atm.index = -1
         atm.selected = False
@@ -152,15 +150,46 @@ class CryoEM(nanome.PluginInstance):
         self._slider_limit_range = limit_range_node.add_new_slider(0, 150, self.limited_view_range)
         limit_range_node.set_size_ratio(0.05)
 
+        def download_pdb_map(textinput):
+            res = download_PDB(textinput.input_text)
+            if res:
+                download_CryoEM_map(textinput.input_text)
 
-        def download_CryoEM_map(text_in):
-            Logs.message("Downloading PDB info for ID:",text_in.input_text)
+        def download_PDB(pdbid):
+            base = "https://files.rcsb.org/download/"
+            self.pdbid = pdbid
+            full_url = base + pdbid + ".pdb.gz"
+            Logs.message("Downloading PDB file from", full_url)
+            response = requests.get(full_url)
+            if response.status_code != 200:
+                Logs.error("Something went wrong fetching the PDB file")
+                self.send_notification(nanome.util.enums.NotificationTypes.error, "Wrong PDB ID")
+                return False
+            pdb_tempfile = tempfile.NamedTemporaryFile(delete=False, prefix="CryoEM_plugin_"+pdbid, suffix='.pdb.gz')
+            open(pdb_tempfile.name, "wb").write(response.content)
+            pdb_path = pdb_tempfile.name.replace("\\", "/") 
+            self.send_files_to_load(pdb_path)
+            return True
+            
+
+        def download_CryoEM_map(pdbid):
+            Logs.message("Downloading PDB info for ID:",pdbid)
             self.send_notification(nanome.util.enums.NotificationTypes.message, "Downloading EM data")
             base = "https://data.rcsb.org/rest/v1/core/entry/"
-            rest_url = base + text_in.input_text
+            rest_url = base + pdbid
             response = requests.get(rest_url)
+            if response.status_code != 200:
+                Logs.error("Something went wrong fetching the EM data")
+                self.send_notification(nanome.util.enums.NotificationTypes.error, "No EMDB data for", pdbid)
+                return
             result = response.json()
-            emdb_ids = result["rcsb_entry_container_identifiers"]["emdb_ids"]
+            k1 = "rcsb_entry_container_identifiers"
+            k2 = "emdb_ids"
+            if not k1 in result or not k2 in result[k1]:
+                Logs.error("No EM data found for", pdbid)
+                self.send_notification(nanome.util.enums.NotificationTypes.error, "No EMDB data for", pdbid)
+                return
+            emdb_ids = result[k1][k2]
             if len(emdb_ids) >= 1:
                 first_emdb = emdb_ids[0]
                 Logs.message("Downloading EM data for EMDBID:", first_emdb)
@@ -177,12 +206,12 @@ class CryoEM(nanome.PluginInstance):
                     self.map_file = map_tempfile
                     self.load_map()
                     self.generate_histogram()
-                    self.generate_isosurface(self.iso_value)
+                    self.request_workspace(self.set_current_complex_generate_surface)
             else:
-                Logs.message("No EM data found for", text_in.input_text)
-                
+                Logs.error("No EM data found for", pdbid)
+                self.send_notification(nanome.util.enums.NotificationTypes.error, "No EMDB data for", pdbid)
 
-        text_input.register_submitted_callback(download_CryoEM_map)
+        text_input.register_submitted_callback(download_pdb_map)
         self._slider_iso.register_released_callback(self.update_isosurface)
         self._slider_opacity.register_released_callback(self.update_opacity)
         self._slider_limit_x.register_released_callback(self.update_limited_view_x)
@@ -190,9 +219,20 @@ class CryoEM(nanome.PluginInstance):
         self._slider_limit_z.register_released_callback(self.update_limited_view_z)
         self._slider_limit_range.register_released_callback(self.update_limited_view_range)
 
+    def set_current_complex_generate_surface(self, workspace):
+        self.nanome_workspace = workspace
+
+        for c in reversed(self.nanome_workspace.complexes):
+            if "CryoEM_plugin" in c.name:
+                self.nanome_complex = c
+        
+        self.generate_isosurface(self.iso_value)
+
     def load_map(self):
         with mrcfile.open(self.map_file.name) as mrc:
             self._map_data = mrc.data
+            self._map_offset = np.array([mrc.header.cella.x, mrc.header.cella.y, mrc.header.cella.z])
+            self._map_voxel_size = mrc.voxel_size
     
     def on_run(self):
         self.menu.enabled = True
@@ -310,6 +350,11 @@ class CryoEM(nanome.PluginInstance):
         if self.nanome_mesh is None:
             self.nanome_mesh = Mesh()
 
+        if self._map_voxel_size.x > 0.0001:
+            voxel_size = np.array([self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z])
+            vertices *= voxel_size
+            self._map_offset *= voxel_size
+
         self.nanome_mesh.vertices = np.asarray(vertices).flatten()
         self.nanome_mesh.normals = np.asarray(normals).flatten()
         self.nanome_mesh.triangles = np.asarray(triangles).flatten()
@@ -323,6 +368,7 @@ class CryoEM(nanome.PluginInstance):
         # anchor.target = self.nanome_atom.index
         anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
         anchor.target = self.nanome_complex.index
+        anchor.local_offset = Vector3(-self._map_offset[0], -self._map_offset[1], -self._map_offset[2])
         # anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
 
         Logs.message("Uploading iso-surface ("+str(len(self.nanome_mesh.vertices))+" vertices)")
