@@ -267,7 +267,7 @@ class CryoEM(nanome.PluginInstance):
             delta = np.diag(np.array(
                 [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]))
             offsets = np.hstack([h.nxstart, h.nystart, h.nzstart])[
-                                axes_c_order] * np.diag(delta)
+                axes_c_order] * np.diag(delta)
             self._map_origin = np.hstack(
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
 
@@ -281,91 +281,95 @@ class CryoEM(nanome.PluginInstance):
         self.update_content(self.label_iso)
         if self._map_data is not None:
             self.generate_isosurface(iso.current_value)
-        Logs.debug("Setting iso-value to", str(round(iso.current_value, 3))
+        Logs.debug("Setting iso-value to", str(round(iso.current_value, 3)))
 
     def update_limited_view_x(self, slider):
-        self.limit_x=slider.current_value
-        self.label_limit_x.text_value="Position.x: " +
+        self.limit_x = slider.current_value
+        self.label_limit_x.text_value = "Position.x: " + \
             str(round(self.limit_x, 2))
         self.update_content(self.label_limit_x)
-        self.limited_view_pos=[self.limit_x, self.limit_y, self.limit_z]
+        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2), str(round(self.limit_y, 2), str(round(self.limit_z, 2), ")")
+        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
+            round(self.limit_y, 2)), str(round(self.limit_z, 2)), ")")
 
     def update_limited_view_y(self, slider):
-        self.limit_y=slider.current_value
-        self.label_limit_y.text_value="Position.y: " +
+        self.limit_y = slider.current_value
+        self.label_limit_y.text_value = "Position.y: " + \
             str(round(self.limit_y, 2))
         self.update_content(self.label_limit_y)
-        self.limited_view_pos=[self.limit_x, self.limit_y, self.limit_z]
+        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2), str(round(self.limit_y, 2), str(round(self.limit_z, 2), ")")
+        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
+            round(self.limit_y, 2)), str(round(self.limit_z, 2)), ")")
 
     def update_limited_view_z(self, slider):
-        self.limit_z=slider.current_value
-        self.label_limit_z.text_value="Position.z: " +
+        self.limit_z = slider.current_value
+        self.label_limit_z.text_value = "Position.z: " + \
             str(round(self.limit_z, 2))
         self.update_content(self.label_limit_z)
-        self.limited_view_pos=[self.limit_x, self.limit_y, self.limit_z]
+        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2), str(round(self.limit_y, 2), str(round(self.limit_z, 2), ")")
+        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
+            round(self.limit_y, 2)), str(round(self.limit_z, 2), ")"))
 
     def update_limited_view_range(self, slider):
-        self.limited_view_range=slider.current_value
-        self.label_limit_range.text_value="Size: " + str(
+        self.limited_view_range = slider.current_value
+        self.label_limit_range.text_value = "Size: " + str(
             round(self.limited_view_range, 2)
         )
         self.update_content(self.label_limit_range)
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view range to", str(round(self.limited_view_range, 2))
+        Logs.debug("Setting limited view range to",
+                   str(round(self.limited_view_range, 2)))
 
     def update_mesh_limited_view(self):
         if self.current_mesh != [] and self.nanome_mesh is not None:
-            vertices, normals, triangles=self.limit_view(
+            vertices, normals, triangles = self.limit_view(
                 self.current_mesh, self.limited_view_pos, self.limited_view_range
             )
 
-            self.nanome_mesh.vertices=np.asarray(vertices).flatten()
-            self.nanome_mesh.normals=np.asarray(normals).flatten()
-            self.nanome_mesh.triangles=np.asarray(triangles).flatten()
+            self.nanome_mesh.vertices = np.asarray(vertices).flatten()
+            self.nanome_mesh.normals = np.asarray(normals).flatten()
+            self.nanome_mesh.triangles = np.asarray(triangles).flatten()
 
             self.nanome_mesh.upload()
 
     def update_opacity(self, alpha):
 
-        self.opacity=alpha.current_value
-        self.label_opac.text_value="Opacity: " + str(round(self.opacity, 2))
+        self.opacity = alpha.current_value
+        self.label_opac.text_value = "Opacity: " + str(round(self.opacity, 2))
         self.update_content(self.label_opac)
 
         if self._map_data is not None and self.nanome_mesh:
-            self.nanome_mesh.color.a=int(self.opacity * 255)
+            self.nanome_mesh.color.a = int(self.opacity * 255)
             self.nanome_mesh.upload()
             Logs.debug("Setting opacity to", int(self.opacity * 255))
 
     def limit_view(self, mesh, position, range):
         if range <= 0:
             return mesh
-        vertices, normals, triangles=mesh
+        vertices, normals, triangles = mesh
 
-        pos=np.asarray(position)
-        idv=0
-        to_keep=[]
+        pos = np.asarray(position)
+        idv = 0
+        to_keep = []
         for v in vertices:
-            vert=np.asarray(v)
-            dist=np.linalg.norm(vert - pos)
+            vert = np.asarray(v)
+            dist = np.linalg.norm(vert - pos)
             if dist <= range:
                 to_keep.append(idv)
             idv += 1
         if len(to_keep) == len(vertices):
             return mesh
 
-        new_vertices=[]
-        new_triangles=[]
-        new_normals=[]
-        mapping=np.full(len(vertices), -1, np.int32)
-        idv=0
+        new_vertices = []
+        new_triangles = []
+        new_normals = []
+        mapping = np.full(len(vertices), -1, np.int32)
+        idv = 0
         for i in to_keep:
-            mapping[i]=idv
+            mapping[i] = idv
             new_vertices.append(vertices[i])
             new_normals.append(normals[i])
             idv += 1
@@ -384,54 +388,55 @@ class CryoEM(nanome.PluginInstance):
     def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message("Generating iso-surface for iso-value " +
                      str(round(iso, 3)))
-        self.iso_value=iso
+        self.iso_value = iso
 
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Running...", False)
 
         # Compute iso-surface with marching cubes algorithm
-        vertices, triangles=mcubes.marching_cubes(self._map_data, iso)
+        vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
 
-        target=max(100, len(triangles) / decimation_factor)
+        target = max(100, len(triangles) / decimation_factor)
 
-        mesh_simplifier=pyfqmr.Simplify()
+        mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(np.asarray(vertices), np.asarray(triangles))
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
 
-        vertices, triangles, normals=mesh_simplifier.getMesh()
+        vertices, triangles, normals = mesh_simplifier.getMesh()
 
         if self._map_voxel_size.x > 0.0001:
-            voxel_size=np.array(
+            voxel_size = np.array(
                 [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
             )
             vertices *= voxel_size
 
-        self.current_mesh=[vertices, normals, triangles]
+        self.current_mesh = [vertices, normals, triangles]
 
-        vertices, normals, triangles=self.limit_view(
+        vertices, normals, triangles = self.limit_view(
             (vertices, normals, triangles),
             self.limited_view_pos,
             self.limited_view_range,
         )
 
         if self.nanome_mesh is None:
-            self.nanome_mesh=Mesh()
+            self.nanome_mesh = Mesh()
 
-        self.nanome_mesh.vertices=np.asarray(vertices).flatten()
-        self.nanome_mesh.normals=np.asarray(normals).flatten()
-        self.nanome_mesh.triangles=np.asarray(triangles).flatten()
 
-        self.nanome_mesh.anchors[0].anchor_type=nanome.util.enums.ShapeAnchorType.Workspace
+        self.nanome_mesh.vertices = np.asarray(vertices).flatten()
+        # self.nanome_mesh.normals = np.asarray(normals).flatten()
+        self.nanome_mesh.triangles = np.asarray(triangles).flatten()
 
-        self.nanome_mesh.color=Color(128, 128, 255, int(self.opacity * 255))
+        self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
 
-        anchor=self.nanome_mesh.anchors[0]
-        anchor.anchor_type=nanome.util.enums.ShapeAnchorType.Complex
-        anchor.target=self.nanome_complex.index
+        self.nanome_mesh.color = Color(128, 128, 255, int(self.opacity * 255))
 
-        anchor.local_offset=Vector3(
+        anchor = self.nanome_mesh.anchors[0]
+        anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
+        anchor.target = self.nanome_complex.index
+
+        anchor.local_offset = Vector3(
             self._map_origin[0], self._map_origin[1], self._map_origin[2])
 
         Logs.message(
@@ -442,13 +447,13 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.upload(self.done_updating)
 
     def generate_histogram(self):
-        flat=self._map_data.flatten()
+        flat = self._map_data.flatten()
         plt.hist(flat, bins=100)
         plt.title("Iso-value distribution")
-        self.png_tempfile=tempfile.NamedTemporaryFile(
+        self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png")
         plt.savefig(self.png_tempfile.name)
-        self.histo_image.file_path=self.png_tempfile.name
+        self.histo_image.file_path = self.png_tempfile.name
         self.update_content(self.histo_image)
 
     def done_updating(self, m):
@@ -460,7 +465,7 @@ class CryoEM(nanome.PluginInstance):
 
 
 def main():
-    plugin=nanome.Plugin(
+    plugin = nanome.Plugin(
         "Cryo-EM",
         "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces",
         "other",
