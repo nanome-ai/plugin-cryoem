@@ -31,7 +31,6 @@ class CryoEM(nanome.PluginInstance):
         self.limited_view_range = 15.0
         self.current_mesh = []
 
-        # self.request_workspace(self.received_workspace_create_atom)
         self.create_menu()
         self.request_workspace(self.remove_existing_plugin_structure)
 
@@ -46,51 +45,6 @@ class CryoEM(nanome.PluginInstance):
             ]
 
         self.update_workspace(self.nanome_workspace)
-
-    # def received_workspace_create_atom(self, workspace):
-    #     self.nanome_workspace = workspace
-    #     self.create_atom()
-
-    # def received_workspace_update_index(self, workspace):
-    #     self.nanome_workspace = workspace
-    #     for c in reversed(self.nanome_workspace.complexes):
-    #         if "CryoEM_plugin" in c.name:
-    #             self.nanome_complex = c
-
-    # def create_atom(self):
-    #     atm = structure.Atom()
-    #     atm.index = -1
-    #     atm.selected = False
-    #     atm.atom_mode = 1  # BALLSTICK
-    #     atm.atom_rendering = True
-    #     atm.symbol = "Carbon"
-    #     atm.serial = 0
-    #     atm.name = "cryoem_dummy"
-    #     atm.position = Vector3()
-    #     self.nanome_atom = atm
-
-    #     nanome_residue = structure.Residue()
-    #     nanome_residue._atoms = [atm]
-    #     nanome_residue.serial = 1
-
-    #     nanome_chain = structure.Chain()
-    #     nanome_chain.index = 1000
-    #     nanome_chain.name = "A"
-    #     nanome_chain._residues = [nanome_residue]
-
-    #     nanome_molecule = structure.Molecule()
-    #     nanome_molecule.index = 1000
-    #     nanome_molecule._chains = [nanome_chain]
-
-    #     self.nanome_complex = structure.Complex()
-    #     self.nanome_complex.index = -1
-    #     self.nanome_complex.name = "CryoEM_plugin"
-
-    #     self.nanome_complex._molecules = [nanome_molecule]
-
-    #     self.nanome_workspace.complexes.append(self.nanome_complex)
-    #     self.update_workspace(self.nanome_workspace)
-    #     self.request_workspace(self.received_workspace_update_index)
 
     def create_menu(self):
         self.menu = Menu()
