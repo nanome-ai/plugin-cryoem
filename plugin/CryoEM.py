@@ -330,7 +330,7 @@ class CryoEM(nanome.PluginInstance):
             )
 
             self.nanome_mesh.vertices = np.asarray(vertices).flatten()
-            self.nanome_mesh.normals = np.asarray(normals).flatten()
+            # self.nanome_mesh.normals = np.asarray(normals).flatten()
             self.nanome_mesh.triangles = np.asarray(triangles).flatten()
 
             self.nanome_mesh.upload()
