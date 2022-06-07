@@ -30,6 +30,7 @@ class CryoEM(nanome.PluginInstance):
         self.limited_view_pos = [0, 0, 0]
         self.limited_view_range = 15.0
         self.current_mesh = []
+        self.shown = True
 
         self.create_menu()
         self.request_workspace(self.remove_existing_plugin_structure)
@@ -128,6 +129,12 @@ class CryoEM(nanome.PluginInstance):
         )
         limit_range_node.set_size_ratio(0.05)
 
+        show_hide_node = self.menu.root.create_child_node()
+        self._show_button = show_hide_node.add_new_toggle_switch("Show/Hide")
+        self._show_button.selected = True
+        show_hide_node.set_size_ratio(0.05)
+        show_hide_node.forward_dist = 0.001
+
         def download_PDB(textinput):
             pdbid = textinput.input_text
             base = "https://files.rcsb.org/download/"
@@ -212,6 +219,13 @@ class CryoEM(nanome.PluginInstance):
                     self.pdbid,
                 )
 
+        def show_hide_map(toggle):
+            if self.nanome_mesh is not None:
+                self.nanome_mesh.color.a = int(
+                    self.opacity * 255) if toggle.selected else 0
+                self.shown = toggle.selected
+                self.nanome_mesh.upload()
+
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
         self._slider_opacity.register_released_callback(self.update_opacity)
@@ -224,6 +238,7 @@ class CryoEM(nanome.PluginInstance):
         self._slider_limit_range.register_released_callback(
             self.update_limited_view_range
         )
+        self._show_button.register_pressed_callback(show_hide_map)
 
     def set_current_complex_generate_surface(self, workspace):
         self.nanome_workspace = workspace
@@ -290,8 +305,10 @@ class CryoEM(nanome.PluginInstance):
         self.update_content(self.label_limit_x)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
-            round(self.limit_y, 2)), str(round(self.limit_z, 2)), ")")
+        x = str(round(self.limit_x, 2))
+        y = str(round(self.limit_y, 2))
+        z = str(round(self.limit_z, 2))
+        Logs.debug("Setting limited view to (", x, y, z, ")")
 
     def update_limited_view_y(self, slider):
         self.limit_y = slider.current_value
@@ -300,8 +317,10 @@ class CryoEM(nanome.PluginInstance):
         self.update_content(self.label_limit_y)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
-            round(self.limit_y, 2)), str(round(self.limit_z, 2)), ")")
+        x = str(round(self.limit_x, 2))
+        y = str(round(self.limit_y, 2))
+        z = str(round(self.limit_z, 2))
+        Logs.debug("Setting limited view to (", x, y, z, ")")
 
     def update_limited_view_z(self, slider):
         self.limit_z = slider.current_value
@@ -310,8 +329,10 @@ class CryoEM(nanome.PluginInstance):
         self.update_content(self.label_limit_z)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
         self.update_mesh_limited_view()
-        Logs.debug("Setting limited view to (", str(round(self.limit_x, 2)), str(
-            round(self.limit_y, 2)), str(round(self.limit_z, 2), ")"))
+        x = str(round(self.limit_x, 2))
+        y = str(round(self.limit_y, 2))
+        z = str(round(self.limit_z, 2))
+        Logs.debug("Setting limited view to (", x, y, z, ")")
 
     def update_limited_view_range(self, slider):
         self.limited_view_range = slider.current_value
@@ -341,7 +362,7 @@ class CryoEM(nanome.PluginInstance):
         self.label_opac.text_value = "Opacity: " + str(round(self.opacity, 2))
         self.update_content(self.label_opac)
 
-        if self._map_data is not None and self.nanome_mesh:
+        if self._map_data is not None and self.nanome_mesh and self.shown:
             self.nanome_mesh.color.a = int(self.opacity * 255)
             self.nanome_mesh.upload()
             Logs.debug("Setting opacity to", int(self.opacity * 255))
@@ -423,7 +444,6 @@ class CryoEM(nanome.PluginInstance):
         if self.nanome_mesh is None:
             self.nanome_mesh = Mesh()
 
-
         self.nanome_mesh.vertices = np.asarray(vertices).flatten()
         # self.nanome_mesh.normals = np.asarray(normals).flatten()
         self.nanome_mesh.triangles = np.asarray(triangles).flatten()
@@ -431,6 +451,9 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
 
         self.nanome_mesh.color = Color(128, 128, 255, int(self.opacity * 255))
+
+        if not self.shown:
+            self.nanome_mesh.color.a = 0
 
         anchor = self.nanome_mesh.anchors[0]
         anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
