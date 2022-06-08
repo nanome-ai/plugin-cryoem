@@ -154,6 +154,12 @@ class CryoEM(nanome.PluginInstance):
         show_hide_node.forward_dist = 0.001
 
         def download_PDB(textinput):
+            self.current_mesh = []
+            if self.nanome_mesh is not None:
+                self.nanome_mesh.destroy()
+            self.nanome_mesh = None
+            self.nanome_complex = None
+            
             pdbid = textinput.input_text
             base = "https://files.rcsb.org/download/"
             self.pdbid = pdbid
@@ -254,6 +260,8 @@ class CryoEM(nanome.PluginInstance):
             if self.color_by != new_color_scheme:
                 self.color_by = new_color_scheme
                 self.color_by_scheme()
+                if self.nanome_mesh is not None:
+                    self.nanome_mesh.upload()
 
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
@@ -533,7 +541,6 @@ class CryoEM(nanome.PluginInstance):
             self.color_by_bfactor()
         elif self.color_by == enums.ColorScheme.Chain:
             self.color_by_chain()
-        self.nanome_mesh.upload()
 
     def color_by_element(self):
         atom_positions = []
