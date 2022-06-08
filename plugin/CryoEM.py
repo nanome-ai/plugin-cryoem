@@ -8,8 +8,8 @@ import numpy as np
 import pyfqmr
 import randomcolor
 import requests
-from nanome.api import structure
-from nanome.api.shapes import Mesh, Shape
+from matplotlib import cm
+from nanome.api.shapes import Mesh
 from nanome.api.ui import Menu
 from nanome.util import Color, Logs, Vector3, enums
 from scipy.spatial import KDTree
@@ -34,6 +34,7 @@ class CryoEM(nanome.PluginInstance):
         self.limited_view_range = 15.0
         self.current_mesh = []
         self.shown = True
+        self.color_by = enums.ColorScheme.BFactor
 
         self.create_menu()
         self.request_workspace(self.remove_existing_plugin_structure)
@@ -87,38 +88,38 @@ class CryoEM(nanome.PluginInstance):
             0.01, 1.0, self.opacity)
         opac_node.set_size_ratio(0.05)
 
-        node_label_limit_x = self.menu.root.create_child_node()
-        self.label_limit_x = node_label_limit_x.add_new_label(
-            "Position.x: " + str(round(self.limit_x, 2))
-        )
-        node_label_limit_x.set_size_ratio(0.01)
+        # node_label_limit_x = self.menu.root.create_child_node()
+        # self.label_limit_x = node_label_limit_x.add_new_label(
+        #     "Position.x: " + str(round(self.limit_x, 2))
+        # )
+        # node_label_limit_x.set_size_ratio(0.01)
 
-        limit_x_node = self.menu.root.create_child_node()
-        self._slider_limit_x = limit_x_node.add_new_slider(
-            -50, 50, self.limit_x)
-        limit_x_node.set_size_ratio(0.05)
+        # limit_x_node = self.menu.root.create_child_node()
+        # self._slider_limit_x = limit_x_node.add_new_slider(
+        #     -50, 50, self.limit_x)
+        # limit_x_node.set_size_ratio(0.05)
 
-        node_label_limit_y = self.menu.root.create_child_node()
-        self.label_limit_y = node_label_limit_y.add_new_label(
-            "Position.y: " + str(round(self.limit_y, 2))
-        )
-        node_label_limit_y.set_size_ratio(0.01)
+        # node_label_limit_y = self.menu.root.create_child_node()
+        # self.label_limit_y = node_label_limit_y.add_new_label(
+        #     "Position.y: " + str(round(self.limit_y, 2))
+        # )
+        # node_label_limit_y.set_size_ratio(0.01)
 
-        limit_y_node = self.menu.root.create_child_node()
-        self._slider_limit_y = limit_y_node.add_new_slider(
-            -50, 50, self.limit_y)
-        limit_y_node.set_size_ratio(0.05)
+        # limit_y_node = self.menu.root.create_child_node()
+        # self._slider_limit_y = limit_y_node.add_new_slider(
+        #     -50, 50, self.limit_y)
+        # limit_y_node.set_size_ratio(0.05)
 
-        node_label_limit_z = self.menu.root.create_child_node()
-        self.label_limit_z = node_label_limit_z.add_new_label(
-            "Position.z: " + str(round(self.limit_z, 2))
-        )
-        node_label_limit_z.set_size_ratio(0.01)
+        # node_label_limit_z = self.menu.root.create_child_node()
+        # self.label_limit_z = node_label_limit_z.add_new_label(
+        #     "Position.z: " + str(round(self.limit_z, 2))
+        # )
+        # node_label_limit_z.set_size_ratio(0.01)
 
-        limit_z_node = self.menu.root.create_child_node()
-        self._slider_limit_z = limit_z_node.add_new_slider(
-            -50, 50, self.limit_z)
-        limit_z_node.set_size_ratio(0.05)
+        # limit_z_node = self.menu.root.create_child_node()
+        # self._slider_limit_z = limit_z_node.add_new_slider(
+        #     -50, 50, self.limit_z)
+        # limit_z_node.set_size_ratio(0.05)
 
         node_label_limit_range = self.menu.root.create_child_node()
         self.label_limit_range = node_label_limit_range.add_new_label(
@@ -131,6 +132,20 @@ class CryoEM(nanome.PluginInstance):
             0, 150, self.limited_view_range
         )
         limit_range_node.set_size_ratio(0.05)
+
+        node_color_scheme_label = self.menu.root.create_child_node()
+        self.label_color_scheme = node_color_scheme_label.add_new_label(
+            "Color scheme: " + str(round(self.limited_view_range, 2))
+        )
+        node_color_scheme_label.set_size_ratio(0.01)
+
+        color_scheme_node = self.menu.root.create_child_node()
+        self._dropdown_color_scheme = color_scheme_node.add_new_dropdown()
+        color_scheme_node.set_size_ratio(0.05)
+        self._dropdown_color_scheme.items = [nanome.ui.DropdownItem(
+            name) for name in ["Bfactor", "Element", "Chain"]]
+        self._dropdown_color_scheme.items[0].selected = True
+        color_scheme_node.forward_dist = .001
 
         show_hide_node = self.menu.root.create_child_node()
         self._show_button = show_hide_node.add_new_toggle_switch("Show/Hide")
@@ -229,18 +244,31 @@ class CryoEM(nanome.PluginInstance):
                 self.shown = toggle.selected
                 self.nanome_mesh.upload()
 
+        def change_color_scheme(dropdown, item):
+            if item.name == "Element":
+                new_color_scheme = enums.ColorScheme.Element
+            elif item.name == "Bfactor":
+                new_color_scheme = enums.ColorScheme.BFactor
+            elif item.name == "Chain":
+                new_color_scheme = enums.ColorScheme.Chain
+            if self.color_by != new_color_scheme:
+                self.color_by = new_color_scheme
+                self.color_by_scheme()
+
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
         self._slider_opacity.register_released_callback(self.update_opacity)
-        self._slider_limit_x.register_released_callback(
-            self.update_limited_view_x)
-        self._slider_limit_y.register_released_callback(
-            self.update_limited_view_y)
-        self._slider_limit_z.register_released_callback(
-            self.update_limited_view_z)
+        # self._slider_limit_x.register_released_callback(
+        #     self.update_limited_view_x)
+        # self._slider_limit_y.register_released_callback(
+        #     self.update_limited_view_y)
+        # self._slider_limit_z.register_released_callback(
+        #     self.update_limited_view_z)
         self._slider_limit_range.register_released_callback(
             self.update_limited_view_range
         )
+        self._dropdown_color_scheme.register_item_clicked_callback(
+            change_color_scheme)
         self._show_button.register_pressed_callback(show_hide_map)
 
     def set_current_complex_generate_surface(self, workspace):
@@ -266,11 +294,11 @@ class CryoEM(nanome.PluginInstance):
         self.limit_y = cog[1]
         self.limit_z = cog[2]
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self._slider_limit_x.current_value = cog[0]
-        self._slider_limit_y.current_value = cog[1]
-        self._slider_limit_z.current_value = cog[2]
-        self.update_content(
-            [self._slider_limit_x, self._slider_limit_y, self._slider_limit_z])
+        # self._slider_limit_x.current_value = cog[0]
+        # self._slider_limit_y.current_value = cog[1]
+        # self._slider_limit_z.current_value = cog[2]
+        # self.update_content(
+        # [self._slider_limit_x, self._slider_limit_y, self._slider_limit_z])
 
     def load_map(self):
         with mrcfile.open(self.map_file.name) as mrc:
@@ -358,8 +386,7 @@ class CryoEM(nanome.PluginInstance):
             # self.nanome_mesh.normals = np.asarray(normals).flatten()
             self.nanome_mesh.triangles = np.asarray(triangles).flatten()
 
-            # self.color_by_chain()
-            self.color_by_bfactor()
+            self.color_by_scheme()
 
             self.nanome_mesh.upload()
 
@@ -471,8 +498,7 @@ class CryoEM(nanome.PluginInstance):
         anchor.local_offset = Vector3(
             self._map_origin[0], self._map_origin[1], self._map_origin[2])
 
-        # self.color_by_chain()
-        self.color_by_bfactor()
+        self.color_by_scheme()
 
         Logs.message(
             "Uploading iso-surface ("
@@ -498,6 +524,17 @@ class CryoEM(nanome.PluginInstance):
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Run", True)
 
+    def color_by_scheme(self):
+        if self.nanome_mesh is None:
+            return
+        if self.color_by == enums.ColorScheme.Element:
+            self.color_by_element()
+        elif self.color_by == enums.ColorScheme.BFactor:
+            self.color_by_bfactor()
+        elif self.color_by == enums.ColorScheme.Chain:
+            self.color_by_chain()
+        self.nanome_mesh.upload()
+
     def color_by_element(self):
         atom_positions = []
         atoms = []
@@ -515,7 +552,6 @@ class CryoEM(nanome.PluginInstance):
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
         self.nanome_mesh.colors = np.array(colors)
-        self.nanome_mesh.color = Color(255, 255, 255, 255)
 
     def color_by_chain(self):
         molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
@@ -564,7 +600,6 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self):
-        from matplotlib import cm
 
         sections = 128
         cm_subsection = np.linspace(0.0, 1.0, sections)
