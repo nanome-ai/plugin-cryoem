@@ -6,11 +6,13 @@ import mrcfile
 import nanome
 import numpy as np
 import pyfqmr
+import randomcolor
 import requests
 from nanome.api import structure
 from nanome.api.shapes import Mesh, Shape
 from nanome.api.ui import Menu
 from nanome.util import Color, Logs, Vector3, enums
+from scipy.spatial import KDTree
 
 
 class CryoEM(nanome.PluginInstance):
@@ -20,6 +22,7 @@ class CryoEM(nanome.PluginInstance):
         self.map_file = None
         self._map_data = None
         self.nanome_mesh = None
+        self.nanome_complex = None
         self.iso_value = 0.3
         self.opacity = 0.6
         self._slider_iso = None
@@ -350,9 +353,13 @@ class CryoEM(nanome.PluginInstance):
                 self.current_mesh, self.limited_view_pos, self.limited_view_range
             )
 
+            self.computed_vertices = np.array(vertices)
             self.nanome_mesh.vertices = np.asarray(vertices).flatten()
             # self.nanome_mesh.normals = np.asarray(normals).flatten()
             self.nanome_mesh.triangles = np.asarray(triangles).flatten()
+
+            # self.color_by_chain()
+            self.color_by_bfactor()
 
             self.nanome_mesh.upload()
 
@@ -444,13 +451,15 @@ class CryoEM(nanome.PluginInstance):
         if self.nanome_mesh is None:
             self.nanome_mesh = Mesh()
 
+        self.computed_vertices = np.array(vertices)
         self.nanome_mesh.vertices = np.asarray(vertices).flatten()
         # self.nanome_mesh.normals = np.asarray(normals).flatten()
         self.nanome_mesh.triangles = np.asarray(triangles).flatten()
 
         self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
 
-        self.nanome_mesh.color = Color(128, 128, 255, int(self.opacity * 255))
+        # self.nanome_mesh.color = Color(128, 128, 255, int(self.opacity * 255))
+        self.nanome_mesh.color = Color(255, 255, 255, int(self.opacity * 255))
 
         if not self.shown:
             self.nanome_mesh.color.a = 0
@@ -461,6 +470,9 @@ class CryoEM(nanome.PluginInstance):
 
         anchor.local_offset = Vector3(
             self._map_origin[0], self._map_origin[1], self._map_origin[2])
+
+        # self.color_by_chain()
+        self.color_by_bfactor()
 
         Logs.message(
             "Uploading iso-surface ("
@@ -485,6 +497,259 @@ class CryoEM(nanome.PluginInstance):
         )
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Run", True)
+
+    def color_by_element(self):
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+        colors = []
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                colors += cpk_colors(atoms[i])
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        self.nanome_mesh.colors = np.array(colors)
+        self.nanome_mesh.color = Color(255, 255, 255, 255)
+
+    def color_by_chain(self):
+        molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
+        n_chain = len(list(molecule.chains))
+
+        rdcolor = randomcolor.RandomColor(seed=1234)
+        chain_cols = rdcolor.generate(format_="rgb", count=n_chain)
+
+        id_chain = 0
+        color_per_atom = []
+        for c in molecule.chains:
+            col = chain_cols[id_chain]
+            col = col.replace("rgb(", "").replace(
+                ")", "").replace(",", "").split()
+            chain_color = [int(i) / 255.0 for i in col] + [1.0]
+            id_chain += 1
+            for atom in c.atoms:
+                color_per_atom.append(chain_color)
+
+        colors = []
+
+        # No need for neighbor search as all vertices have the same color
+        if n_chain == 1:
+            for i in range(len(self.computed_vertices)):
+                colors += color_per_atom[0]
+            self.nanome_mesh.colors = np.array(colors)
+            return
+
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+
+        # Create a KDTree for fast neighbor search
+        # Look for the closest atom near each vertex
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                colors += color_per_atom[i]
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        self.nanome_mesh.colors = np.array(colors)
+
+    def color_by_bfactor(self):
+        from matplotlib import cm
+
+        sections = 128
+        cm_subsection = np.linspace(0.0, 1.0, sections)
+        colors_rainbow = [cm.jet(x) for x in cm_subsection]
+
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+
+        # Create a KDTree for fast neighbor search
+        # Look for the closest atom near each vertex
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+
+        colors = []
+        bfactors = np.array([a.bfactor for a in atoms])
+        minbf = np.min(bfactors)
+        maxbf = np.max(bfactors)
+        if np.abs(maxbf - minbf) < 0.001:
+            maxbf = minbf + 1.0
+
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                bf = bfactors[i]
+                norm_bf = (bf - minbf) / (maxbf - minbf)
+                id_color = int(norm_bf * (sections-1))
+                colors += colors_rainbow[int(id_color)]
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        self.nanome_mesh.colors = np.array(colors)
+
+
+def chain_color(id_chain):
+    molecule = self._complex._molecules[self._complex.current_frame]
+    n_chain = len(list(molecule.chains))
+
+    rdcolor = randomcolor.RandomColor(seed=1234)
+    chain_cols = rdcolor.generate(format_="rgb", count=n_chain)
+
+    id_chain = 0
+    color_per_atom = []
+    for c in molecule.chains:
+        col = chain_cols[id_chain]
+        col = col.replace("rgb(", "").replace(")", "").replace(",", "").split()
+        chain_color = [int(i) / 255.0 for i in col] + [1.0]
+        id_chain += 1
+        for atom in c.atoms:
+            color_per_atom.append(chain_color)
+
+    colors = []
+    for idx in self._temp_mesh["indices"]:
+        colors.append(color_per_atom[idx])
+    return np.array(colors)
+
+
+def cpk_colors(a):
+    colors = {}
+    colors["xx"] = "#030303"
+    colors["h"] = "#FFFFFF"
+    colors["he"] = "#D9FFFF"
+    colors["li"] = "#CC80FF"
+    colors["be"] = "#C2FF00"
+    colors["b"] = "#FFB5B5"
+    colors["c"] = "#909090"
+    colors["n"] = "#3050F8"
+    colors["o"] = "#FF0D0D"
+    colors["f"] = "#B5FFFF"
+    colors["ne"] = "#B3E3F5"
+    colors["na"] = "#AB5CF2"
+    colors["mg"] = "#8AFF00"
+    colors["al"] = "#BFA6A6"
+    colors["si"] = "#F0C8A0"
+    colors["p"] = "#FF8000"
+    colors["s"] = "#FFFF30"
+    colors["cl"] = "#1FF01F"
+    colors["ar"] = "#80D1E3"
+    colors["k"] = "#8F40D4"
+    colors["ca"] = "#3DFF00"
+    colors["sc"] = "#E6E6E6"
+    colors["ti"] = "#BFC2C7"
+    colors["v"] = "#A6A6AB"
+    colors["cr"] = "#8A99C7"
+    colors["mn"] = "#9C7AC7"
+    colors["fe"] = "#E06633"
+    colors["co"] = "#F090A0"
+    colors["ni"] = "#50D050"
+    colors["cu"] = "#C88033"
+    colors["zn"] = "#7D80B0"
+    colors["ga"] = "#C28F8F"
+    colors["ge"] = "#668F8F"
+    colors["as"] = "#BD80E3"
+    colors["se"] = "#FFA100"
+    colors["br"] = "#A62929"
+    colors["kr"] = "#5CB8D1"
+    colors["rb"] = "#702EB0"
+    colors["sr"] = "#00FF00"
+    colors["y"] = "#94FFFF"
+    colors["zr"] = "#94E0E0"
+    colors["nb"] = "#73C2C9"
+    colors["mo"] = "#54B5B5"
+    colors["tc"] = "#3B9E9E"
+    colors["ru"] = "#248F8F"
+    colors["rh"] = "#0A7D8C"
+    colors["pd"] = "#006985"
+    colors["ag"] = "#C0C0C0"
+    colors["cd"] = "#FFD98F"
+    colors["in"] = "#A67573"
+    colors["sn"] = "#668080"
+    colors["sb"] = "#9E63B5"
+    colors["te"] = "#D47A00"
+    colors["i"] = "#940094"
+    colors["xe"] = "#429EB0"
+    colors["cs"] = "#57178F"
+    colors["ba"] = "#00C900"
+    colors["la"] = "#70D4FF"
+    colors["ce"] = "#FFFFC7"
+    colors["pr"] = "#D9FFC7"
+    colors["nd"] = "#C7FFC7"
+    colors["pm"] = "#A3FFC7"
+    colors["sm"] = "#8FFFC7"
+    colors["eu"] = "#61FFC7"
+    colors["gd"] = "#45FFC7"
+    colors["tb"] = "#30FFC7"
+    colors["dy"] = "#1FFFC7"
+    colors["ho"] = "#00FF9C"
+    colors["er"] = "#00E675"
+    colors["tm"] = "#00D452"
+    colors["yb"] = "#00BF38"
+    colors["lu"] = "#00AB24"
+    colors["hf"] = "#4DC2FF"
+    colors["ta"] = "#4DA6FF"
+    colors["w"] = "#2194D6"
+    colors["re"] = "#267DAB"
+    colors["os"] = "#266696"
+    colors["ir"] = "#175487"
+    colors["pt"] = "#D0D0E0"
+    colors["au"] = "#FFD123"
+    colors["hg"] = "#B8B8D0"
+    colors["tl"] = "#A6544D"
+    colors["pb"] = "#575961"
+    colors["bi"] = "#9E4FB5"
+    colors["po"] = "#AB5C00"
+    colors["at"] = "#754F45"
+    colors["rn"] = "#428296"
+    colors["fr"] = "#420066"
+    colors["ra"] = "#007D00"
+    colors["ac"] = "#70ABFA"
+    colors["th"] = "#00BAFF"
+    colors["pa"] = "#00A1FF"
+    colors["u"] = "#008FFF"
+    colors["np"] = "#0080FF"
+    colors["pu"] = "#006BFF"
+    colors["am"] = "#545CF2"
+    colors["cm"] = "#785CE3"
+    colors["bk"] = "#8A4FE3"
+    colors["cf"] = "#A136D4"
+    colors["es"] = "#B31FD4"
+    colors["fm"] = "#B31FBA"
+    colors["md"] = "#B30DA6"
+    colors["no"] = "#BD0D87"
+    colors["lr"] = "#C70066"
+    colors["rf"] = "#CC0059"
+    colors["db"] = "#D1004F"
+    colors["sg"] = "#D90045"
+    colors["bh"] = "#E00038"
+    colors["hs"] = "#E6002E"
+    colors["mt"] = "#EB0026"
+    colors["ds"] = "#ED0023"
+    colors["rg"] = "#F00021"
+    colors["cn"] = "#E5001E"
+    colors["nh"] = "#F4001C"
+    colors["fl"] = "#F70019"
+    colors["mc"] = "#FA0019"
+    colors["lv"] = "#FC0017"
+    colors["ts"] = "#FC0014"
+    colors["og"] = "#FC000F"
+    a_type = a.symbol.lower()
+    if a_type not in colors:
+        return [1.0, 0, 1.0, 1.0]  # Pink unknown
+    h = colors[a_type].lstrip('#')
+    return list(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + [1.0]
 
 
 def main():
