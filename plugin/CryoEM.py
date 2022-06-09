@@ -36,8 +36,7 @@ class CryoEM(nanome.PluginInstance):
         self.shown = True
         self.color_by = enums.ColorScheme.BFactor
 
-        self.create_menu()
-        self.request_workspace(self.remove_existing_plugin_structure)
+        self.request_workspace(self.create_menu)
 
     def remove_existing_plugin_structure(self, workspace):
         self.nanome_workspace = workspace
@@ -51,7 +50,9 @@ class CryoEM(nanome.PluginInstance):
 
         self.update_workspace(self.nanome_workspace)
 
-    def create_menu(self):
+    def create_menu(self, workspace):
+        self.remove_existing_plugin_structure(workspace)
+
         self.menu = Menu()
         self.menu.title = "Cryo-EM"
         self.menu.width = 0.7
@@ -60,6 +61,14 @@ class CryoEM(nanome.PluginInstance):
         node_image = self.menu.root.create_child_node()
         self.histo_image = node_image.add_new_image()
         node_image.set_size_ratio(0.2)
+
+        node_switch_input = self.menu.root.create_child_node()
+        node_switch_input.set_size_ratio(0.05)
+        self._dropdown_complexes = node_switch_input.add_new_dropdown()
+        self._dropdown_complexes.items = [nanome.ui.DropdownItem(
+            name) for name in [c.name for c in self.nanome_workspace.complexes]]
+        # self._dropdown_complexes.items[0].selected = True
+        node_switch_input.forward_dist = .001
 
         node_input = self.menu.root.create_child_node()
         text_input = node_input.add_new_text_input("PDBId")
@@ -87,39 +96,6 @@ class CryoEM(nanome.PluginInstance):
         self._slider_opacity = opac_node.add_new_slider(
             0.01, 1.0, self.opacity)
         opac_node.set_size_ratio(0.05)
-
-        # node_label_limit_x = self.menu.root.create_child_node()
-        # self.label_limit_x = node_label_limit_x.add_new_label(
-        #     "Position.x: " + str(round(self.limit_x, 2))
-        # )
-        # node_label_limit_x.set_size_ratio(0.01)
-
-        # limit_x_node = self.menu.root.create_child_node()
-        # self._slider_limit_x = limit_x_node.add_new_slider(
-        #     -50, 50, self.limit_x)
-        # limit_x_node.set_size_ratio(0.05)
-
-        # node_label_limit_y = self.menu.root.create_child_node()
-        # self.label_limit_y = node_label_limit_y.add_new_label(
-        #     "Position.y: " + str(round(self.limit_y, 2))
-        # )
-        # node_label_limit_y.set_size_ratio(0.01)
-
-        # limit_y_node = self.menu.root.create_child_node()
-        # self._slider_limit_y = limit_y_node.add_new_slider(
-        #     -50, 50, self.limit_y)
-        # limit_y_node.set_size_ratio(0.05)
-
-        # node_label_limit_z = self.menu.root.create_child_node()
-        # self.label_limit_z = node_label_limit_z.add_new_label(
-        #     "Position.z: " + str(round(self.limit_z, 2))
-        # )
-        # node_label_limit_z.set_size_ratio(0.01)
-
-        # limit_z_node = self.menu.root.create_child_node()
-        # self._slider_limit_z = limit_z_node.add_new_slider(
-        #     -50, 50, self.limit_z)
-        # limit_z_node.set_size_ratio(0.05)
 
         node_label_limit_range = self.menu.root.create_child_node()
         self.label_limit_range = node_label_limit_range.add_new_label(
@@ -153,37 +129,33 @@ class CryoEM(nanome.PluginInstance):
         show_hide_node.set_size_ratio(0.05)
         show_hide_node.forward_dist = 0.001
 
-        def download_PDB(textinput):
-            self.current_mesh = []
-            if self.nanome_mesh is not None:
-                self.nanome_mesh.destroy()
-            self.nanome_mesh = None
-            self.nanome_complex = None
-            
-            pdbid = textinput.input_text
-            base = "https://files.rcsb.org/download/"
-            self.pdbid = pdbid
-            full_url = base + pdbid + ".pdb.gz"
-            self.send_notification(
-                nanome.util.enums.NotificationTypes.message, "Downloading PDB"
-            )
-            Logs.message("Downloading PDB file from", full_url)
-            response = requests.get(full_url)
-            if response.status_code != 200:
-                Logs.error("Something went wrong fetching the PDB file")
-                self.send_notification(
-                    nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
-                )
-                return False
-            pdb_tempfile = tempfile.NamedTemporaryFile(
-                delete=False, prefix="CryoEM_plugin_" + pdbid, suffix=".pdb.gz"
-            )
-            open(pdb_tempfile.name, "wb").write(response.content)
-            pdb_path = pdb_tempfile.name.replace("\\", "/")
-            self.send_files_to_load(pdb_path, download_CryoEM_map)
-            return True
+        def download_CryoEM_map_from_EMDBID(emdbid):
+            Logs.message("Downloading EM data for EMDBID:", emdbid)
 
-        def download_CryoEM_map(file):
+            new_url = (
+                "https://files.rcsb.org/pub/emdb/structures/"
+                + emdbid
+                + "/map/"
+                + emdbid.lower().replace("-", "_")
+                + ".map.gz"
+            )
+
+            # Write the map to a .map file
+            with requests.get(new_url, stream=True) as r:
+                r.raise_for_status()
+                map_tempfile = tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".map.gz"
+                )
+                with open(map_tempfile.name, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                self.map_file = map_tempfile
+                self.load_map()
+                self.generate_histogram()
+                self.request_workspace(
+                    self.set_current_complex_generate_surface)
+
+        def download_CryoEM_map_from_PDBID(file):
             Logs.message("Downloading PDB info for ID:", self.pdbid)
             self.send_notification(
                 nanome.util.enums.NotificationTypes.message, "Downloading EM data"
@@ -210,31 +182,7 @@ class CryoEM(nanome.PluginInstance):
                 return
             emdb_ids = result[k1][k2]
             if len(emdb_ids) >= 1:
-                first_emdb = emdb_ids[0]
-                Logs.message("Downloading EM data for EMDBID:", first_emdb)
-
-                new_url = (
-                    "https://files.rcsb.org/pub/emdb/structures/"
-                    + first_emdb
-                    + "/map/"
-                    + first_emdb.lower().replace("-", "_")
-                    + ".map.gz"
-                )
-
-                # Write the map to a .map file
-                with requests.get(new_url, stream=True) as r:
-                    r.raise_for_status()
-                    map_tempfile = tempfile.NamedTemporaryFile(
-                        delete=False, suffix=".map.gz"
-                    )
-                    with open(map_tempfile.name, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=8192):
-                            f.write(chunk)
-                    self.map_file = map_tempfile
-                    self.load_map()
-                    self.generate_histogram()
-                    self.request_workspace(
-                        self.set_current_complex_generate_surface)
+                download_CryoEM_map_from_EMDBID(emdb_ids[0])
             else:
                 Logs.error("No EM data found for", self.pdbid)
                 self.send_notification(
@@ -242,6 +190,44 @@ class CryoEM(nanome.PluginInstance):
                     "No EMDB data for",
                     self.pdbid,
                 )
+
+        def download_PDB(textinput):
+            self.current_mesh = []
+            if self.nanome_mesh is not None:
+                self.nanome_mesh.destroy()
+            self.nanome_mesh = None
+            
+            self.pdbid = textinput.input_text.strip()
+
+            #Download the PDB only if no target complex set
+            if self.nanome_complex is not None:
+                if len(self.pdbid) == 4:
+                    download_CryoEM_map_from_PDBID(None)
+                else:
+                    download_CryoEM_map_from_EMDBID(self.pdbid)
+
+                return True
+
+            base = "https://files.rcsb.org/download/"
+            full_url = base + self.pdbid + ".pdb.gz"
+            self.send_notification(
+                nanome.util.enums.NotificationTypes.message, "Downloading PDB"
+            )
+            Logs.message("Downloading PDB file from", full_url)
+            response = requests.get(full_url)
+            if response.status_code != 200:
+                Logs.error("Something went wrong fetching the PDB file")
+                self.send_notification(
+                    nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
+                )
+                return False
+            pdb_tempfile = tempfile.NamedTemporaryFile(
+                delete=False, prefix="CryoEM_plugin_" + self.pdbid, suffix=".pdb.gz"
+            )
+            open(pdb_tempfile.name, "wb").write(response.content)
+            pdb_path = pdb_tempfile.name.replace("\\", "/")
+            self.send_files_to_load(pdb_path, download_CryoEM_map_from_PDBID)
+            return True
 
         def show_hide_map(toggle):
             if self.nanome_mesh is not None:
@@ -262,25 +248,29 @@ class CryoEM(nanome.PluginInstance):
                 self.color_by_scheme()
                 if self.nanome_mesh is not None:
                     self.nanome_mesh.upload()
+        
+        def set_target_complex(dropdown, item):
+            for c in self.nanome_workspace.complexes:
+                if c.name == item.name:
+                    self.nanome_complex = c
+                    return
+
 
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
         self._slider_opacity.register_released_callback(self.update_opacity)
-        # self._slider_limit_x.register_released_callback(
-        #     self.update_limited_view_x)
-        # self._slider_limit_y.register_released_callback(
-        #     self.update_limited_view_y)
-        # self._slider_limit_z.register_released_callback(
-        #     self.update_limited_view_z)
         self._slider_limit_range.register_released_callback(
             self.update_limited_view_range
         )
         self._dropdown_color_scheme.register_item_clicked_callback(
             change_color_scheme)
         self._show_button.register_pressed_callback(show_hide_map)
+        self._dropdown_complexes.register_item_clicked_callback(
+            set_target_complex)
 
     def set_current_complex_generate_surface(self, workspace):
         self.nanome_workspace = workspace
+        self.nanome_complex = None
 
         for c in reversed(self.nanome_workspace.complexes):
             if "CryoEM_plugin" in c.name:
@@ -292,6 +282,12 @@ class CryoEM(nanome.PluginInstance):
     def set_limited_view_on_cog(self):
         # Compute center of gravity of structure
         cog = np.array([0.0, 0.0, 0.0])
+        if self.nanome_complex is None:
+            self.limit_x = cog[0]
+            self.limit_y = cog[1]
+            self.limit_z = cog[2]
+            self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
+            return
         count = 0
         for a in self.nanome_complex.atoms:
             count += 1
@@ -302,11 +298,6 @@ class CryoEM(nanome.PluginInstance):
         self.limit_y = cog[1]
         self.limit_z = cog[2]
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        # self._slider_limit_x.current_value = cog[0]
-        # self._slider_limit_y.current_value = cog[1]
-        # self._slider_limit_z.current_value = cog[2]
-        # self.update_content(
-        # [self._slider_limit_x, self._slider_limit_y, self._slider_limit_z])
 
     def load_map(self):
         with mrcfile.open(self.map_file.name) as mrc:
@@ -490,21 +481,21 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.vertices = np.asarray(vertices).flatten()
         # self.nanome_mesh.normals = np.asarray(normals).flatten()
         self.nanome_mesh.triangles = np.asarray(triangles).flatten()
+        
+        anchor = self.nanome_mesh.anchors[0]
 
-        self.nanome_mesh.anchors[0].anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
+        anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
+        anchor.local_offset = Vector3(
+            self._map_origin[0], self._map_origin[1], self._map_origin[2])
 
-        # self.nanome_mesh.color = Color(128, 128, 255, int(self.opacity * 255))
         self.nanome_mesh.color = Color(255, 255, 255, int(self.opacity * 255))
 
         if not self.shown:
             self.nanome_mesh.color.a = 0
 
-        anchor = self.nanome_mesh.anchors[0]
-        anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
-        anchor.target = self.nanome_complex.index
-
-        anchor.local_offset = Vector3(
-            self._map_origin[0], self._map_origin[1], self._map_origin[2])
+        if self.nanome_complex is not None:
+            anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
+            anchor.target = self.nanome_complex.index
 
         self.color_by_scheme()
 
@@ -543,6 +534,9 @@ class CryoEM(nanome.PluginInstance):
             self.color_by_chain()
 
     def color_by_element(self):
+        if self.nanome_complex is None:
+            return
+
         atom_positions = []
         atoms = []
         for a in self.nanome_complex.atoms:
@@ -561,6 +555,9 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.colors = np.array(colors)
 
     def color_by_chain(self):
+        if self.nanome_complex is None:
+            return
+
         molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
         n_chain = len(list(molecule.chains))
 
@@ -607,7 +604,8 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self):
-
+        if self.nanome_complex is None:
+            return
         sections = 128
         cm_subsection = np.linspace(0.0, 1.0, sections)
         colors_rainbow = [cm.jet(x) for x in cm_subsection]
