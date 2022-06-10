@@ -51,7 +51,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._map_data = None
         self.nanome_mesh = None
         self.nanome_complex = None
-        self.iso_value = 0.3
+        self.iso_value = 0.0
         self.opacity = 0.6
         self._slider_iso = None
         self._slider_opacity = None
@@ -240,6 +240,13 @@ class CryoEM(nanome.AsyncPluginInstance):
                 )
                 return
             emdb_ids = result[k1][k2]
+
+            self.map_prefered_level = 0.0
+            if "pdbx_vrpt_summary" in result and "contour_level_primary_map" in result["pdbx_vrpt_summary"]:
+                self.map_prefered_level = float(
+                    result["pdbx_vrpt_summary"]["contour_level_primary_map"])
+                Logs.debug("Found prevered level =", self.map_prefered_level)
+
             if len(emdb_ids) >= 1:
                 download_CryoEM_map_from_EMDBID(emdb_ids[0])
             else:
@@ -335,7 +342,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             if self._Vault_map_file_to_download is not None:
                 tfile = self.get_file_from_Vault(
                     self._Vault_map_file_to_download)
-                self.map_file = tfile.name
+                self.map_file = tfile
 
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
@@ -404,6 +411,13 @@ class CryoEM(nanome.AsyncPluginInstance):
                 axes_c_order] * np.diag(delta)
             self._map_origin = np.hstack(
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
+
+            self.iso_value = self.map_prefered_level
+            self._slider_iso.current_value = self.iso_value
+            self.label_iso.text_value = "Iso-value: " + \
+                str(round(self.iso_value, 3))
+            self.update_content(self.label_iso)
+            self.update_content(self._slider_iso)
 
     def on_run(self):
         self._menu.enabled = True
@@ -625,6 +639,8 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_element(self):
         if self.nanome_complex is None:
             return
+        if len(self.computed_vertices) < 3:
+            return
 
         atom_positions = []
         atoms = []
@@ -634,7 +650,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+            self.computed_vertices + self._map_origin, distance_upper_bound=20)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -645,6 +661,8 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def color_by_chain(self):
         if self.nanome_complex is None:
+            return
+        if len(self.computed_vertices) < 3:
             return
 
         molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
@@ -684,7 +702,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+            self.computed_vertices + self._map_origin, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
                 colors += color_per_atom[i]
@@ -695,6 +713,9 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_bfactor(self):
         if self.nanome_complex is None:
             return
+        if len(self.computed_vertices) < 3:
+            return
+
         sections = 128
         cm_subsection = np.linspace(0.0, 1.0, sections)
         colors_rainbow = [cm.jet(x) for x in cm_subsection]
@@ -710,7 +731,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices+self._map_origin, distance_upper_bound=20)
+            self.computed_vertices + self._map_origin, distance_upper_bound=20)
 
         colors = []
         bfactors = np.array([a.bfactor for a in atoms])
