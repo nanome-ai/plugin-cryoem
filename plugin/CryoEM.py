@@ -1,3 +1,4 @@
+import os
 import tempfile
 
 import matplotlib.pyplot as plt
@@ -11,14 +12,41 @@ import requests
 from matplotlib import cm
 from nanome.api.shapes import Mesh
 from nanome.api.ui import Menu
-from nanome.util import Color, Logs, Vector3, enums
+from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
+from .VaultManager import VaultManager
 
-class CryoEM(nanome.PluginInstance):
-    def start(self):
+
+class CryoEM(nanome.AsyncPluginInstance):
+    async def get_Vault_file_list(self):
+        api_key = ''
+        server_url = ''
+
+        self._vault_manager = VaultManager(api_key, server_url)
+        presenter_info = await self.request_presenter_info()
+        self._user_id = presenter_info.account_id
+
+        user_folder = self._vault_manager.list_path(self._user_id)
+        self.user_files = user_folder['files']
+
+    def get_file_from_Vault(self, filename):
+        name, ext = os.path.splitext(filename)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        file_path = os.path.join(self._user_id, filename)
+        self._vault_manager.get_file(file_path, None, temp_file.path)
+        return temp_file.name
+
+    @async_callback
+    async def start(self):
+        self.set_plugin_list_button(
+            enums.PluginListButtonType.run, "Creating Menu...", False)
+
+        await self.get_Vault_file_list()
         self.nanome_workspace = None
 
+        self._Vault_mol_file_to_download = None
+        self._Vault_map_file_to_download = None
         self.map_file = None
         self._map_data = None
         self.nanome_mesh = None
@@ -53,69 +81,97 @@ class CryoEM(nanome.PluginInstance):
     def create_menu(self, workspace):
         self.remove_existing_plugin_structure(workspace)
 
-        self.menu = Menu()
-        self.menu.title = "Cryo-EM"
-        self.menu.width = 0.7
-        self.menu.height = 1
+        self._menu = Menu()
+        self._menu.title = "Cryo-EM"
+        self._menu.width = 0.7
+        self._menu.height = 1
 
-        node_image = self.menu.root.create_child_node()
+        node_image = self._menu.root.create_child_node()
         self.histo_image = node_image.add_new_image()
         node_image.set_size_ratio(0.2)
 
-        node_switch_input = self.menu.root.create_child_node()
+        node_label_loaded_mols = self._menu.root.create_child_node()
+        self.label_loaded_mols = node_label_loaded_mols.add_new_label(
+            "Loaded molecules")
+        node_label_loaded_mols.set_size_ratio(0.02)
+
+        node_switch_input = self._menu.root.create_child_node()
         node_switch_input.set_size_ratio(0.05)
         self._dropdown_complexes = node_switch_input.add_new_dropdown()
         self._dropdown_complexes.items = [nanome.ui.DropdownItem(
-            name) for name in [c.name for c in self.nanome_workspace.complexes]]
-        # self._dropdown_complexes.items[0].selected = True
+            c.name) for c in self.nanome_workspace.complexes]
         node_switch_input.forward_dist = .001
 
-        node_input = self.menu.root.create_child_node()
+        node_label_Vault_mol = self._menu.root.create_child_node()
+        self.label_Vault_mol = node_label_Vault_mol.add_new_label(
+            "Vault molecular files")
+        node_label_Vault_mol.set_size_ratio(0.02)
+
+        node_Vault_files = self._menu.root.create_child_node()
+        node_Vault_files.set_size_ratio(0.05)
+        self._dropdown_files = node_Vault_files.add_new_dropdown()
+        self._dropdown_files.items = [nanome.ui.DropdownItem(
+            file["name"]) for file in self.user_files if not file["name"].endswith(".map")]
+        node_Vault_files.forward_dist = .001
+
+        node_label_Vault_map = self._menu.root.create_child_node()
+        self.label_Vault_map = node_label_Vault_map.add_new_label(
+            "Vault map files")
+        node_label_Vault_map.set_size_ratio(0.02)
+
+        node_Vault_files2 = self._menu.root.create_child_node()
+        node_Vault_files2.set_size_ratio(0.05)
+        self._dropdown_files2 = node_Vault_files2.add_new_dropdown()
+        self._dropdown_files2.items = [nanome.ui.DropdownItem(
+            file["name"]) for file in self.user_files if file["name"].endswith(".map")]
+        node_Vault_files2.forward_dist = .001
+
+        node_input = self._menu.root.create_child_node()
         text_input = node_input.add_new_text_input("PDBId")
         # text_input.input_text = "7efc"
         text_input.input_text = "6cl7"
         node_input.set_size_ratio(0.05)
 
-        node_label = self.menu.root.create_child_node()
+        node_label = self._menu.root.create_child_node()
         self.label_iso = node_label.add_new_label(
             "Iso-value: " + str(round(self.iso_value, 3))
         )
         node_label.set_size_ratio(0.05)
 
-        node_iso = self.menu.root.create_child_node()
+        node_iso = self._menu.root.create_child_node()
         self._slider_iso = node_iso.add_new_slider(-5.0, 5.0, self.iso_value)
         node_iso.set_size_ratio(0.05)
 
-        node_label_opac = self.menu.root.create_child_node()
+        node_label_opac = self._menu.root.create_child_node()
         self.label_opac = node_label_opac.add_new_label(
             "Opacity: " + str(round(self.opacity, 2))
         )
         node_label_opac.set_size_ratio(0.01)
 
-        opac_node = self.menu.root.create_child_node()
+        opac_node = self._menu.root.create_child_node()
         self._slider_opacity = opac_node.add_new_slider(
             0.01, 1.0, self.opacity)
         opac_node.set_size_ratio(0.05)
 
-        node_label_limit_range = self.menu.root.create_child_node()
+        node_label_limit_range = self._menu.root.create_child_node()
         self.label_limit_range = node_label_limit_range.add_new_label(
             "Size: " + str(round(self.limited_view_range, 2))
         )
         node_label_limit_range.set_size_ratio(0.01)
 
-        limit_range_node = self.menu.root.create_child_node()
+        limit_range_node = self._menu.root.create_child_node()
         self._slider_limit_range = limit_range_node.add_new_slider(
             0, 150, self.limited_view_range
         )
         limit_range_node.set_size_ratio(0.05)
 
-        node_color_scheme_label = self.menu.root.create_child_node()
+        node_color_scheme_label = self._menu.root.create_child_node()
         self.label_color_scheme = node_color_scheme_label.add_new_label(
             "Color scheme: " + str(round(self.limited_view_range, 2))
         )
         node_color_scheme_label.set_size_ratio(0.01)
 
-        color_scheme_node = self.menu.root.create_child_node()
+        color_scheme_node = self._menu.root.create_child_node()
         self._dropdown_color_scheme = color_scheme_node.add_new_dropdown()
         color_scheme_node.set_size_ratio(0.05)
         self._dropdown_color_scheme.items = [nanome.ui.DropdownItem(
@@ -123,7 +179,7 @@ class CryoEM(nanome.PluginInstance):
         self._dropdown_color_scheme.items[0].selected = True
         color_scheme_node.forward_dist = .001
 
-        show_hide_node = self.menu.root.create_child_node()
+        show_hide_node = self._menu.root.create_child_node()
         self._show_button = show_hide_node.add_new_toggle_switch("Show/Hide")
         self._show_button.selected = True
         show_hide_node.set_size_ratio(0.05)
@@ -131,6 +187,9 @@ class CryoEM(nanome.PluginInstance):
 
         def download_CryoEM_map_from_EMDBID(emdbid):
             Logs.message("Downloading EM data for EMDBID:", emdbid)
+            self.send_notification(
+                nanome.util.enums.NotificationTypes.message, "Downloading EM data"
+            )
 
             new_url = (
                 "https://files.rcsb.org/pub/emdb/structures/"
@@ -156,7 +215,7 @@ class CryoEM(nanome.PluginInstance):
                     self.set_current_complex_generate_surface)
 
         def download_CryoEM_map_from_PDBID(file):
-            Logs.message("Downloading PDB info for ID:", self.pdbid)
+            Logs.message("Downloading EM data for PDBID:", self.pdbid)
             self.send_notification(
                 nanome.util.enums.NotificationTypes.message, "Downloading EM data"
             )
@@ -167,7 +226,7 @@ class CryoEM(nanome.PluginInstance):
                 Logs.error("Something went wrong fetching the EM data")
                 self.send_notification(
                     nanome.util.enums.NotificationTypes.error,
-                    "No EMDB data for" + str(self.pdbid),
+                    "No EMDB data for " + str(self.pdbid),
                 )
                 return
             result = response.json()
@@ -177,7 +236,7 @@ class CryoEM(nanome.PluginInstance):
                 Logs.error("No EM data found for", self.pdbid)
                 self.send_notification(
                     nanome.util.enums.NotificationTypes.error,
-                    "No EMDB data for" + str(self.pdbid),
+                    "No EMDB data for " + str(self.pdbid),
                 )
                 return
             emdb_ids = result[k1][k2]
@@ -187,7 +246,7 @@ class CryoEM(nanome.PluginInstance):
                 Logs.error("No EM data found for", self.pdbid)
                 self.send_notification(
                     nanome.util.enums.NotificationTypes.error,
-                    "No EMDB data for",
+                    "No EMDB data for ",
                     self.pdbid,
                 )
 
@@ -196,14 +255,22 @@ class CryoEM(nanome.PluginInstance):
             if self.nanome_mesh is not None:
                 self.nanome_mesh.destroy()
             self.nanome_mesh = None
-            
+
             self.pdbid = textinput.input_text.strip()
 
-            #Download the PDB only if no target complex set
+            if self.nanome_complex is None and len(self.pdbid) != 4:
+                Logs.error("Wrong PDBID:", self.pdbid)
+                self.send_notification(
+                    nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
+                )
+                return False
+            # Download the PDB only if no target complex set
             if self.nanome_complex is not None:
                 if len(self.pdbid) == 4:
                     download_CryoEM_map_from_PDBID(None)
                 else:
+                    if len(self.pdbid) > 4 and not "EMD" in self.pdbid and not "emd" in self.pdbid:
+                        self.pdbid = "EMD-" + self.pdbid
                     download_CryoEM_map_from_EMDBID(self.pdbid)
 
                 return True
@@ -214,6 +281,7 @@ class CryoEM(nanome.PluginInstance):
                 nanome.util.enums.NotificationTypes.message, "Downloading PDB"
             )
             Logs.message("Downloading PDB file from", full_url)
+
             response = requests.get(full_url)
             if response.status_code != 200:
                 Logs.error("Something went wrong fetching the PDB file")
@@ -248,13 +316,26 @@ class CryoEM(nanome.PluginInstance):
                 self.color_by_scheme()
                 if self.nanome_mesh is not None:
                     self.nanome_mesh.upload()
-        
+
         def set_target_complex(dropdown, item):
             for c in self.nanome_workspace.complexes:
                 if c.name == item.name:
                     self.nanome_complex = c
                     return
 
+        def set_selected_file(dropdown, item):
+            self._Vault_mol_file_to_download = item.name
+            print(item.name)
+
+        def set_selected_map_file(dropdown, item):
+            self._Vault_map_file_to_download = item.name
+            print(item.name)
+
+        def load_map_from_Vault():
+            if self._Vault_map_file_to_download is not None:
+                tfile = self.get_file_from_Vault(
+                    self._Vault_map_file_to_download)
+                self.map_file = tfile.name
 
         text_input.register_submitted_callback(download_PDB)
         self._slider_iso.register_released_callback(self.update_isosurface)
@@ -267,6 +348,14 @@ class CryoEM(nanome.PluginInstance):
         self._show_button.register_pressed_callback(show_hide_map)
         self._dropdown_complexes.register_item_clicked_callback(
             set_target_complex)
+
+        self._dropdown_files.register_item_clicked_callback(
+            set_selected_file)
+        self._dropdown_files2.register_item_clicked_callback(
+            set_selected_map_file)
+
+        self.set_plugin_list_button(
+            enums.PluginListButtonType.run, "Run", True)
 
     def set_current_complex_generate_surface(self, workspace):
         self.nanome_workspace = workspace
@@ -317,8 +406,8 @@ class CryoEM(nanome.PluginInstance):
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
 
     def on_run(self):
-        self.menu.enabled = True
-        self.update_menu(self.menu)
+        self._menu.enabled = True
+        self.update_menu(self._menu)
 
     def update_isosurface(self, iso):
         self.label_iso.text_value = "Iso-value: " + \
@@ -481,7 +570,7 @@ class CryoEM(nanome.PluginInstance):
         self.nanome_mesh.vertices = np.asarray(vertices).flatten()
         # self.nanome_mesh.normals = np.asarray(normals).flatten()
         self.nanome_mesh.triangles = np.asarray(triangles).flatten()
-        
+
         anchor = self.nanome_mesh.anchors[0]
 
         anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Workspace
