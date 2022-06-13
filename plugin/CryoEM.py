@@ -58,6 +58,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.limit_x = 0.0
         self.limit_y = 0.0
         self.limit_z = 0.0
+        self.map_prefered_level = 0.0
         self.limited_view_pos = [0, 0, 0]
         self.limited_view_range = 15.0
         self.current_mesh = []
@@ -88,7 +89,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         node_image = self._menu.root.create_child_node()
         self.histo_image = node_image.add_new_image()
-        node_image.set_size_ratio(0.2)
+        node_image.set_size_ratio(0.25)
 
         node_label_loaded_mols = self._menu.root.create_child_node()
         self.label_loaded_mols = node_label_loaded_mols.add_new_label(
@@ -129,6 +130,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         node_input = self._menu.root.create_child_node()
         text_input = node_input.add_new_text_input("PDBId")
         # text_input.input_text = "7efc"
+        # text_input.input_text = "7q1u"
         text_input.input_text = "6cl7"
         node_input.set_size_ratio(0.05)
 
@@ -241,7 +243,6 @@ class CryoEM(nanome.AsyncPluginInstance):
                 return
             emdb_ids = result[k1][k2]
 
-            self.map_prefered_level = 0.0
             if "pdbx_vrpt_summary" in result and "contour_level_primary_map" in result["pdbx_vrpt_summary"]:
                 self.map_prefered_level = float(
                     result["pdbx_vrpt_summary"]["contour_level_primary_map"])
@@ -553,7 +554,8 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Compute iso-surface with marching cubes algorithm
         vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
 
-        target = max(100, len(triangles) / decimation_factor)
+        Logs.debug("Decimating mesh")
+        target = max(1000, len(triangles) / decimation_factor)
 
         mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(np.asarray(vertices), np.asarray(triangles))
@@ -611,8 +613,15 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def generate_histogram(self):
         flat = self._map_data.flatten()
-        plt.hist(flat, bins=100)
-        plt.title("Iso-value distribution")
+        minmap = np.min(flat)
+        flat_offset = flat + abs(minmap) + 0.001
+        hist, bins = np.histogram(flat_offset, bins=1000)
+        logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
+
+        plt.hist(flat, bins=logbins-abs(minmap))
+        plt.ylim(bottom=10)
+        plt.yscale('log')
+        plt.title("Level histogram")
         self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png")
         plt.savefig(self.png_tempfile.name)
