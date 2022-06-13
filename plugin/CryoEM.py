@@ -27,7 +27,11 @@ class CryoEM(nanome.AsyncPluginInstance):
         presenter_info = await self.request_presenter_info()
         self._user_id = presenter_info.account_id
 
+        self.user_files = []
         user_folder = self._vault_manager.list_path(self._user_id)
+        if not "files" in user_folder:
+            Logs.error("Failed to get Vault files")
+            return
         self.user_files = user_folder['files']
 
     def get_file_from_Vault(self, filename):
