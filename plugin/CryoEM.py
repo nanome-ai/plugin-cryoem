@@ -67,6 +67,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.limited_view_range = 15.0
         self.current_mesh = []
         self.shown = True
+        self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
 
         self.request_workspace(self.create_menu)
@@ -190,6 +191,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._show_button.selected = True
         show_hide_node.set_size_ratio(0.05)
         show_hide_node.forward_dist = 0.001
+        
+        wireframe_node = self._menu.root.create_child_node()
+        self._wireframe_button = wireframe_node.add_new_toggle_switch("Wireframe")
+        self._wireframe_button.selected = False
+        wireframe_node.set_size_ratio(0.05)
+        wireframe_node.forward_dist = 0.001
 
         def download_CryoEM_map_from_EMDBID(emdbid):
             Logs.message("Downloading EM data for EMDBID:", emdbid)
@@ -315,6 +322,20 @@ class CryoEM(nanome.AsyncPluginInstance):
                     self.opacity * 255) if toggle.selected else 0
                 self.shown = toggle.selected
                 self.nanome_mesh.upload()
+        
+        def set_wireframe_mode(toggle):
+            self.wireframe_mode = toggle.selected
+            if self.nanome_mesh is not None:
+                if self.wireframe_mode:
+                    self.wire_vertices, wire_normals, self.wire_triangles = self.wireframe_mesh()
+                    self.nanome_mesh.vertices = self.wire_vertices.flatten()
+                    self.nanome_mesh.triangles = self.wire_triangles.flatten()
+                else:
+                    self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
+                    self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+                
+                self.color_by_scheme()
+                self.nanome_mesh.upload()
 
         def change_color_scheme(dropdown, item):
             if item.name == "Element":
@@ -358,6 +379,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._dropdown_color_scheme.register_item_clicked_callback(
             change_color_scheme)
         self._show_button.register_pressed_callback(show_hide_map)
+        self._wireframe_button.register_pressed_callback(set_wireframe_mode)
         self._dropdown_complexes.register_item_clicked_callback(
             set_target_complex)
 
@@ -489,9 +511,16 @@ class CryoEM(nanome.AsyncPluginInstance):
             )
 
             self.computed_vertices = np.array(vertices)
-            self.nanome_mesh.vertices = np.asarray(vertices).flatten()
-            # self.nanome_mesh.normals = np.asarray(normals).flatten()
-            self.nanome_mesh.triangles = np.asarray(triangles).flatten()
+            self.computed_normals = np.array(normals)
+            self.computed_triangles = np.array(triangles)
+
+            if self.wireframe_mode:
+                self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+                self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
+            else:
+                self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
 
             self.color_by_scheme()
 
@@ -587,9 +616,12 @@ class CryoEM(nanome.AsyncPluginInstance):
             self.nanome_mesh = Mesh()
 
         self.computed_vertices = np.array(vertices)
-        self.nanome_mesh.vertices = np.asarray(vertices).flatten()
-        # self.nanome_mesh.normals = np.asarray(normals).flatten()
-        self.nanome_mesh.triangles = np.asarray(triangles).flatten()
+        self.computed_normals = np.array(normals)
+        self.computed_triangles = np.array(triangles)
+
+        self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
+        # self.nanome_mesh.normals = np.asarray(self.computed_normals).flatten()
+        self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
 
         anchor = self.nanome_mesh.anchors[0]
 
@@ -606,6 +638,10 @@ class CryoEM(nanome.AsyncPluginInstance):
             anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
             anchor.target = self.nanome_complex.index
 
+        if self.wireframe_mode:
+            self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+            self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
+            self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
         self.color_by_scheme()
 
         Logs.message(
@@ -652,7 +688,10 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_element(self):
         if self.nanome_complex is None:
             return
-        if len(self.computed_vertices) < 3:
+        
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+
+        if len(verts) < 3:
             return
 
         atom_positions = []
@@ -663,7 +702,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices + self._map_origin, distance_upper_bound=20)
+            verts + self._map_origin, distance_upper_bound=20)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -675,7 +714,8 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_chain(self):
         if self.nanome_complex is None:
             return
-        if len(self.computed_vertices) < 3:
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+        if len(verts) < 3:
             return
 
         molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
@@ -699,7 +739,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         # No need for neighbor search as all vertices have the same color
         if n_chain == 1:
-            for i in range(len(self.computed_vertices)):
+            for i in range(len(verts)):
                 colors += color_per_atom[0]
             self.nanome_mesh.colors = np.array(colors)
             return
@@ -715,7 +755,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices + self._map_origin, distance_upper_bound=20)
+            verts + self._map_origin, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
                 colors += color_per_atom[i]
@@ -726,7 +766,8 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_bfactor(self):
         if self.nanome_complex is None:
             return
-        if len(self.computed_vertices) < 3:
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+        if len(verts) < 3:
             return
 
         sections = 128
@@ -744,7 +785,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            self.computed_vertices + self._map_origin, distance_upper_bound=20)
+            verts + self._map_origin, distance_upper_bound=20)
 
         colors = []
         bfactors = np.array([a.bfactor for a in atoms])
@@ -762,7 +803,126 @@ class CryoEM(nanome.AsyncPluginInstance):
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
         self.nanome_mesh.colors = np.array(colors)
+    
+    def wireframe_mesh(self, wiresize=0.01):
+        ntri = len(self.computed_triangles) * 3
 
+        new_verts = np.zeros((ntri * 4, 3))
+        new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
+        new_norms = np.zeros((ntri * 4, 3))
+        # new_cols = np.zeros((ntri * 4, 3))
+
+        for i in range(int(ntri / 3)):
+            t1 = self.computed_triangles[i][0]
+            t2 = self.computed_triangles[i][1]
+            t3 = self.computed_triangles[i][2]
+
+            if t1 == t2 or t2 == t3 or t1 == t3:
+                continue
+                
+            v1 = np.array(self.computed_vertices[t1])
+            v2 = np.array(self.computed_vertices[t2])
+            v3 = np.array(self.computed_vertices[t3])
+            
+            n1 = np.array(self.computed_normals[t1])
+            n2 = np.array(self.computed_normals[t2])
+            n3 = np.array(self.computed_normals[t3])
+            
+            v1v2 = v2 - v1
+            v2v3 = v3 - v2
+            v3v1 = v1 - v3
+
+            sidev1 = np.linalg.norm(np.cross(v1v2, n1))
+            sidev2 = np.linalg.norm(np.cross(v2v3, n2))
+            sidev3 = np.linalg.norm(np.cross(v3v1, n3))
+
+            newId = i * 3 * 4
+            newIdT = i * 6 * 2
+
+            new_verts[newId + 0] = v1 + sidev1 * wiresize
+            new_verts[newId + 1] = v1 - sidev1 * wiresize
+            new_verts[newId + 2] = v2 + sidev1 * wiresize
+            new_verts[newId + 3] = v2 - sidev1 * wiresize
+
+            new_verts[newId + 4] = v2 + sidev2 * wiresize
+            new_verts[newId + 5] = v2 - sidev2 * wiresize
+            new_verts[newId + 6] = v3 + sidev2 * wiresize
+            new_verts[newId + 7] = v3 - sidev2 * wiresize
+
+            new_verts[newId + 8] = v3 + sidev3 * wiresize
+            new_verts[newId + 9] = v3 - sidev3 * wiresize
+            new_verts[newId + 10] = v1 + sidev3 * wiresize
+            new_verts[newId + 11] = v1 - sidev3 * wiresize
+
+            new_norms[newId + 0] = n1
+            # new_cols[newId + 0] = cols[t1]
+            new_norms[newId + 1] = n1
+            # new_cols[newId + 1] = cols[t1]
+            new_norms[newId + 2] = n2
+            # new_cols[newId + 2] = cols[t2]
+            new_norms[newId + 3] = n2
+            # new_cols[newId + 3] = cols[t2]
+
+            new_norms[newId + 4] = n2
+            # new_cols[newId + 4] = cols[t2]
+            new_norms[newId + 5] = n2
+            # new_cols[newId + 5] = cols[t2]
+            new_norms[newId + 6] = n3
+            # new_cols[newId + 6] = cols[t3]
+            new_norms[newId + 7] = n3
+            # new_cols[newId + 7] = cols[t3]
+
+            new_norms[newId + 8] = n3
+            # new_cols[newId + 8] = cols[t3]
+            new_norms[newId + 9] = n3
+            # new_cols[newId + 9] = cols[t3]
+            new_norms[newId + 10] = n1
+            # new_cols[newId + 10] = cols[t1]
+            new_norms[newId + 11] = n1
+            # new_cols[newId + 11] = cols[t1]
+
+            new_tris[newIdT][0] = newId
+            new_tris[newIdT + 6] = newId + 1
+            new_tris[newIdT][1] = newId + 1
+            new_tris[newIdT + 6] = newId + 0
+            new_tris[newIdT][2] = newId + 2
+            new_tris[newIdT + 6] = newId + 2
+
+            new_tris[newIdT + 1][0] = newId + 1
+            new_tris[newIdT + 7] = newId + 3
+            new_tris[newIdT + 1][1] = newId + 3
+            new_tris[newIdT + 7] = newId + 1
+            new_tris[newIdT + 1][2] = newId + 2
+            new_tris[newIdT + 7] = newId + 2
+
+            new_tris[newIdT + 2][0] = newId + 4
+            new_tris[newIdT + 8][0] = newId + 5
+            new_tris[newIdT + 2][1] = newId + 5
+            new_tris[newIdT + 8][1] = newId + 4
+            new_tris[newIdT + 2][2] = newId + 6
+            new_tris[newIdT + 8][2] = newId + 6
+
+            new_tris[newIdT + 3][0] = newId + 5
+            new_tris[newIdT + 9][0] = newId + 7
+            new_tris[newIdT + 3][1] = newId + 7
+            new_tris[newIdT + 9][1] = newId + 5
+            new_tris[newIdT + 3][2] = newId + 6
+            new_tris[newIdT + 9][2] = newId + 6
+
+            new_tris[newIdT + 4][0] = newId + 8
+            new_tris[newIdT + 10][0] = newId + 9
+            new_tris[newIdT + 4][1] = newId + 9
+            new_tris[newIdT + 10][1] = newId + 8
+            new_tris[newIdT + 4][2] = newId + 10
+            new_tris[newIdT + 10][2] = newId + 10
+
+            new_tris[newIdT + 5][0] = newId + 9
+            new_tris[newIdT + 11][0] = newId + 11
+            new_tris[newIdT + 5][1] = newId + 11
+            new_tris[newIdT + 11][1] = newId + 9
+            new_tris[newIdT + 5][2] = newId + 10
+            new_tris[newIdT + 11][2] = newId + 10
+        return (new_verts, new_norms, new_tris)
 
 def chain_color(id_chain):
     molecule = self._complex._molecules[self._complex.current_frame]
