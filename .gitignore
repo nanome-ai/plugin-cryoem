@@ -132,3 +132,5 @@ dmypy.json
 # Nanome specific
 .cachebust
 docker/redeploy.sh
+.vscode
+.env*
