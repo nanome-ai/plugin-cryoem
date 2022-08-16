@@ -79,7 +79,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._vault_manager.get_file(file_path, None, temp_file.path)
         return temp_file.name
 
-
     def remove_existing_plugin_structure(self, workspace):
         self.nanome_workspace = workspace
         # First remove previous cryo-em plugin complexes
