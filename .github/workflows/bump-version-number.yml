@@ -5,6 +5,7 @@ on:
       version_part:
         type: choice
         description: Part of version number to bump
+        required: true
         options:
           - patch
           - minor
