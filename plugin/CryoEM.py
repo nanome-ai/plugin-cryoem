@@ -19,7 +19,7 @@ from .VaultManager import VaultManager
 
 
 class CryoEM(nanome.AsyncPluginInstance):
-    async def get_Vault_file_list(self):
+    async def get_vault_file_list(self):
         api_key = ''
         server_url = ''
 
@@ -34,7 +34,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             return
         self.user_files = user_folder['files']
 
-    def get_file_from_Vault(self, filename):
+    def get_file_from_vault(self, filename):
         name, ext = os.path.splitext(filename)
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
         file_path = os.path.join(self._user_id, filename)
@@ -46,7 +46,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Creating Menu...", False)
 
-        await self.get_Vault_file_list()
+        await self.get_vault_file_list()
         self.nanome_workspace = None
 
         self._Vault_mol_file_to_download = None
@@ -198,7 +198,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         wireframe_node.set_size_ratio(0.05)
         wireframe_node.forward_dist = 0.001
 
-        def download_CryoEM_map_from_EMDBID(emdbid):
+        def download_cryoem_map_from_emdbid(emdbid):
             Logs.message("Downloading EM data for EMDBID:", emdbid)
             self.send_notification(
                 nanome.util.enums.NotificationTypes.message, "Downloading EM data"
@@ -227,7 +227,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                 self.request_workspace(
                     self.set_current_complex_generate_surface)
 
-        def download_CryoEM_map_from_PDBID(file):
+        def download_cryoem_map_from_pdbid(file):
             Logs.message("Downloading EM data for PDBID:", self.pdbid)
             self.send_notification(
                 nanome.util.enums.NotificationTypes.message, "Downloading EM data"
@@ -260,7 +260,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                 Logs.debug("Found prevered level =", self.map_prefered_level)
 
             if len(emdb_ids) >= 1:
-                download_CryoEM_map_from_EMDBID(emdb_ids[0])
+                download_cryoem_map_from_emdbid(emdb_ids[0])
             else:
                 Logs.error("No EM data found for", self.pdbid)
                 self.send_notification(
@@ -269,7 +269,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                     self.pdbid,
                 )
 
-        def download_PDB(textinput):
+        def download_pdb(textinput):
             self.current_mesh = []
             if self.nanome_mesh is not None:
                 self.nanome_mesh.destroy()
@@ -286,11 +286,11 @@ class CryoEM(nanome.AsyncPluginInstance):
             # Download the PDB only if no target complex set
             if self.nanome_complex is not None:
                 if len(self.pdbid) == 4:
-                    download_CryoEM_map_from_PDBID(None)
+                    download_cryoem_map_from_pdbid(None)
                 else:
                     if len(self.pdbid) > 4 and not "EMD" in self.pdbid and not "emd" in self.pdbid:
                         self.pdbid = "EMD-" + self.pdbid
-                    download_CryoEM_map_from_EMDBID(self.pdbid)
+                    download_cryoem_map_from_emdbid(self.pdbid)
 
                 return True
 
@@ -313,7 +313,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             )
             open(pdb_tempfile.name, "wb").write(response.content)
             pdb_path = pdb_tempfile.name.replace("\\", "/")
-            self.send_files_to_load(pdb_path, download_CryoEM_map_from_PDBID)
+            self.send_files_to_load(pdb_path, download_cryoem_map_from_pdbid)
             return True
 
         def show_hide_map(toggle):
@@ -364,13 +364,13 @@ class CryoEM(nanome.AsyncPluginInstance):
             self._Vault_map_file_to_download = item.name
             print(item.name)
 
-        def load_map_from_Vault():
+        def load_map_from_vault():
             if self._Vault_map_file_to_download is not None:
-                tfile = self.get_file_from_Vault(
+                tfile = self.get_file_from_vault(
                     self._Vault_map_file_to_download)
                 self.map_file = tfile
 
-        text_input.register_submitted_callback(download_PDB)
+        text_input.register_submitted_callback(download_pdb)
         self._slider_iso.register_released_callback(self.update_isosurface)
         self._slider_opacity.register_released_callback(self.update_opacity)
         self._slider_limit_range.register_released_callback(
