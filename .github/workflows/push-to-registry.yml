@@ -19,41 +19,32 @@ jobs:
     env:
       INPUT_PATH: "."
     steps:
-    - uses: actions/checkout@v2.2.0
-    - name: Get repo name
-      id: repoName
-      run: |
-        repo_name=cryo-em 
-        echo "::set-output name=repo_name::$(echo $repo_name)"
+    - uses: actions/checkout@v2
     - name: Set default tag
       id: default_tag
       run: |
-        default_tag="${GITHUB_REF#refs/*/}"
-        echo Default tag = $default_tag
+        default_tag=latest
         echo "::set-output name=default_tag::$default_tag"
     - name: Get short SHA
-      id: sha7
+      id: sha
       run: echo "::set-output name=sha7::$(echo ${GITHUB_SHA} | cut -c1-7)"
     - name: Get tag
       id: tag
       run: |
-        input_tag=${{ inputs.tag }}
-        echo "::set-output name=tag::$input_tag"
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+        input_tag=${{ github.event.inputs.tag }}
+        default_tag=${{ steps.default_tag.outputs.default_tag }}
+        if [ -z "$input_tag" ]; then
+          echo "::set-output name=tag::$default_tag"
+        else
+          echo "::set-output name=tag::$input_tag"
+        fi
+    - uses: docker://ghcr.io/kciter/aws-ecr-action:latest
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-    - name: Build and Push to ECR public
-      id: build-and-push
-      uses: pahud/ecr-public-action@8cd826db40befb59b0cd0b60b22a7ba72d06a7f7
-      with:
+        access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+        repo: cryo-em
+        region: us-west-1
+        tags: ${{ steps.tag.outputs.tag }},${{ steps.sha.outputs.sha7 }}
         dockerfile: docker/Dockerfile
-        context: .
-        tags: |
-          public.ecr.aws/h7r1e4h2/${{ steps.repoName.outputs.repo_name }}:${{ steps.tag.outputs.tag }}
-          public.ecr.aws/h7r1e4h2/${{ steps.repoName.outputs.repo_name }}:${{ steps.sha7.outputs.sha7 }}
+        image_scanning_configuration: true
