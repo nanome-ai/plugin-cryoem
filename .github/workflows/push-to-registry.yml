@@ -1,5 +1,4 @@
 name: Push to ECR Registry
-
 on:
   workflow_dispatch:
     inputs:
