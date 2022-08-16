@@ -17,29 +17,11 @@ from scipy.spatial import KDTree
 
 from .VaultManager import VaultManager
 
+API_KEY = os.environ.get('API_KEY', None)
+SERVER_URL = os.environ.get('SERVER_URL', None)
+
 
 class CryoEM(nanome.AsyncPluginInstance):
-    async def get_vault_file_list(self):
-        api_key = ''
-        server_url = ''
-
-        self._vault_manager = VaultManager(api_key, server_url)
-        presenter_info = await self.request_presenter_info()
-        self._user_id = presenter_info.account_id
-
-        self.user_files = []
-        user_folder = self._vault_manager.list_path(self._user_id)
-        if not "files" in user_folder:
-            Logs.error("Failed to get Vault files")
-            return
-        self.user_files = user_folder['files']
-
-    def get_file_from_vault(self, filename):
-        name, ext = os.path.splitext(filename)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-        file_path = os.path.join(self._user_id, filename)
-        self._vault_manager.get_file(file_path, None, temp_file.path)
-        return temp_file.name
 
     @async_callback
     async def start(self):
@@ -69,8 +51,34 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.shown = True
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
+        ws = await self.request_workspace()
+        self.create_menu(ws)
+        self.set_plugin_list_button(
+            enums.PluginListButtonType.run, "Run", True)
 
-        self.request_workspace(self.create_menu)
+    def on_run(self):
+        self._menu.enabled = True
+        self.update_menu(self._menu)
+
+    async def get_vault_file_list(self):
+        self._vault_manager = VaultManager(API_KEY, SERVER_URL)
+        presenter_info = await self.request_presenter_info()
+        self._user_id = presenter_info.account_id
+
+        self.user_files = []
+        user_folder = self._vault_manager.list_path(self._user_id)
+        if not "files" in user_folder:
+            Logs.error("Failed to get Vault files")
+            return
+        self.user_files = user_folder['files']
+
+    def get_file_from_vault(self, filename):
+        name, ext = os.path.splitext(filename)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        file_path = os.path.join(self._user_id, filename)
+        self._vault_manager.get_file(file_path, None, temp_file.path)
+        return temp_file.name
+
 
     def remove_existing_plugin_structure(self, workspace):
         self.nanome_workspace = workspace
@@ -113,24 +121,24 @@ class CryoEM(nanome.AsyncPluginInstance):
             "Vault molecular files")
         node_label_Vault_mol.set_size_ratio(0.02)
 
-        node_Vault_files = self._menu.root.create_child_node()
-        node_Vault_files.set_size_ratio(0.05)
-        self._dropdown_files = node_Vault_files.add_new_dropdown()
+        node_vault_files = self._menu.root.create_child_node()
+        node_vault_files.set_size_ratio(0.05)
+        self._dropdown_files = node_vault_files.add_new_dropdown()
         self._dropdown_files.items = [nanome.ui.DropdownItem(
             file["name"]) for file in self.user_files if not file["name"].endswith(".map")]
-        node_Vault_files.forward_dist = .001
+        node_vault_files.forward_dist = .001
 
         node_label_Vault_map = self._menu.root.create_child_node()
         self.label_Vault_map = node_label_Vault_map.add_new_label(
             "Vault map files")
         node_label_Vault_map.set_size_ratio(0.02)
 
-        node_Vault_files2 = self._menu.root.create_child_node()
-        node_Vault_files2.set_size_ratio(0.05)
-        self._dropdown_files2 = node_Vault_files2.add_new_dropdown()
+        node_vault_files2 = self._menu.root.create_child_node()
+        node_vault_files2.set_size_ratio(0.05)
+        self._dropdown_files2 = node_vault_files2.add_new_dropdown()
         self._dropdown_files2.items = [nanome.ui.DropdownItem(
             file["name"]) for file in self.user_files if file["name"].endswith(".map")]
-        node_Vault_files2.forward_dist = .001
+        node_vault_files2.forward_dist = .001
 
         node_input = self._menu.root.create_child_node()
         text_input = node_input.add_new_text_input("PDBId")
@@ -388,9 +396,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._dropdown_files2.register_item_clicked_callback(
             set_selected_map_file)
 
-        self.set_plugin_list_button(
-            enums.PluginListButtonType.run, "Run", True)
-
     def set_current_complex_generate_surface(self, workspace):
         self.nanome_workspace = workspace
         self.nanome_complex = None
@@ -445,10 +450,6 @@ class CryoEM(nanome.AsyncPluginInstance):
                 str(round(self.iso_value, 3))
             self.update_content(self.label_iso)
             self.update_content(self._slider_iso)
-
-    def on_run(self):
-        self._menu.enabled = True
-        self.update_menu(self._menu)
 
     def update_isosurface(self, iso):
         self.label_iso.text_value = "Iso-value: " + \
