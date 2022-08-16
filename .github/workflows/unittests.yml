@@ -1,0 +1,14 @@
+name: Unittests
+on:
+  pull_request:
+    branches: [ master ]
+  # push:
+  #   branches: [ master ]
+
+jobs:
+  unittests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: cd docker && ./build.sh
+    - run: docker run --rm cryo-em:latest python -m discover tests

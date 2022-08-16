@@ -1,6 +1,6 @@
 nanome
 mrcfile
-mcubes
+PyMCubes
 pyfqmr
 randomcolor
 scipy

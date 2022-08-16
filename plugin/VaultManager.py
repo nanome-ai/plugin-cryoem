@@ -55,4 +55,3 @@ class VaultManager:
     def list_path(self, path=None, key=None):
         r = self.get(path, key)
         return r.json()
-

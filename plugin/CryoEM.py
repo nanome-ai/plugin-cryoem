@@ -191,7 +191,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._show_button.selected = True
         show_hide_node.set_size_ratio(0.05)
         show_hide_node.forward_dist = 0.001
-        
+
         wireframe_node = self._menu.root.create_child_node()
         self._wireframe_button = wireframe_node.add_new_toggle_switch("Wireframe")
         self._wireframe_button.selected = False
@@ -322,7 +322,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                     self.opacity * 255) if toggle.selected else 0
                 self.shown = toggle.selected
                 self.nanome_mesh.upload()
-        
+
         def set_wireframe_mode(toggle):
             self.wireframe_mode = toggle.selected
             if self.nanome_mesh is not None:
@@ -333,7 +333,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                 else:
                     self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
                     self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
-                
+
                 self.color_by_scheme()
                 self.nanome_mesh.upload()
 
@@ -656,9 +656,9 @@ class CryoEM(nanome.AsyncPluginInstance):
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
         hist, bins = np.histogram(flat_offset, bins=1000)
-        logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
+        logbins = np.logspace(np.log10(bins[0]), np.log10(bins[-1]), len(bins))
 
-        plt.hist(flat, bins=logbins-abs(minmap))
+        plt.hist(flat, bins=logbins - abs(minmap))
         plt.ylim(bottom=10)
         plt.yscale('log')
         plt.title("Level histogram")
@@ -688,7 +688,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     def color_by_element(self):
         if self.nanome_complex is None:
             return
-        
+
         verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
 
         if len(verts) < 3:
@@ -798,12 +798,12 @@ class CryoEM(nanome.AsyncPluginInstance):
             if i >= 0 and i < len(atom_positions):
                 bf = bfactors[i]
                 norm_bf = (bf - minbf) / (maxbf - minbf)
-                id_color = int(norm_bf * (sections-1))
+                id_color = int(norm_bf * (sections - 1))
                 colors += colors_rainbow[int(id_color)]
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
         self.nanome_mesh.colors = np.array(colors)
-    
+
     def wireframe_mesh(self, wiresize=0.01):
         ntri = len(self.computed_triangles) * 3
 
@@ -819,15 +819,15 @@ class CryoEM(nanome.AsyncPluginInstance):
 
             if t1 == t2 or t2 == t3 or t1 == t3:
                 continue
-                
+
             v1 = np.array(self.computed_vertices[t1])
             v2 = np.array(self.computed_vertices[t2])
             v3 = np.array(self.computed_vertices[t3])
-            
+
             n1 = np.array(self.computed_normals[t1])
             n2 = np.array(self.computed_normals[t2])
             n3 = np.array(self.computed_normals[t3])
-            
+
             v1v2 = v2 - v1
             v2v3 = v3 - v2
             v3v1 = v1 - v3
@@ -923,6 +923,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             new_tris[newIdT + 5][2] = newId + 10
             new_tris[newIdT + 11][2] = newId + 10
         return (new_verts, new_norms, new_tris)
+
 
 def chain_color(id_chain):
     molecule = self._complex._molecules[self._complex.current_frame]
