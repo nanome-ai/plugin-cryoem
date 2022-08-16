@@ -23,10 +23,7 @@ jobs:
     - name: Get repo name
       id: repoName
       run: |
-        prefix=nanome-ai/plugin-
-        git_repository="${{github.repository}}"
-        repo_name=${git_repository/#$prefix} 
-        echo $repo_name
+        repo_name=cryo-em 
         echo "::set-output name=repo_name::$(echo $repo_name)"
     - name: Set default tag
       id: default_tag
