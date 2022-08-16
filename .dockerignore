@@ -1,0 +1,6 @@
+*
+!plugin
+!tests
+!requirements.txt
+!run_tests.py
+!run.py
