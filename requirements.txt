@@ -5,3 +5,5 @@ pyfqmr
 randomcolor
 scipy
 numpy
+matplotlib
+requests
