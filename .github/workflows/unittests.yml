@@ -9,4 +9,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - run: cd docker && ./build.sh
-    - run: docker run --rm cryo-em:latest python -m discover tests
+    - run: docker run --rm cryo-em:latest python -m unittest discover tests
