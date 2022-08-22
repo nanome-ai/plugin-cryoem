@@ -99,7 +99,8 @@ class CryoEM(nanome.AsyncPluginInstance):
                 self.nanome_complex = c
 
         self.set_limited_view_on_cog()
-        self.generate_isosurface(self.iso_value)
+        iso_value = self.menu.sl_iso_value.current_value
+        self.generate_isosurface(iso_value)
 
     def set_limited_view_on_cog(self):
         # Compute center of gravity of structure
