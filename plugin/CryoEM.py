@@ -147,8 +147,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             # self.update_content(self._slider_iso)
 
     def generate_isosurface(self, iso, decimation_factor=5):
-        Logs.message("Generating iso-surface for iso-value " +
-                     str(round(iso, 3)))
+        Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
         self.iso_value = iso
 
         self.set_plugin_list_button(
@@ -212,7 +211,9 @@ class CryoEM(nanome.AsyncPluginInstance):
             self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
             self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
             self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
-        self.color_by_scheme()
+
+        scheme = self.menu.get_color_scheme()
+        self.color_by_scheme(scheme)
 
         Logs.message(
             "Uploading iso-surface ("
@@ -284,14 +285,14 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Run", True)
 
-    def color_by_scheme(self):
+    def color_by_scheme(self, scheme):
         if self.nanome_mesh is None:
             return
-        if self.color_by == enums.ColorScheme.Element:
+        if scheme == enums.ColorScheme.Element:
             self.color_by_element()
-        elif self.color_by == enums.ColorScheme.BFactor:
+        elif scheme == enums.ColorScheme.BFactor:
             self.color_by_bfactor()
-        elif self.color_by == enums.ColorScheme.Chain:
+        elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain()
 
     def color_by_element(self):

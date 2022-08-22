@@ -70,6 +70,10 @@ class MainMenu:
     def lbl_limit_range_value(self):
         return self._menu.root.find_node('lbl_limit_range_value').get_content()
 
+    @property
+    def nanome_mesh(self):
+        return self._plugin_instance.nanome_mesh
+
     def __init__(self, plugin_instance):
         self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
         self._plugin_instance = plugin_instance
@@ -90,7 +94,6 @@ class MainMenu:
         self.btn_show_hide_map.toggle_on_press = True
         self.btn_wireframe.switch.active = True
         self.btn_wireframe.toggle_on_press = True
-        self.nanome_mesh = None
         self.color_by = enums.ColorScheme.BFactor
 
     def render(self, ws):
@@ -199,7 +202,6 @@ class MainMenu:
         self.current_mesh = []
         if self.nanome_mesh is not None:
             self.nanome_mesh.destroy()
-        self.nanome_mesh = None
 
         self.pdbid = textinput.input_text.strip()
 
@@ -259,21 +261,26 @@ class MainMenu:
                 self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
                 self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
 
-            self.color_by_scheme()
+            self._plugin_instance.color_by_scheme()
             self.nanome_mesh.upload()
 
     def change_color_scheme(self, dropdown, item):
-        if item.name == "Element":
-            new_color_scheme = enums.ColorScheme.Element
-        elif item.name == "Bfactor":
-            new_color_scheme = enums.ColorScheme.BFactor
-        elif item.name == "Chain":
-            new_color_scheme = enums.ColorScheme.Chain
+        new_color_scheme = self.get_color_scheme()
         if self.color_by != new_color_scheme:
             self.color_by = new_color_scheme
-            self.color_by_scheme()
+            self._plugin_instance.color_by_scheme(new_color_scheme)
             if self.nanome_mesh is not None:
                 self.nanome_mesh.upload()
+
+    def get_color_scheme(self):
+        item = next(item for item in self.dd_color_scheme.items if item.selected)
+        if item.name == "Element":
+            color_scheme = enums.ColorScheme.Element
+        elif item.name == "Bfactor":
+            color_scheme = enums.ColorScheme.BFactor
+        elif item.name == "Chain":
+            color_scheme = enums.ColorScheme.Chain
+        return color_scheme
 
     def set_target_complex(self, dropdown, item):
         self._plugin_instance.update_content(dropdown)
@@ -299,8 +306,8 @@ class MainMenu:
     def update_isosurface(self, iso):
         self.lbl_iso_value.text_value = str(round(iso.current_value, 3))
         self._plugin_instance.update_content(self.lbl_iso_value)
-        # if self._map_data is not None:
-        #     self.generate_isosurface(iso.current_value)
+        if self._map_data is not None:
+            self.generate_isosurface(iso.current_value)
         Logs.debug("Setting iso-value to", str(round(iso.current_value, 3)))
 
     def update_limited_view_x(self, slider):
@@ -343,7 +350,7 @@ class MainMenu:
         self.limited_view_range = slider.current_value
         self.lbl_limit_range_value.text_value = str(round(self.limited_view_range, 2))
         self._plugin_instance.update_content(self.lbl_limit_range_value)
-        # self.update_mesh_limited_view()
+        # self._plugin_instance.update_mesh_limited_view()
         Logs.debug("Setting limited view range to",
                    str(round(self.limited_view_range, 2)))
 
