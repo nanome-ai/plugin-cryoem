@@ -11,6 +11,7 @@ MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
 
 MAP_FILETYPES = ['.map', '.map.gz']
 
+
 class MainMenu:
     nanome_complex = None
 
@@ -44,11 +45,11 @@ class MainMenu:
     @property
     def dd_complexes(self):
         return self._menu.root.find_node('dd_complexes').get_content()
-    
+
     @property
     def dd_vault_mol_files(self):
         return self._menu.root.find_node('dd_vault_mol_files').get_content()
-    
+
     @property
     def dd_vault_map_files(self):
         return self._menu.root.find_node('dd_vault_map_files').get_content()
@@ -56,7 +57,7 @@ class MainMenu:
     @property
     def sl_iso_value(self):
         return self._menu.root.find_node('sl_iso_value').get_content()
-    
+
     @property
     def sl_opacity(self):
         return self._menu.root.find_node('sl_opacity').get_content()
@@ -68,7 +69,7 @@ class MainMenu:
     @property
     def dd_color_scheme(self):
         return self._menu.root.find_node('dd_color_scheme').get_content()
-    
+
     @property
     def btn_show_hide_map(self):
         return self._menu.root.find_node('btn_show_hide_map').get_content()
@@ -80,15 +81,15 @@ class MainMenu:
     @property
     def ti_pdb_id(self):
         return self._menu.root.find_node('ti_pdb_id').get_content()
-    
+
     @property
     def lbl_iso_value(self):
         return self._menu.root.find_node('lbl_iso_value').get_content()
-    
+
     @property
     def lbl_opacity_value(self):
         return self._menu.root.find_node('lbl_opacity_value').get_content()
-    
+
     @property
     def lbl_limit_range_value(self):
         return self._menu.root.find_node('lbl_limit_range_value').get_content()
@@ -304,7 +305,7 @@ class MainMenu:
             tfile = self.get_file_from_vault(
                 self._Vault_map_file_to_download)
             self._plugin.map_file = tfile
-    
+
     def update_isosurface(self, iso):
         self.lbl_iso_value.text_value = str(round(iso.current_value, 3))
         self._plugin.update_content(self.lbl_iso_value)
