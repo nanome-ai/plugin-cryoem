@@ -37,9 +37,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.nanome_mesh = None
         self.nanome_complex = None
         self.iso_value = 0.0
-        self.opacity = 0.6
-        self._slider_iso = None
-        self._slider_opacity = None
         self.limit_x = 0.0
         self.limit_y = 0.0
         self.limit_z = 0.0
@@ -139,13 +136,6 @@ class CryoEM(nanome.AsyncPluginInstance):
             self._map_origin = np.hstack(
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
 
-            # self.iso_value = self.map_prefered_level
-            # self._slider_iso.current_value = self.iso_value
-            # self.label_iso.text_value = "Iso-value: " + \
-            #     str(round(self.iso_value, 3))
-            # self.update_content(self.label_iso)
-            # self.update_content(self._slider_iso)
-
     def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
         self.iso_value = iso
@@ -198,7 +188,8 @@ class CryoEM(nanome.AsyncPluginInstance):
         anchor.local_offset = Vector3(
             self._map_origin[0], self._map_origin[1], self._map_origin[2])
 
-        self.nanome_mesh.color = Color(255, 255, 255, int(self.opacity * 255))
+        opacity = self.menu.sl_opacity.current_value
+        self.nanome_mesh.color = Color(255, 255, 255, int(opacity * 255))
 
         if not self.shown:
             self.nanome_mesh.color.a = 0
