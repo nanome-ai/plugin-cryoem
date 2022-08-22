@@ -9,8 +9,14 @@ import numpy as np
 BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
 MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
 
+MAP_FILETYPES = ['.map', '.map.gz']
 
 class MainMenu:
+    nanome_complex = None
+
+    @property
+    def img_histo(self):
+        return self._menu.root.find_node('img_histo').get_content()
 
     @property
     def dd_complexes(self):
@@ -80,27 +86,31 @@ class MainMenu:
         self.dd_complexes.register_item_clicked_callback(self.set_target_complex)
         self.dd_vault_mol_files.register_item_clicked_callback(self.set_selected_file)
         self.dd_vault_map_files.register_item_clicked_callback(self.set_selected_map_file)
+        self.btn_show_hide_map.switch.active = True
+        self.btn_show_hide_map.toggle_on_press = True
+        self.btn_wireframe.switch.active = True
+        self.btn_wireframe.toggle_on_press = True
         self.nanome_mesh = None
+        self.color_by = enums.ColorScheme.BFactor
 
-    def enable(self):
+    def render(self, ws):
         Logs.message("Enabling menu")
         self._menu.enabled = True
         self._plugin_instance.update_menu(self._menu)
-
-    def create_menu(self, workspace):
-        self._dropdown_complexes.items = [
+        self.dd_complexes.items = [
             nanome.ui.DropdownItem(c.name)
-            for c in self.nanome_workspace.complexes
+            for c in ws.complexes
+        ]
+        self.dd_vault_mol_files.items = [
+            nanome.ui.DropdownItem(file["name"])
+            for file in self._plugin_instance.user_files
+            if file["name"] not in MAP_FILETYPES
         ]
 
-        self._dropdown_files.items = [
+        self.dd_vault_map_files.items = [
             nanome.ui.DropdownItem(file["name"])
-            for file in self.user_files if not file["name"].endswith(".map")
-        ]
-
-        self._dropdown_files2.items = [
-            nanome.ui.DropdownItem(file["name"])
-            for file in self.user_files if file["name"].endswith(".map")
+            for file in self._plugin_instance.user_files
+            if file["name"] in MAP_FILETYPES
         ]
 
         self.dd_color_scheme.items = [
@@ -109,9 +119,14 @@ class MainMenu:
         ]
         self.dd_color_scheme.items[0].selected = True
 
+        self.lbl_iso_value.text_value = str(round(self.sl_iso_value.current_value, 2))
+        self.lbl_opacity_value.text_value = str(round(self.sl_opacity.current_value, 2))
+        self.lbl_limit_range_value.text_value = str(round(self.sl_range_limit.current_value, 2))
+        self._plugin_instance.update_menu(self._menu)
+
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
-        self.send_notification(
+        self._plugin_instance.send_notification(
             nanome.util.enums.NotificationTypes.message, "Downloading EM data"
         )
 
@@ -132,15 +147,15 @@ class MainMenu:
             with open(map_tempfile.name, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            self.map_file = map_tempfile
-            self.load_map()
-            self.generate_histogram()
-            self.request_workspace(
-                self.set_current_complex_generate_surface)
+            self._plugin_instance.map_file = map_tempfile
+            self._plugin_instance.load_map()
+            self._plugin_instance.generate_histogram()
+            self._plugin_instance.request_workspace(
+                self._plugin_instance.set_current_complex_generate_surface)
 
     def download_cryoem_map_from_pdbid(self, file):
         Logs.message("Downloading EM data for PDBID:", self.pdbid)
-        self.send_notification(
+        self._plugin_instance.send_notification(
             nanome.util.enums.NotificationTypes.message, "Downloading EM data"
         )
         base = "https://data.rcsb.org/rest/v1/core/entry/"
@@ -148,7 +163,7 @@ class MainMenu:
         response = requests.get(rest_url)
         if response.status_code != 200:
             Logs.error("Something went wrong fetching the EM data")
-            self.send_notification(
+            self._plugin_instance.send_notification(
                 nanome.util.enums.NotificationTypes.error,
                 "No EMDB data for " + str(self.pdbid),
             )
@@ -158,7 +173,7 @@ class MainMenu:
         k2 = "emdb_ids"
         if not k1 in result or not k2 in result[k1]:
             Logs.error("No EM data found for", self.pdbid)
-            self.send_notification(
+            self._plugin_instance.send_notification(
                 nanome.util.enums.NotificationTypes.error,
                 "No EMDB data for " + str(self.pdbid),
             )
@@ -174,7 +189,7 @@ class MainMenu:
             self.download_cryoem_map_from_emdbid(emdb_ids[0])
         else:
             Logs.error("No EM data found for", self.pdbid)
-            self.send_notification(
+            self._plugin_instance.send_notification(
                 nanome.util.enums.NotificationTypes.error,
                 "No EMDB data for ",
                 self.pdbid,
@@ -190,7 +205,7 @@ class MainMenu:
 
         if self.nanome_complex is None and len(self.pdbid) != 4:
             Logs.error("Wrong PDBID:", self.pdbid)
-            self.send_notification(
+            self._plugin_instance.send_notification(
                 nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
             )
             return False
@@ -202,12 +217,11 @@ class MainMenu:
                 if len(self.pdbid) > 4 and not "EMD" in self.pdbid and not "emd" in self.pdbid:
                     self.pdbid = "EMD-" + self.pdbid
                 self.download_cryoem_map_from_emdbid(self.pdbid)
-
             return True
 
         base = "https://files.rcsb.org/download/"
         full_url = base + self.pdbid + ".pdb.gz"
-        self.send_notification(
+        self._plugin_instance.send_notification(
             nanome.util.enums.NotificationTypes.message, "Downloading PDB"
         )
         Logs.message("Downloading PDB file from", full_url)
@@ -215,7 +229,7 @@ class MainMenu:
         response = requests.get(full_url)
         if response.status_code != 200:
             Logs.error("Something went wrong fetching the PDB file")
-            self.send_notification(
+            self._plugin_instance.send_notification(
                 nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
             )
             return False
@@ -224,7 +238,7 @@ class MainMenu:
         )
         open(pdb_tempfile.name, "wb").write(response.content)
         pdb_path = pdb_tempfile.name.replace("\\", "/")
-        self.send_files_to_load(pdb_path, self.download_cryoem_map_from_pdbid)
+        self._plugin_instance.send_files_to_load(pdb_path, self.download_cryoem_map_from_pdbid)
         return True
 
     def show_hide_map(self, toggle):
@@ -262,10 +276,11 @@ class MainMenu:
                 self.nanome_mesh.upload()
 
     def set_target_complex(self, dropdown, item):
-        for c in self.nanome_workspace.complexes:
-            if c.name == item.name:
-                self.nanome_complex = c
-                return
+        self._plugin_instance.update_content(dropdown)
+        # for c in self.nanome_workspace.complexes:
+        #     if c.name == item.name:
+        #         self.nanome_complex = c
+        #         return
 
     def set_selected_file(self, dropdown, item):
         self._Vault_mol_file_to_download = item.name
@@ -279,7 +294,7 @@ class MainMenu:
         if self._Vault_map_file_to_download is not None:
             tfile = self.get_file_from_vault(
                 self._Vault_map_file_to_download)
-            self.map_file = tfile
+            self._plugin_instance.map_file = tfile
     
     def update_isosurface(self, iso):
         self.lbl_iso_value.text_value = str(round(iso.current_value, 3))
@@ -334,7 +349,7 @@ class MainMenu:
 
     def update_mesh_limited_view(self):
         if self.current_mesh != [] and self.nanome_mesh is not None:
-            vertices, normals, triangles = self.limit_view(
+            vertices, normals, triangles = self._plugin_instance.limit_view(
                 self.current_mesh, self.limited_view_pos, self.limited_view_range
             )
 
@@ -363,41 +378,3 @@ class MainMenu:
         #     self.nanome_mesh.color.a = int(self.opacity * 255)
         #     self.nanome_mesh.upload()
 
-    def limit_view(self, mesh, position, range):
-        if range <= 0:
-            return mesh
-        vertices, normals, triangles = mesh
-
-        pos = np.asarray(position)
-        idv = 0
-        to_keep = []
-        for v in vertices:
-            vert = np.asarray(v)
-            dist = np.linalg.norm(vert - pos)
-            if dist <= range:
-                to_keep.append(idv)
-            idv += 1
-        if len(to_keep) == len(vertices):
-            return mesh
-
-        new_vertices = []
-        new_triangles = []
-        new_normals = []
-        mapping = np.full(len(vertices), -1, np.int32)
-        idv = 0
-        for i in to_keep:
-            mapping[i] = idv
-            new_vertices.append(vertices[i])
-            new_normals.append(normals[i])
-            idv += 1
-
-        for t in triangles:
-            if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
-                new_triangles.append(
-                    [mapping[t[0]], mapping[t[1]], mapping[t[2]]])
-
-        return (
-            np.asarray(new_vertices),
-            np.asarray(new_normals),
-            np.asarray(new_triangles),
-        )

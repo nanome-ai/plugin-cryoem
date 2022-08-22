@@ -29,7 +29,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         #     enums.PluginListButtonType.run, "Creating Menu...", False)
         # await self.get_vault_file_list()
         self.nanome_workspace = None
-
+        self.user_files = []
         self._Vault_mol_file_to_download = None
         self._Vault_map_file_to_download = None
         self.map_file = None
@@ -50,13 +50,14 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.shown = True
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
-        # ws = await self.request_workspace()
         self.menu = MainMenu(self)
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Run", True)
 
-    def on_run(self):
-        self.menu.enable()
+    @async_callback
+    async def on_run(self):
+        ws = await self.request_workspace()
+        self.menu.render(ws)
 
     async def get_vault_file_list(self):
         self._vault_manager = VaultManager(API_KEY, SERVER_URL)
@@ -137,12 +138,12 @@ class CryoEM(nanome.AsyncPluginInstance):
             self._map_origin = np.hstack(
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
 
-            self.iso_value = self.map_prefered_level
-            self._slider_iso.current_value = self.iso_value
-            self.label_iso.text_value = "Iso-value: " + \
-                str(round(self.iso_value, 3))
-            self.update_content(self.label_iso)
-            self.update_content(self._slider_iso)
+            # self.iso_value = self.map_prefered_level
+            # self._slider_iso.current_value = self.iso_value
+            # self.label_iso.text_value = "Iso-value: " + \
+            #     str(round(self.iso_value, 3))
+            # self.update_content(self.label_iso)
+            # self.update_content(self._slider_iso)
 
     def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message("Generating iso-surface for iso-value " +
@@ -219,6 +220,45 @@ class CryoEM(nanome.AsyncPluginInstance):
         )
         self.nanome_mesh.upload(self.done_updating)
 
+    def limit_view(self, mesh, position, range):
+        if range <= 0:
+            return mesh
+        vertices, normals, triangles = mesh
+
+        pos = np.asarray(position)
+        idv = 0
+        to_keep = []
+        for v in vertices:
+            vert = np.asarray(v)
+            dist = np.linalg.norm(vert - pos)
+            if dist <= range:
+                to_keep.append(idv)
+            idv += 1
+        if len(to_keep) == len(vertices):
+            return mesh
+
+        new_vertices = []
+        new_triangles = []
+        new_normals = []
+        mapping = np.full(len(vertices), -1, np.int32)
+        idv = 0
+        for i in to_keep:
+            mapping[i] = idv
+            new_vertices.append(vertices[i])
+            new_normals.append(normals[i])
+            idv += 1
+
+        for t in triangles:
+            if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
+                new_triangles.append(
+                    [mapping[t[0]], mapping[t[1]], mapping[t[2]]])
+
+        return (
+            np.asarray(new_vertices),
+            np.asarray(new_normals),
+            np.asarray(new_triangles),
+        )
+
     def generate_histogram(self):
         flat = self._map_data.flatten()
         minmap = np.min(flat)
@@ -233,8 +273,8 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png")
         plt.savefig(self.png_tempfile.name)
-        self.histo_image.file_path = self.png_tempfile.name
-        self.update_content(self.histo_image)
+        self.menu.img_histo.file_path = self.png_tempfile.name
+        self.update_content(self.menu.img_histo)
 
     def done_updating(self, m):
         Logs.message(
