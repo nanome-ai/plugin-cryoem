@@ -16,6 +16,7 @@ from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
 from .VaultManager import VaultManager
+from .menu import MainMenu
 
 API_KEY = os.environ.get('API_KEY', None)
 SERVER_URL = os.environ.get('SERVER_URL', None)
