@@ -28,6 +28,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # self.set_plugin_list_button(
         #     enums.PluginListButtonType.run, "Creating Menu...", False)
         # await self.get_vault_file_list()
+        self.temp_dir = tempfile.TemporaryDirectory()
         self.nanome_workspace = None
         self.user_files = []
         self._Vault_mol_file_to_download = None
@@ -50,6 +51,9 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.menu = MainMenu(self)
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Run", True)
+    
+    def on_stop(self):
+        self.temp_dir.cleanup()
 
     @async_callback
     async def on_run(self):
@@ -70,7 +74,8 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def get_file_from_vault(self, filename):
         name, ext = os.path.splitext(filename)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        temp_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix=ext, dir=self.temp_dir.name)
         file_path = os.path.join(self._user_id, filename)
         self._vault_manager.get_file(file_path, None, temp_file.path)
         return temp_file.name
@@ -264,7 +269,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         plt.yscale('log')
         plt.title("Level histogram")
         self.png_tempfile = tempfile.NamedTemporaryFile(
-            delete=False, suffix=".png")
+            delete=False, suffix=".png", dir=self.temp_dir.name)
         plt.savefig(self.png_tempfile.name)
         self.menu.img_histo.file_path = self.png_tempfile.name
         self.update_content(self.menu.img_histo)
