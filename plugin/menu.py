@@ -3,7 +3,7 @@ import requests
 import tempfile
 from os import path
 from nanome.api import ui
-from nanome.util import Logs, enums
+from nanome.util import async_callback, enums, Logs
 import numpy as np
 
 BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
@@ -98,6 +98,10 @@ class MainMenu:
     def nanome_mesh(self):
         return self._plugin.nanome_mesh
 
+    @property
+    def nanome_complex(self):
+        return self._plugin.nanome_complex
+
     def render(self, ws):
         Logs.message("Enabling menu")
         self._menu.enabled = True
@@ -129,7 +133,7 @@ class MainMenu:
         self.lbl_limit_range_value.text_value = str(round(self.sl_range_limit.current_value, 2))
         self._plugin.update_menu(self._menu)
 
-    def download_cryoem_map_from_emdbid(self, emdbid):
+    async def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
         self._plugin.send_notification(
             nanome.util.enums.NotificationTypes.message, "Downloading EM data"
@@ -147,7 +151,7 @@ class MainMenu:
         with requests.get(new_url, stream=True) as r:
             r.raise_for_status()
             map_tempfile = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".map.gz"
+                delete=False, suffix=".map.gz", dir=self._plugin.temp_dir.name
             )
             with open(map_tempfile.name, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -155,10 +159,10 @@ class MainMenu:
             self._plugin.map_file = map_tempfile
             self._plugin.load_map()
             self._plugin.generate_histogram()
-            self._plugin.request_workspace(
-                self._plugin.set_current_complex_generate_surface)
+            ws = await self._plugin.request_workspace()
+            await self._plugin.set_current_complex_generate_surface(ws)
 
-    def download_cryoem_map_from_pdbid(self, file):
+    async def download_cryoem_map_from_pdbid(self, file):
         Logs.message("Downloading EM data for PDBID:", self.pdbid)
         self._plugin.send_notification(
             nanome.util.enums.NotificationTypes.message, "Downloading EM data"
@@ -191,7 +195,7 @@ class MainMenu:
             Logs.debug("Found prevered level =", self.map_prefered_level)
 
         if len(emdb_ids) >= 1:
-            self.download_cryoem_map_from_emdbid(emdb_ids[0])
+            await self.download_cryoem_map_from_emdbid(emdb_ids[0])
         else:
             Logs.error("No EM data found for", self.pdbid)
             self._plugin.send_notification(
@@ -200,7 +204,8 @@ class MainMenu:
                 self.pdbid,
             )
 
-    def download_pdb(self, textinput):
+    @async_callback
+    async def download_pdb(self, textinput):
         self.current_mesh = []
         if self.nanome_mesh is not None:
             self.nanome_mesh.destroy()
@@ -216,7 +221,7 @@ class MainMenu:
         # Download the PDB only if no target complex set
         if self.nanome_complex is not None:
             if len(self.pdbid) == 4:
-                self.download_cryoem_map_from_pdbid(None)
+                await self.download_cryoem_map_from_pdbid(None)
             else:
                 if len(self.pdbid) > 4 and not "EMD" in self.pdbid and not "emd" in self.pdbid:
                     self.pdbid = "EMD-" + self.pdbid
@@ -237,12 +242,17 @@ class MainMenu:
                 nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
             )
             return False
+
         pdb_tempfile = tempfile.NamedTemporaryFile(
-            delete=False, prefix="CryoEM_plugin_" + self.pdbid, suffix=".pdb.gz"
+            delete=False,
+            prefix="CryoEM_plugin_" + self.pdbid,
+            suffix=".pdb.gz",
+            dir=self._plugin.temp_dir.name
         )
         open(pdb_tempfile.name, "wb").write(response.content)
         pdb_path = pdb_tempfile.name.replace("\\", "/")
-        self._plugin.send_files_to_load(pdb_path, self.download_cryoem_map_from_pdbid)
+        file = await self._plugin.send_files_to_load(pdb_path)
+        await self.download_cryoem_map_from_pdbid(file)
         return True
 
     def show_hide_map(self, toggle):
@@ -306,11 +316,12 @@ class MainMenu:
                 self._Vault_map_file_to_download)
             self._plugin.map_file = tfile
 
-    def update_isosurface(self, iso):
+    @async_callback
+    async def update_isosurface(self, iso):
         self.lbl_iso_value.text_value = str(round(iso.current_value, 3))
         self._plugin.update_content(self.lbl_iso_value)
         if self._plugin._map_data is not None:
-            self._plugin.generate_isosurface(iso.current_value)
+            await self._plugin.generate_isosurface(iso.current_value)
         Logs.debug("Setting iso-value to", str(round(iso.current_value, 3)))
 
     def update_limited_view_x(self, slider):

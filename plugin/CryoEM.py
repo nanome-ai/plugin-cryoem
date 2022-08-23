@@ -25,13 +25,9 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def start(self):
-        # self.set_plugin_list_button(
-        #     enums.PluginListButtonType.run, "Creating Menu...", False)
-        # await self.get_vault_file_list()
+        self.temp_dir = tempfile.TemporaryDirectory()
         self.nanome_workspace = None
         self.user_files = []
-        self._Vault_mol_file_to_download = None
-        self._Vault_map_file_to_download = None
         self.map_file = None
         self._map_data = None
         self.nanome_mesh = None
@@ -48,8 +44,9 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
         self.menu = MainMenu(self)
-        self.set_plugin_list_button(
-            enums.PluginListButtonType.run, "Run", True)
+
+    def on_stop(self):
+        self.temp_dir.cleanup()
 
     @async_callback
     async def on_run(self):
@@ -70,7 +67,8 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def get_file_from_vault(self, filename):
         name, ext = os.path.splitext(filename)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        temp_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix=ext, dir=self.temp_dir.name)
         file_path = os.path.join(self._user_id, filename)
         self._vault_manager.get_file(file_path, None, temp_file.path)
         return temp_file.name
@@ -87,7 +85,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         self.update_workspace(self.nanome_workspace)
 
-    def set_current_complex_generate_surface(self, workspace):
+    async def set_current_complex_generate_surface(self, workspace):
         self.nanome_workspace = workspace
         self.nanome_complex = None
 
@@ -97,7 +95,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         self.set_limited_view_on_cog()
         iso_value = self.menu.sl_iso_value.current_value
-        self.generate_isosurface(iso_value)
+        await self.generate_isosurface(iso_value)
 
     def set_limited_view_on_cog(self):
         # Compute center of gravity of structure
@@ -136,7 +134,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             self._map_origin = np.hstack(
                 [h.origin.x, h.origin.y, h.origin.z]) + offsets
 
-    def generate_isosurface(self, iso, decimation_factor=5):
+    async def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
         self.iso_value = iso
 
@@ -211,7 +209,8 @@ class CryoEM(nanome.AsyncPluginInstance):
             + str(len(self.nanome_mesh.vertices))
             + " vertices)"
         )
-        self.nanome_mesh.upload(self.done_updating)
+        await self.nanome_mesh.upload()
+        self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
 
     def limit_view(self, mesh, position, range):
         if range <= 0:
@@ -264,17 +263,10 @@ class CryoEM(nanome.AsyncPluginInstance):
         plt.yscale('log')
         plt.title("Level histogram")
         self.png_tempfile = tempfile.NamedTemporaryFile(
-            delete=False, suffix=".png")
+            delete=False, suffix=".png", dir=self.temp_dir.name)
         plt.savefig(self.png_tempfile.name)
         self.menu.img_histo.file_path = self.png_tempfile.name
         self.update_content(self.menu.img_histo)
-
-    def done_updating(self, m):
-        Logs.message(
-            "Done updating mesh for iso-value " + str(round(self.iso_value, 3))
-        )
-        self.set_plugin_list_button(
-            enums.PluginListButtonType.run, "Run", True)
 
     def color_by_scheme(self, scheme):
         if self.nanome_mesh is None:
