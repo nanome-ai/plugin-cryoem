@@ -32,7 +32,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self._map_data = None
         self.nanome_mesh = None
         self.nanome_complex = None
-        self.iso_value = 0.0
         self.limit_x = 0.0
         self.limit_y = 0.0
         self.limit_z = 0.0
@@ -136,8 +135,6 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
-        self.iso_value = iso
-
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Running...", False)
 
