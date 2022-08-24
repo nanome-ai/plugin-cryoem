@@ -47,8 +47,8 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
-        ws = await self.request_workspace()
-        self.menu.render(ws)
+        # ws = await self.request_workspace()
+        self.menu.render()
 
     async def get_vault_file_list(self):
         self._vault_manager = VaultManager(API_KEY, SERVER_URL)
@@ -188,7 +188,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
             anchor.target = self.nanome_complex.index
 
-        if self.wireframe_mode:
+        if self.menu.wireframe_mode:
             self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
             self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
             self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
@@ -391,7 +391,6 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def wireframe_mesh(self, wiresize=0.01):
         ntri = len(self.computed_triangles) * 3
-
         new_verts = np.zeros((ntri * 4, 3))
         new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
         new_norms = np.zeros((ntri * 4, 3))
@@ -509,6 +508,24 @@ class CryoEM(nanome.AsyncPluginInstance):
             new_tris[newIdT + 11][2] = newId + 10
         return (new_verts, new_norms, new_tris)
 
+    def update_mesh_limited_view(self):
+        if self.nanome_mesh is not None:
+            vertices, normals, triangles = self.limit_view(
+                self.nanome_mesh, self.limited_view_pos, self.limited_view_range
+            )
+            self.computed_vertices = np.array(vertices)
+            self.computed_normals = np.array(normals)
+            self.computed_triangles = np.array(triangles)
+
+            if self.wireframe_mode:
+                self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+                self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
+            else:
+                self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+            self.color_by_scheme()
+            self.nanome_mesh.upload()
 
 def chain_color(self, id_chain):
     molecule = self._complex._molecules[self._complex.current_frame]
