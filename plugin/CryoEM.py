@@ -527,6 +527,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             self.color_by_scheme()
             self.nanome_mesh.upload()
 
+
 def chain_color(self, id_chain):
     molecule = self._complex._molecules[self._complex.current_frame]
     n_chain = len(list(molecule.chains))
