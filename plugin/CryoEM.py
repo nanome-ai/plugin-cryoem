@@ -13,9 +13,8 @@ from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
-from .VaultManager import VaultManager
 from .menu import MainMenu
-
+from .VaultManager import VaultManager
 
 API_KEY = os.environ.get('API_KEY', None)
 SERVER_URL = os.environ.get('SERVER_URL', None)
@@ -26,32 +25,30 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.menu = MainMenu(self)
         self.nanome_workspace = None
         self.user_files = []
         self.map_file = None
-        self._map_data = None
         self.nanome_mesh = None
         self.nanome_complex = None
-        self.iso_value = 0.0
         self.limit_x = 0.0
         self.limit_y = 0.0
         self.limit_z = 0.0
         self.map_prefered_level = 0.0
         self.limited_view_pos = [0, 0, 0]
         self.limited_view_range = 15.0
-        self.current_mesh = []
         self.shown = True
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
-        self.menu = MainMenu(self)
+        self._map_data = None
 
     def on_stop(self):
         self.temp_dir.cleanup()
 
     @async_callback
     async def on_run(self):
-        ws = await self.request_workspace()
-        self.menu.render(ws)
+        # ws = await self.request_workspace()
+        self.menu.render()
 
     async def get_vault_file_list(self):
         self._vault_manager = VaultManager(API_KEY, SERVER_URL)
@@ -136,49 +133,44 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def generate_isosurface(self, iso, decimation_factor=5):
         Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
-        self.iso_value = iso
-
         self.set_plugin_list_button(
             enums.PluginListButtonType.run, "Running...", False)
 
         # Compute iso-surface with marching cubes algorithm
         vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
-
+        np_vertices = np.asarray(vertices)
+        np_triangles = np.asarray(triangles)
         Logs.debug("Decimating mesh")
-        target = max(1000, len(triangles) / decimation_factor)
-
+        target = max(1000, len(np_triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
-        mesh_simplifier.setMesh(np.asarray(vertices), np.asarray(triangles))
+        mesh_simplifier.setMesh(np_vertices, np_triangles)
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
-
         vertices, triangles, normals = mesh_simplifier.getMesh()
-
         if self._map_voxel_size.x > 0.0001:
+            Logs.debug("Setting voxels")
             voxel_size = np.array(
                 [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
             )
             vertices *= voxel_size
-
-        self.current_mesh = [vertices, normals, triangles]
-
+        Logs.debug("Limiting View")
         vertices, normals, triangles = self.limit_view(
             (vertices, normals, triangles),
             self.limited_view_pos,
             self.limited_view_range,
         )
 
-        if self.nanome_mesh is None:
-            self.nanome_mesh = Mesh()
-
+        Logs.debug("Setting computed values")
         self.computed_vertices = np.array(vertices)
         self.computed_normals = np.array(normals)
         self.computed_triangles = np.array(triangles)
 
-        self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
-        # self.nanome_mesh.normals = np.asarray(self.computed_normals).flatten()
-        self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+        if self.nanome_mesh is None:
+            self.nanome_mesh = Mesh()
+        self.nanome_mesh.vertices = self.computed_vertices.flatten()
+        self.nanome_mesh.normals = self.computed_normals.flatten()
+        self.nanome_mesh.triangles = self.computed_triangles.flatten()
 
         anchor = self.nanome_mesh.anchors[0]
 
@@ -196,7 +188,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Complex
             anchor.target = self.nanome_complex.index
 
-        if self.wireframe_mode:
+        if self.menu.wireframe_mode:
             self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
             self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
             self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
@@ -399,7 +391,6 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def wireframe_mesh(self, wiresize=0.01):
         ntri = len(self.computed_triangles) * 3
-
         new_verts = np.zeros((ntri * 4, 3))
         new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
         new_norms = np.zeros((ntri * 4, 3))
@@ -516,6 +507,25 @@ class CryoEM(nanome.AsyncPluginInstance):
             new_tris[newIdT + 5][2] = newId + 10
             new_tris[newIdT + 11][2] = newId + 10
         return (new_verts, new_norms, new_tris)
+
+    def update_mesh_limited_view(self):
+        if self.nanome_mesh is not None:
+            vertices, normals, triangles = self.limit_view(
+                self.nanome_mesh, self.limited_view_pos, self.limited_view_range
+            )
+            self.computed_vertices = np.array(vertices)
+            self.computed_normals = np.array(normals)
+            self.computed_triangles = np.array(triangles)
+
+            if self.wireframe_mode:
+                self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+                self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
+            else:
+                self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+            self.color_by_scheme()
+            self.nanome_mesh.upload()
 
 
 def chain_color(self, id_chain):

@@ -39,6 +39,10 @@ class MainMenu:
         self.shown = self.btn_show_hide_map.selected
 
     @property
+    def wireframe_mode(self):
+        return self._menu.root.find_node('btn_wireframe').get_content().selected
+
+    @property
     def img_histo(self):
         return self._menu.root.find_node('img_histo').get_content()
 
@@ -102,32 +106,30 @@ class MainMenu:
     def nanome_complex(self):
         return self._plugin.nanome_complex
 
-    def render(self, ws):
+    def render(self):
         Logs.message("Enabling menu")
         self._menu.enabled = True
         self._plugin.update_menu(self._menu)
-        self.dd_complexes.items = [
-            nanome.ui.DropdownItem(c.name)
-            for c in ws.complexes
-        ]
-        self.dd_vault_mol_files.items = [
-            nanome.ui.DropdownItem(file["name"])
-            for file in self._plugin.user_files
-            if file["name"] not in MAP_FILETYPES
-        ]
-
-        self.dd_vault_map_files.items = [
-            nanome.ui.DropdownItem(file["name"])
-            for file in self._plugin.user_files
-            if file["name"] in MAP_FILETYPES
-        ]
-
         self.dd_color_scheme.items = [
             nanome.ui.DropdownItem(name)
             for name in ["Bfactor", "Element", "Chain"]
         ]
-        self.dd_color_scheme.items[0].selected = True
+        # self.dd_complexes.items = [
+        #     nanome.ui.DropdownItem(c.name)
+        #     for c in ws.complexes
+        # ]
+        # self.dd_vault_mol_files.items = [
+        #     nanome.ui.DropdownItem(file["name"])
+        #     for file in self._plugin.user_files
+        #     if file["name"] not in MAP_FILETYPES
+        # ]
 
+        # self.dd_vault_map_files.items = [
+        #     nanome.ui.DropdownItem(file["name"])
+        #     for file in self._plugin.user_files
+        #     if file["name"] in MAP_FILETYPES
+        # ]
+        self.dd_color_scheme.items[0].selected = True
         self.lbl_iso_value.text_value = str(round(self.sl_iso_value.current_value, 2))
         self.lbl_opacity_value.text_value = str(round(self.sl_opacity.current_value, 2))
         self.lbl_limit_range_value.text_value = str(round(self.sl_range_limit.current_value, 2))
@@ -206,7 +208,6 @@ class MainMenu:
 
     @async_callback
     async def download_pdb(self, textinput):
-        self.current_mesh = []
         if self.nanome_mesh is not None:
             self.nanome_mesh.destroy()
 
@@ -264,20 +265,19 @@ class MainMenu:
             self.nanome_mesh.upload()
 
     def set_wireframe_mode(self, toggle):
-        self.wireframe_mode = toggle.selected
         if self.nanome_mesh is not None:
             if self.wireframe_mode:
-                self.wire_vertices, wire_normals, self.wire_triangles = self.wireframe_mesh()
-                self.nanome_mesh.vertices = self.wire_vertices.flatten()
-                self.nanome_mesh.triangles = self.wire_triangles.flatten()
+                self._plugin.wire_vertices, self._plugin.wire_normals, self._plugin.wire_triangles = self._plugin.wireframe_mesh()
+                self.nanome_mesh.vertices = self._plugin.wire_vertices.flatten()
+                self.nanome_mesh.triangles = self._plugin.wire_triangles.flatten()
             else:
-                self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
-                self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+                self.nanome_mesh.vertices = np.asarray(self._plugin.computed_vertices).flatten()
+                self.nanome_mesh.triangles = np.asarray(self._plugin.computed_triangles).flatten()
 
-            self._plugin.color_by_scheme()
+            self.change_color_scheme()
             self.nanome_mesh.upload()
 
-    def change_color_scheme(self, dropdown, item):
+    def change_color_scheme(self, **kwargs):
         new_color_scheme = self.get_color_scheme()
         if self.color_by != new_color_scheme:
             self.color_by = new_color_scheme
@@ -330,7 +330,7 @@ class MainMenu:
             str(round(self.limit_x, 2))
         self._plugin.update_content(self.label_limit_x)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self.update_mesh_limited_view()
+        self._plugin.update_mesh_limited_view()
         x = str(round(self.limit_x, 2))
         y = str(round(self.limit_y, 2))
         z = str(round(self.limit_z, 2))
@@ -342,7 +342,7 @@ class MainMenu:
             str(round(self.limit_y, 2))
         self._plugin.update_content(self.label_limit_y)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self.update_mesh_limited_view()
+        self._plugin.update_mesh_limited_view()
         x = str(round(self.limit_x, 2))
         y = str(round(self.limit_y, 2))
         z = str(round(self.limit_z, 2))
@@ -354,7 +354,7 @@ class MainMenu:
             str(round(self.limit_z, 2))
         self._plugin.update_content(self.label_limit_z)
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self.update_mesh_limited_view()
+        self._plugin.update_mesh_limited_view()
         x = str(round(self.limit_x, 2))
         y = str(round(self.limit_y, 2))
         z = str(round(self.limit_z, 2))
@@ -364,29 +364,9 @@ class MainMenu:
         self.limited_view_range = slider.current_value
         self.lbl_limit_range_value.text_value = str(round(self.limited_view_range, 2))
         self._plugin.update_content(self.lbl_limit_range_value)
-        # self._plugin.update_mesh_limited_view()
+        self._plugin.update_mesh_limited_view()
         Logs.debug("Setting limited view range to",
                    str(round(self.limited_view_range, 2)))
-
-    def update_mesh_limited_view(self):
-        if self.current_mesh != [] and self.nanome_mesh is not None:
-            vertices, normals, triangles = self._plugin.limit_view(
-                self.current_mesh, self.limited_view_pos, self.limited_view_range
-            )
-
-            self.computed_vertices = np.array(vertices)
-            self.computed_normals = np.array(normals)
-            self.computed_triangles = np.array(triangles)
-
-            if self.wireframe_mode:
-                self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
-                self.nanome_mesh.vertices = np.asarray(self.wire_vertices).flatten()
-                self.nanome_mesh.triangles = np.asarray(self.wire_triangles).flatten()
-            else:
-                self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
-                self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
-            self.color_by_scheme()
-            self.nanome_mesh.upload()
 
     def update_opacity(self, alpha):
         opacity = alpha.current_value
