@@ -13,9 +13,8 @@ from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
-from .VaultManager import VaultManager
 from .menu import MainMenu
-
+from .VaultManager import VaultManager
 
 API_KEY = os.environ.get('API_KEY', None)
 SERVER_URL = os.environ.get('SERVER_URL', None)
@@ -38,7 +37,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.map_prefered_level = 0.0
         self.limited_view_pos = [0, 0, 0]
         self.limited_view_range = 15.0
-        self.current_mesh = []
         self.shown = True
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
@@ -140,42 +138,44 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         # Compute iso-surface with marching cubes algorithm
         vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
-
+        np_vertices = np.asarray(vertices)
+        np_triangles = np.asarray(triangles)
+        del vertices
+        del triangles
         Logs.debug("Decimating mesh")
-        target = max(1000, len(triangles) / decimation_factor)
-
+        target = max(1000, len(np_triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
-        mesh_simplifier.setMesh(np.asarray(vertices), np.asarray(triangles))
+        mesh_simplifier.setMesh(np_vertices, np_triangles)
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
-
+        del np_vertices
+        del np_triangles
         vertices, triangles, normals = mesh_simplifier.getMesh()
-
+        del mesh_simplifier
         if self._map_voxel_size.x > 0.0001:
+            Logs.debug("Setting voxels")
             voxel_size = np.array(
                 [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
             )
             vertices *= voxel_size
-
-        self.current_mesh = [vertices, normals, triangles]
-
+        Logs.debug("Limiting View")
         vertices, normals, triangles = self.limit_view(
             (vertices, normals, triangles),
             self.limited_view_pos,
             self.limited_view_range,
         )
 
-        if self.nanome_mesh is None:
-            self.nanome_mesh = Mesh()
-
+        Logs.debug("Setting computed values")
         self.computed_vertices = np.array(vertices)
         self.computed_normals = np.array(normals)
         self.computed_triangles = np.array(triangles)
 
-        self.nanome_mesh.vertices = np.asarray(self.computed_vertices).flatten()
-        # self.nanome_mesh.normals = np.asarray(self.computed_normals).flatten()
-        self.nanome_mesh.triangles = np.asarray(self.computed_triangles).flatten()
+        if self.nanome_mesh is None:
+            self.nanome_mesh = Mesh()
+        self.nanome_mesh.vertices = self.computed_vertices.flatten()
+        self.nanome_mesh.normals = self.computed_normals.flatten()
+        self.nanome_mesh.triangles = self.computed_triangles.flatten()
 
         anchor = self.nanome_mesh.anchors[0]
 

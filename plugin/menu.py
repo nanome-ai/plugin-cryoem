@@ -206,7 +206,6 @@ class MainMenu:
 
     @async_callback
     async def download_pdb(self, textinput):
-        self.current_mesh = []
         if self.nanome_mesh is not None:
             self.nanome_mesh.destroy()
 
@@ -369,9 +368,9 @@ class MainMenu:
                    str(round(self.limited_view_range, 2)))
 
     def update_mesh_limited_view(self):
-        if self.current_mesh != [] and self.nanome_mesh is not None:
+        if self.nanome_mesh is not None:
             vertices, normals, triangles = self._plugin.limit_view(
-                self.current_mesh, self.limited_view_pos, self.limited_view_range
+                self.nanome_mesh, self.limited_view_pos, self.limited_view_range
             )
 
             self.computed_vertices = np.array(vertices)
