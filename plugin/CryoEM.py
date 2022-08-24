@@ -25,10 +25,10 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.menu = MainMenu(self)
         self.nanome_workspace = None
         self.user_files = []
         self.map_file = None
-        self._map_data = None
         self.nanome_mesh = None
         self.nanome_complex = None
         self.limit_x = 0.0
@@ -40,7 +40,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.shown = True
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
-        self.menu = MainMenu(self)
+        self._map_data = None
 
     def on_stop(self):
         self.temp_dir.cleanup()
@@ -140,8 +140,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
-        del vertices
-        del triangles
         Logs.debug("Decimating mesh")
         target = max(1000, len(np_triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
@@ -149,10 +147,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
-        del np_vertices
-        del np_triangles
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        del mesh_simplifier
         if self._map_voxel_size.x > 0.0001:
             Logs.debug("Setting voxels")
             voxel_size = np.array(
