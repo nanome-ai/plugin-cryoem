@@ -13,7 +13,7 @@ from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
-from .menu import MainMenu
+from .old_menu import OldMenu
 from .VaultManager import VaultManager
 
 API_KEY = os.environ.get('API_KEY', None)
@@ -25,7 +25,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.menu = MainMenu(self)
+        self.menu = OldMenu(self)
         self.nanome_workspace = None
         self.user_files = []
         self.map_file = None
@@ -510,8 +510,10 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def update_mesh_limited_view(self):
         if self.nanome_mesh is not None:
+            mesh = self.nanome_mesh
+            mesh_data = (mesh.vertices, mesh.normals, mesh.triangles)
             vertices, normals, triangles = self.limit_view(
-                self.nanome_mesh, self.limited_view_pos, self.limited_view_range
+                mesh_data, self.limited_view_pos, self.limited_view_range
             )
             self.computed_vertices = np.array(vertices)
             self.computed_normals = np.array(normals)

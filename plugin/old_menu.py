@@ -7,12 +7,12 @@ from nanome.util import async_callback, enums, Logs
 import numpy as np
 
 BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
-MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
+MAIN_MENU_PATH = path.join(BASE_PATH, 'old_menu.json')
 
 MAP_FILETYPES = ['.map', '.map.gz']
 
 
-class MainMenu:
+class OldMenu:
     nanome_complex = None
 
     def __init__(self, plugin_instance):
