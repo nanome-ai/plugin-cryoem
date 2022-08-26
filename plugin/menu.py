@@ -1,3 +1,5 @@
+import nanome
+import requests
 from os import path
 from nanome.api import ui
 from nanome.util import Logs
@@ -38,7 +40,13 @@ class EmbiDBMenu:
         self._plugin = plugin_instance
         self.btn_rcsb_submit.register_pressed_callback(self.query_rcsb)
         self.btn_embl_submit.register_pressed_callback(self.query_embl)
-    
+        self.ti_rcsb_query.input_text = '7q1u'
+        self.ti_embl_query.input_text = '13764'
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
     @property
     def btn_rcsb_submit(self):
         return self._menu.root.find_node('btn_rcsb_submit').get_content()
@@ -47,13 +55,42 @@ class EmbiDBMenu:
     def btn_embl_submit(self):
         return self._menu.root.find_node('btn_embl_submit').get_content()
 
+    @property
+    def ti_rcsb_query(self):
+        return self._menu.root.find_node('ti_rcsb_query').get_content()
+    
+    @property
+    def ti_embl_query(self):
+        return self._menu.root.find_node('ti_embl_query').get_content()
+
     def render(self, force_enable=False):
         if force_enable:
             self._menu.enabled = True
         self._plugin.update_menu(self._menu)
 
     def query_rcsb(self, btn):
-        Logs.message("querying RCSB")
-    
+        query = self.ti_rcsb_query.input_text
+        Logs.debug(f"RCSB query: {query}")
+        pdb_path = self.download_pdb_from_rcsb(query)
+        # comp = structure.Complex.io.from_pdb(path=pdb_path)
+        self._plugin.send_files_to_load([pdb_path])
+
     def query_embl(self, btn):
-        Logs.message("querying EMBL")
+        query = self.ti_embl_query.input_text
+        Logs.debug(f"EMBL query: {query}")
+    
+    def download_pdb_from_rcsb(self, pdb_id):
+        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+        response = requests.get(url)
+        if response.status_code != 200:
+            Logs.warning(f"PDB for {pdb_id} not found")
+            self._plugin.send_notification(
+                nanome.util.enums.NotificationTypes.error,
+                "No PDB found for " + str(self.pdbid),
+            )
+            return
+        file_path = f'{self.temp_dir}{pdb_id}.pdb'
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        return file_path
+        
