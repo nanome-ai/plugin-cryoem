@@ -13,7 +13,8 @@ from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
 from scipy.spatial import KDTree
 
-from .old_menu import OldMenu
+# from .old_menu import OldMenu
+from .menu import MainMenu, EmbiDBMenu
 from .VaultManager import VaultManager
 
 API_KEY = os.environ.get('API_KEY', None)
@@ -25,7 +26,8 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.menu = OldMenu(self)
+        self.menu = MainMenu(self)
+        self.embi_db_menu = EmbiDBMenu(self)
         self.nanome_workspace = None
         self.user_files = []
         self.map_file = None
@@ -48,7 +50,10 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def on_run(self):
         # ws = await self.request_workspace()
-        self.menu.render()
+        self.menu.render(force_enable=True)
+
+    def enable_embi_db_menu(self):
+        self.embi_db_menu.render(force_enable=True)
 
     async def get_vault_file_list(self):
         self._vault_manager = VaultManager(API_KEY, SERVER_URL)
