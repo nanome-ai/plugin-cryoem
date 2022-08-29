@@ -99,8 +99,10 @@ class EmbiDBMenu:
         self._plugin.add_to_group(pdb_path)
 
     def on_embl_submit(self, btn):
-        query = self.ti_embl_query.input_text
-        Logs.debug(f"EMBL query: {query}")
+        embid_id = self.ti_embl_query.input_text
+        Logs.debug(f"EMBL query: {embid_id}")
+        map_file = self.download_cryoem_map_from_emdbid(embid_id)
+        self._plugin.add_to_group(map_file)
     
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -116,3 +118,19 @@ class EmbiDBMenu:
             f.write(response.content)
         return file_path
     
+    def download_cryoem_map_from_emdbid(self, emdbid):
+        Logs.message("Downloading EM data for EMDBID:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
+        # Write the map to a .map file
+        file_path = f'{self.temp_dir}/{emdbid}.map.gz'
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(file_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            # self._plugin.map_file = map_tempfile
+            # self._plugin.load_map()
+            # self._plugin.generate_histogram()
+            # ws = await self._plugin.request_workspace()
+            # await self._plugin.set_current_complex_generate_surface(ws)
+        return file_path
