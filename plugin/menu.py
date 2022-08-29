@@ -6,10 +6,12 @@ from os import path
 from nanome.api import ui
 from nanome.util import Logs
 
-BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
-MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
-EMBL_MENU_PATH = path.join(BASE_PATH, 'embl_search_menu.json')
-GROUP_DETAIL_MENU_PATH = path.join(BASE_PATH, 'group_details.json')
+from .models import MapGroup
+
+MENU_JSON_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'menu_json')
+MAIN_MENU_PATH = path.join(MENU_JSON_PATH, 'main_menu.json')
+EMBL_MENU_PATH = path.join(MENU_JSON_PATH, 'embl_search_menu.json')
+GROUP_DETAIL_MENU_PATH = path.join(MENU_JSON_PATH, 'group_details.json')
 MAP_FILETYPES = ['.map', '.map.gz']
 
 __all__ = ['MainMenu', 'EMBLMenu', 'GroupDetailMenu']
@@ -34,7 +36,7 @@ class MainMenu:
         if force_enable:
             self._menu.enabled = True
         groups = self._plugin.groups
-        self.render_groups(groups)
+        self.render_map_groups(groups)
         self._plugin.update_menu(self._menu)
 
     def on_btn_embi_db_pressed(self, btn):
@@ -42,24 +44,26 @@ class MainMenu:
         self._plugin.enable_embi_db_menu()
         self.render(force_enable=False)
 
-    def render_groups(self, groups):
+    def render_map_groups(self, groups):
         lst = ui.UIList()
         lst.display_rows = 3
-        for group_name, filelist in groups.items():
+        for map_group in groups.values():
+            group_name = map_group.group_name
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
             btn.text.value.set_all(group_name)
             Logs.debug(f'Rendering group {group_name}')
-            Logs.debug(f'Filelist: {filelist}')
-            btn.register_pressed_callback(functools.partial(self.open_group_details, group_name, filelist))
+            Logs.debug(f'Filelist: {map_group.files}')
+            btn.register_pressed_callback(
+                functools.partial(self.open_group_details, map_group))
             lst.items.append(ln)
         self.ln_group_btns.set_content(lst)
         self._plugin.update_node(self.ln_group_btns)
 
-    def open_group_details(self, group_name, filelist, btn):
+    def open_group_details(self, map_group, btn):
         Logs.message('Loading group details menu')
         group_menu = GroupDetailsMenu(self._plugin)
-        group_menu.render(group_name, filelist, force_enable=False)
+        group_menu.render(map_group)
 
 
 class EmbiDBMenu:
@@ -158,18 +162,27 @@ class GroupDetailsMenu:
     def ln_lst_files(self):
         return self._menu.root.find_node('lst_files')
     
-    def render(self, group_name, filelist, force_enable=False):
-        if force_enable:
-            self._menu.enabled = True
-        self._menu.title = f'{group_name} Map'
+    @property
+    def img_histogram(self):
+        return self._menu.root.find_node('img_histogram').get_content()
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
+    def render(self, map_group: MapGroup):
+        self._menu.title = f'{map_group.group_name} Map'
         # Populate file list
         lst = ui.UIList()
         lst.display_rows = 3
-        for filepath in filelist:
+        for filepath in map_group.files:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
             filename = os.path.basename(filepath)
             btn.text.value.set_all(filename)
             lst.items.append(ln)
         self.ln_lst_files.set_content(lst)
+        # Generate histogram
+        img_filepath = map_group.generate_histogram(self.temp_dir)
+        self.img_histogram.file_path = img_filepath
         self._plugin.update_menu(self._menu)

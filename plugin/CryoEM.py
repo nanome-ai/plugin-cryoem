@@ -15,6 +15,7 @@ from scipy.spatial import KDTree
 
 # from .old_menu import OldMenu
 from .menu import MainMenu, EmbiDBMenu
+from .models import MapGroup
 from .VaultManager import VaultManager
 
 API_KEY = os.environ.get('API_KEY', None)
@@ -28,7 +29,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.embi_db_menu = EmbiDBMenu(self)
-        self.groups = defaultdict(list)
+        self.groups = {}
 
     def on_stop(self):
         self.temp_dir.cleanup()
@@ -45,13 +46,15 @@ class CryoEM(nanome.AsyncPluginInstance):
         path, ext = os.path.splitext(filepath)
         if ext == ".pdb":
             group_name = os.path.basename(path)
-            self.groups[group_name].append(filepath)
+            group = MapGroup(group_name=group_name)
+            group.add_file(filepath)
+            self.groups[group_name] = group
             self.send_files_to_load([filepath])
         else:
             # For now just add maps to first group
             # Will need to be fixed later
-            group, lst = next(iter(self.groups.items()))
-            lst.append(filepath)
+            group = next(iter(self.groups.values()))
+            group.add_file(filepath)
         self.menu.render()
 
 
