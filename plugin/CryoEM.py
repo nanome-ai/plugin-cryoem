@@ -1,6 +1,5 @@
 import os
 import tempfile
-
 import matplotlib.pyplot as plt
 import mcubes
 import mrcfile
@@ -8,6 +7,7 @@ import nanome
 import numpy as np
 import pyfqmr
 import randomcolor
+from collections import defaultdict
 from matplotlib import cm
 from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
@@ -28,6 +28,36 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.embi_db_menu = EmbiDBMenu(self)
+        self.groups = defaultdict(list)
+
+    def on_stop(self):
+        self.temp_dir.cleanup()
+
+    @async_callback
+    async def on_run(self):
+        # ws = await self.request_workspace()
+        self.menu.render(force_enable=True)
+
+    def enable_embi_db_menu(self):
+        self.embi_db_menu.render(force_enable=True)
+
+    def add_to_group(self, filepath):
+        path, ext = os.path.splitext(filepath)
+        if ext == ".pdb":
+            group_name = os.path.basename(path)
+            self.groups[group_name].append(filepath)
+            self.send_files_to_load([filepath])
+        else:
+            # For now just add maps to first group
+            # Will need to be fixed later
+            group, lst = next(iter(self.groups.items()))
+            lst.append(filepath)
+        self.menu.render()
+
+
+class OldPlugin:
+
+    def __init__(self):
         self.nanome_workspace = None
         self.user_files = []
         self.map_file = None
@@ -43,17 +73,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.wireframe_mode = False
         self.color_by = enums.ColorScheme.BFactor
         self._map_data = None
-
-    def on_stop(self):
-        self.temp_dir.cleanup()
-
-    @async_callback
-    async def on_run(self):
-        # ws = await self.request_workspace()
-        self.menu.render(force_enable=True)
-
-    def enable_embi_db_menu(self):
-        self.embi_db_menu.render(force_enable=True)
 
     async def get_vault_file_list(self):
         self._vault_manager = VaultManager(API_KEY, SERVER_URL)

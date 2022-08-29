@@ -21,15 +21,34 @@ class MainMenu:
     def btn_embi_db(self):
         return self._menu.root.find_node('btn_embi_db').get_content()
 
+    @property
+    def ln_group_btns(self):
+        return self._menu.root.find_node('ln_group_btns')
+
     def render(self, force_enable=False):
         if force_enable:
             self._menu.enabled = True
+        groups = self._plugin.groups
+        self.render_groups(groups)
         self._plugin.update_menu(self._menu)
 
     def on_btn_embi_db_pressed(self, btn):
         Logs.message('Loading EMBiDB menu')
         self._plugin.enable_embi_db_menu()
         self.render(force_enable=False)
+
+    def render_groups(self, groups):
+        lst = ui.UIList()
+        lst.display_rows = 3
+        for group_name, filelist in groups.items():
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            btn.text.value.set_all(group_name)
+            Logs.debug(f'Rendering group {group_name}')
+            Logs.debug(f'Filelist: {filelist}')
+            lst.items.append(ln)
+        self.ln_group_btns.set_content(lst)
+        self._plugin.update_node(self.ln_group_btns)
 
 
 class EmbiDBMenu:
@@ -38,8 +57,11 @@ class EmbiDBMenu:
         self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
         self._menu.index = 2
         self._plugin = plugin_instance
-        self.btn_rcsb_submit.register_pressed_callback(self.query_rcsb)
-        self.btn_embl_submit.register_pressed_callback(self.query_embl)
+        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+
+        self.current_group = "Group 1"
+        # For development only
         self.ti_rcsb_query.input_text = '7q1u'
         self.ti_embl_query.input_text = '13764'
 
@@ -68,14 +90,15 @@ class EmbiDBMenu:
             self._menu.enabled = True
         self._plugin.update_menu(self._menu)
 
-    def query_rcsb(self, btn):
-        query = self.ti_rcsb_query.input_text
-        Logs.debug(f"RCSB query: {query}")
-        pdb_path = self.download_pdb_from_rcsb(query)
-        # comp = structure.Complex.io.from_pdb(path=pdb_path)
-        self._plugin.send_files_to_load([pdb_path])
+    def on_rcsb_submit(self, btn):
+        pdb_id = self.ti_rcsb_query.input_text
+        Logs.debug(f"RCSB query: {pdb_id}")
+        pdb_path = self.download_pdb_from_rcsb(pdb_id)
+        if not pdb_path:
+            return
+        self._plugin.add_to_group(pdb_path)
 
-    def query_embl(self, btn):
+    def on_embl_submit(self, btn):
         query = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {query}")
     
@@ -86,11 +109,10 @@ class EmbiDBMenu:
             Logs.warning(f"PDB for {pdb_id} not found")
             self._plugin.send_notification(
                 nanome.util.enums.NotificationTypes.error,
-                "No PDB found for " + str(self.pdbid),
-            )
+                f"{pdb_id} not found in RCSB")
             return
-        file_path = f'{self.temp_dir}{pdb_id}.pdb'
+        file_path = f'{self.temp_dir}/{pdb_id}.pdb'
         with open(file_path, 'wb') as f:
             f.write(response.content)
         return file_path
-        
+    
