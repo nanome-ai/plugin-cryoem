@@ -1,3 +1,5 @@
+import functools
+import os
 import nanome
 import requests
 from os import path
@@ -7,7 +9,10 @@ from nanome.util import Logs
 BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
 MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
 EMBL_MENU_PATH = path.join(BASE_PATH, 'embl_search_menu.json')
+GROUP_DETAIL_MENU_PATH = path.join(BASE_PATH, 'group_details.json')
 MAP_FILETYPES = ['.map', '.map.gz']
+
+__all__ = ['MainMenu', 'EMBLMenu', 'GroupDetailMenu']
 
 
 class MainMenu:
@@ -46,9 +51,15 @@ class MainMenu:
             btn.text.value.set_all(group_name)
             Logs.debug(f'Rendering group {group_name}')
             Logs.debug(f'Filelist: {filelist}')
+            btn.register_pressed_callback(functools.partial(self.open_group_details, group_name, filelist))
             lst.items.append(ln)
         self.ln_group_btns.set_content(lst)
         self._plugin.update_node(self.ln_group_btns)
+
+    def open_group_details(self, group_name, filelist, btn):
+        Logs.message('Loading group details menu')
+        group_menu = GroupDetailsMenu(self._plugin)
+        group_menu.render(group_name, filelist, force_enable=False)
 
 
 class EmbiDBMenu:
@@ -134,3 +145,31 @@ class EmbiDBMenu:
             # ws = await self._plugin.request_workspace()
             # await self._plugin.set_current_complex_generate_surface(ws)
         return file_path
+
+
+class GroupDetailsMenu:
+
+    def __init__(self, plugin_instance):
+        self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
+        self._plugin = plugin_instance
+        self._menu.index = 20
+
+    @property
+    def ln_lst_files(self):
+        return self._menu.root.find_node('lst_files')
+    
+    def render(self, group_name, filelist, force_enable=False):
+        if force_enable:
+            self._menu.enabled = True
+        self._menu.title = f'{group_name} Map'
+        # Populate file list
+        lst = ui.UIList()
+        lst.display_rows = 3
+        for filepath in filelist:
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            filename = os.path.basename(filepath)
+            btn.text.value.set_all(filename)
+            lst.items.append(ln)
+        self.ln_lst_files.set_content(lst)
+        self._plugin.update_menu(self._menu)
