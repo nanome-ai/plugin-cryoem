@@ -1,7 +1,15 @@
+import mcubes
 import mrcfile
 import matplotlib.pyplot as plt
 import numpy as np
+import pyfqmr
+import randomcolor
 import tempfile
+from matplotlib import cm
+from nanome.api.shapes import Mesh
+from nanome.util import Logs, enums, Vector3, Color
+from scipy.spatial import KDTree
+from .utils import cpk_colors
 
 
 class MapGroup:
@@ -13,6 +21,9 @@ class MapGroup:
         self._map_data = None
         self._map_voxel_size = None
         self._map_origin = None
+        self.nanome_complex = None
+        self.limited_view_range = 15.0
+        self.wireframe_mode = False
 
     def add_file(self, filepath: str):
         self.files.append(filepath)
@@ -52,3 +63,247 @@ class MapGroup:
             delete=False, suffix=".png", dir=temp_dir)
         plt.savefig(self.png_tempfile.name)
         return self.png_tempfile.name
+    
+    def set_limited_view_on_cog(self):
+        # Compute center of gravity of structure
+        cog = np.array([0.0, 0.0, 0.0])
+        if self.nanome_complex is None:
+            self.limit_x = cog[0]
+            self.limit_y = cog[1]
+            self.limit_z = cog[2]
+            self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
+            return
+        count = 0
+        for a in self.nanome_complex.atoms:
+            count += 1
+            cog += np.array([a.position.x, a.position.y, a.position.z])
+        cog /= count
+        cog -= self._map_origin
+        self.limit_x = cog[0]
+        self.limit_y = cog[1]
+        self.limit_z = cog[2]
+        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
+
+    def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
+        # Compute iso-surface with marching cubes algorithm
+        self.set_limited_view_on_cog()
+        vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
+        np_vertices = np.asarray(vertices)
+        np_triangles = np.asarray(triangles)
+        Logs.debug("Decimating mesh")
+        target = max(1000, len(np_triangles) / decimation_factor)
+        mesh_simplifier = pyfqmr.Simplify()
+        mesh_simplifier.setMesh(np_vertices, np_triangles)
+        mesh_simplifier.simplify_mesh(
+            target_count=target, aggressiveness=7, preserve_border=True, verbose=0
+        )
+        vertices, triangles, normals = mesh_simplifier.getMesh()
+        if self._map_voxel_size.x > 0.0001:
+            Logs.debug("Setting voxels")
+            voxel_size = np.array(
+                [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
+            )
+            vertices *= voxel_size
+        Logs.debug("Limiting View")
+        vertices, normals, triangles = self.limit_view(
+            (vertices, normals, triangles),
+            self.limited_view_pos,
+            self.limited_view_range,
+        )
+
+        Logs.debug("Setting computed values")
+        self.computed_vertices = np.array(vertices)
+        self.computed_normals = np.array(normals)
+        self.computed_triangles = np.array(triangles)
+
+        if self.mesh is None:
+            self.mesh = Mesh()
+        self.mesh.vertices = self.computed_vertices.flatten()
+        self.mesh.normals = self.computed_normals.flatten()
+        self.mesh.triangles = self.computed_triangles.flatten()
+
+        anchor = self.mesh.anchors[0]
+
+        anchor.anchor_type = enums.ShapeAnchorType.Workspace
+        anchor.local_offset = Vector3(
+            self._map_origin[0], self._map_origin[1], self._map_origin[2])
+
+        self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+
+        if self.nanome_complex is not None:
+            anchor.anchor_type = enums.ShapeAnchorType.Complex
+            anchor.target = self.nanome_complex.index
+
+        # if self.menu.wireframe_mode:
+        #     self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+        #     self.mesh.vertices = np.asarray(self.wire_vertices).flatten()
+        #     self.mesh.triangles = np.asarray(self.wire_triangles).flatten()
+
+        self.color_by_scheme(self.mesh, color_scheme)
+        return self.mesh
+
+    def color_by_scheme(self, mesh, scheme):
+        if scheme == enums.ColorScheme.Element:
+            self.color_by_element(mesh)
+        elif scheme == enums.ColorScheme.BFactor:
+            self.color_by_bfactor(mesh)
+        elif scheme == enums.ColorScheme.Chain:
+            self.color_by_chain(mesh)
+    
+    def color_by_element(self, mesh):
+        if self.nanome_complex is None:
+            return
+
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+
+        if len(verts) < 3:
+            return
+
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            verts + self._map_origin, distance_upper_bound=20)
+        colors = []
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                colors += cpk_colors(atoms[i])
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        mesh.colors = np.array(colors)
+
+    def color_by_chain(self, mesh):
+        if self.nanome_complex is None:
+            return
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+        if len(verts) < 3:
+            return
+
+        molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
+        n_chain = len(list(molecule.chains))
+
+        rdcolor = randomcolor.RandomColor(seed=1234)
+        chain_cols = rdcolor.generate(format_="rgb", count=n_chain)
+
+        id_chain = 0
+        color_per_atom = []
+        for c in molecule.chains:
+            col = chain_cols[id_chain]
+            col = col.replace("rgb(", "").replace(
+                ")", "").replace(",", "").split()
+            chain_color = [int(i) / 255.0 for i in col] + [1.0]
+            id_chain += 1
+            for atom in c.atoms:
+                color_per_atom.append(chain_color)
+
+        colors = []
+
+        # No need for neighbor search as all vertices have the same color
+        if n_chain == 1:
+            for i in range(len(verts)):
+                colors += color_per_atom[0]
+            mesh.colors = np.array(colors)
+            return
+
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+
+        # Create a KDTree for fast neighbor search
+        # Look for the closest atom near each vertex
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            verts + self._map_origin, distance_upper_bound=20)
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                colors += color_per_atom[i]
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        mesh.colors = np.array(colors)
+
+    def color_by_bfactor(self, mesh):
+        if self.nanome_complex is None:
+            return
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+        if len(verts) < 3:
+            return
+
+        sections = 128
+        cm_subsection = np.linspace(0.0, 1.0, sections)
+        colors_rainbow = [cm.jet(x) for x in cm_subsection]
+
+        atom_positions = []
+        atoms = []
+        for a in self.nanome_complex.atoms:
+            atoms.append(a)
+            p = a.position
+            atom_positions.append(np.array([p.x, p.y, p.z]))
+
+        # Create a KDTree for fast neighbor search
+        # Look for the closest atom near each vertex
+        kdtree = KDTree(np.array(atom_positions))
+        result, indices = kdtree.query(
+            verts + self._map_origin, distance_upper_bound=20)
+
+        colors = []
+        bfactors = np.array([a.bfactor for a in atoms])
+        minbf = np.min(bfactors)
+        maxbf = np.max(bfactors)
+        if np.abs(maxbf - minbf) < 0.001:
+            maxbf = minbf + 1.0
+
+        for i in indices:
+            if i >= 0 and i < len(atom_positions):
+                bf = bfactors[i]
+                norm_bf = (bf - minbf) / (maxbf - minbf)
+                id_color = int(norm_bf * (sections - 1))
+                colors += colors_rainbow[int(id_color)]
+            else:
+                colors += [0.0, 0.0, 0.0, 1.0]
+        mesh.colors = np.array(colors)
+
+    def limit_view(self, mesh, position, range):
+        if range <= 0:
+            return mesh
+        vertices, normals, triangles = mesh
+
+        pos = np.asarray(position)
+        idv = 0
+        to_keep = []
+        for v in vertices:
+            vert = np.asarray(v)
+            dist = np.linalg.norm(vert - pos)
+            if dist <= range:
+                to_keep.append(idv)
+            idv += 1
+        if len(to_keep) == len(vertices):
+            return mesh
+
+        new_vertices = []
+        new_triangles = []
+        new_normals = []
+        mapping = np.full(len(vertices), -1, np.int32)
+        idv = 0
+        for i in to_keep:
+            mapping[i] = idv
+            new_vertices.append(vertices[i])
+            new_normals.append(normals[i])
+            idv += 1
+
+        for t in triangles:
+            if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
+                new_triangles.append(
+                    [mapping[t[0]], mapping[t[1]], mapping[t[2]]])
+
+        return (
+            np.asarray(new_vertices),
+            np.asarray(new_normals),
+            np.asarray(new_triangles),
+        )

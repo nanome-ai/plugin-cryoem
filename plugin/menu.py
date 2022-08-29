@@ -4,7 +4,7 @@ import nanome
 import requests
 from os import path
 from nanome.api import ui
-from nanome.util import Logs
+from nanome.util import Logs, async_callback
 
 from .models import MapGroup
 
@@ -52,8 +52,6 @@ class MainMenu:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
             btn.text.value.set_all(group_name)
-            Logs.debug(f'Rendering group {group_name}')
-            Logs.debug(f'Filelist: {map_group.files}')
             btn.register_pressed_callback(
                 functools.partial(self.open_group_details, map_group))
             lst.items.append(ln)
@@ -105,19 +103,21 @@ class EmbiDBMenu:
             self._menu.enabled = True
         self._plugin.update_menu(self._menu)
 
-    def on_rcsb_submit(self, btn):
+    @async_callback
+    async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        self._plugin.add_to_group(pdb_path)
+        await self._plugin.add_to_group(pdb_path)
 
-    def on_embl_submit(self, btn):
+    @async_callback
+    async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        self._plugin.add_to_group(map_file)
+        await self._plugin.add_to_group(map_file)
     
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"

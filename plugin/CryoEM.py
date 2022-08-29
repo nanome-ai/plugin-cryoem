@@ -7,7 +7,6 @@ import nanome
 import numpy as np
 import pyfqmr
 import randomcolor
-from collections import defaultdict
 from matplotlib import cm
 from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, Vector3, async_callback, enums
@@ -36,13 +35,12 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
-        # ws = await self.request_workspace()
         self.menu.render(force_enable=True)
 
     def enable_embi_db_menu(self):
         self.embi_db_menu.render(force_enable=True)
 
-    def add_to_group(self, filepath):
+    async def add_to_group(self, filepath):
         path, ext = os.path.splitext(filepath)
         if ext == ".pdb":
             group_name = os.path.basename(path)
@@ -55,7 +53,27 @@ class CryoEM(nanome.AsyncPluginInstance):
             # Will need to be fixed later
             group = next(iter(self.groups.values()))
             group.add_file(filepath)
+            await self.render_mesh(group)
         self.menu.render()
+
+    async def render_mesh(self, map_group):
+        self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
+        iso = 0.1
+        opacity = 0.65
+        color_scheme = enums.ColorScheme.BFactor
+
+        comps = await self.request_complex_list()
+        deep_comp = await self.request_complexes([comps[0].index])
+        map_group.nanome_complex = deep_comp[0]
+        Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
+        mesh = map_group.generate_mesh(iso, color_scheme, opacity)
+        Logs.message(
+            "Uploading iso-surface ("
+            + str(len(mesh.vertices))
+            + " vertices)"
+        )
+        await mesh.upload()
+        self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
 
 
 class OldPlugin:
