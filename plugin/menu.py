@@ -158,17 +158,18 @@ class GroupDetailsMenu:
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
-        self.sld_isovalue.register_changed_callback(self.update_isovalue)
+        self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
         self.sld_isovalue.register_released_callback(self.redraw_map)
-        self.dd_color_scheme.register_item_clicked_callback(self.redraw_map)
-        self.set_isovalue(map_group.isovalue)
-        self.set_opacity(map_group.opacity)
+        self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
+        self.sld_opacity.register_released_callback(self.update_color)
+        self.set_isovalue_ui(map_group.isovalue)
+        self.set_opacity_ui(map_group.opacity)
 
-    def set_isovalue(self, isovalue):
+    def set_isovalue_ui(self, isovalue):
         self.sld_isovalue.current_value = isovalue
         self.lbl_isovalue.text_value = str(round(isovalue, 2))
 
-    def set_opacity(self, opacity: float):
+    def set_opacity_ui(self, opacity: float):
         self.sld_opacity.current_value = opacity
         self.lbl_opacity_value.text_value = str(round(opacity, 2))
 
@@ -188,17 +189,27 @@ class GroupDetailsMenu:
     def lbl_isovalue(self):
         return self._menu.root.find_node('lbl_isovalue').get_content()
 
-    def update_isovalue(self, sld):
+    def update_isovalue_lbl(self, sld):
         self.lbl_isovalue.text_value = str(round(sld.current_value, 2))
         self._plugin.update_content(self.lbl_isovalue, sld)
 
+    def update_opacity_lbl(self, sld):
+        self.lbl_opacity_value.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_opacity_value, sld)
+
+    @async_callback
+    async def update_color(self, *args):
+        color_scheme = self.color_scheme
+        opacity = self.opacity
+        await self.map_group.update_color(color_scheme, opacity)
+    
     @async_callback
     async def redraw_map(self, content):
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         await self._plugin.render_mesh(self.map_group)
-    
+
     @property
     def img_histogram(self):
         return self._menu.root.find_node('img_histogram').get_content()
@@ -233,6 +244,7 @@ class GroupDetailsMenu:
             nanome.ui.DropdownItem(name)
             for name in ["Bfactor", "Element", "Chain"]
         ]
+        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
         self.dd_color_scheme.items[0].selected = True
         self._plugin.update_menu(self._menu)
 
@@ -244,6 +256,7 @@ class GroupDetailsMenu:
     def opacity(self):
         return self.sld_opacity.current_value
 
+    @property
     def color_scheme(self):
         item = next(item for item in self.dd_color_scheme.items if item.selected)
         if item.name == "Element":

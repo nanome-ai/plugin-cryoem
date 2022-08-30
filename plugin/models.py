@@ -88,6 +88,14 @@ class MapGroup:
         self.limit_z = cog[2]
         self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
 
+    async def update_color(self, color_scheme, opacity):
+        self.opacity = opacity
+        self.color_scheme = color_scheme
+        if self.mesh is not None:
+            self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+            self.color_by_scheme(self.mesh, color_scheme)
+            await self.mesh.upload()
+
     def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
         # Compute iso-surface with marching cubes algorithm
         self.set_limited_view_on_cog()
