@@ -160,10 +160,29 @@ class GroupDetailsMenu:
         self._menu.index = 20
         self.sld_isovalue.register_changed_callback(self.update_isovalue)
         self.sld_isovalue.register_released_callback(self.redraw_map)
+        self.dd_color_scheme.register_item_clicked_callback(self.redraw_map)
+        self.set_isovalue(map_group.isovalue)
+        self.set_opacity(map_group.opacity)
+
+    def set_isovalue(self, isovalue):
+        self.sld_isovalue.current_value = isovalue
+        self.lbl_isovalue.text_value = str(round(isovalue, 2))
+
+    def set_opacity(self, opacity: float):
+        self.sld_opacity.current_value = opacity
+        self.lbl_opacity_value.text_value = str(round(opacity, 2))
 
     @property
     def sld_isovalue(self):
         return self._menu.root.find_node('sld_isovalue').get_content()
+
+    @property
+    def sld_opacity(self):
+        return self._menu.root.find_node('sld_opacity').get_content()
+    
+    @property
+    def lbl_opacity_value(self):
+        return self._menu.root.find_node('lbl_opacity_value').get_content()
     
     @property
     def lbl_isovalue(self):
@@ -174,19 +193,19 @@ class GroupDetailsMenu:
         self._plugin.update_content(self.lbl_isovalue, sld)
 
     @async_callback
-    async def redraw_map(self, sld):
+    async def redraw_map(self, content):
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         await self._plugin.render_mesh(self.map_group)
-
-    @property
-    def ln_lst_files(self):
-        return self._menu.root.find_node('lst_files')
     
     @property
     def img_histogram(self):
         return self._menu.root.find_node('img_histogram').get_content()
+
+    @property
+    def dd_color_scheme(self):
+        return self._menu.root.find_node('dd_color_scheme').get_content()
 
     @property
     def temp_dir(self):
@@ -203,10 +222,18 @@ class GroupDetailsMenu:
             filename = os.path.basename(filepath)
             btn.text.value.set_all(filename)
             lst.items.append(ln)
-        self.ln_lst_files.set_content(lst)
         # Generate histogram
         img_filepath = map_group.generate_histogram(self.temp_dir)
         self.img_histogram.file_path = img_filepath
+
+        self.sld_isovalue.current_value = self.map_group.isovalue
+        self.sld_opacity.current_value = self.map_group.opacity
+
+        self.dd_color_scheme.items = [
+            nanome.ui.DropdownItem(name)
+            for name in ["Bfactor", "Element", "Chain"]
+        ]
+        self.dd_color_scheme.items[0].selected = True
         self._plugin.update_menu(self._menu)
 
     @property
@@ -215,8 +242,14 @@ class GroupDetailsMenu:
     
     @property
     def opacity(self):
-        return 0.65
-    
-    @property
+        return self.sld_opacity.current_value
+
     def color_scheme(self):
-        return enums.ColorScheme.BFactor
+        item = next(item for item in self.dd_color_scheme.items if item.selected)
+        if item.name == "Element":
+            color_scheme = enums.ColorScheme.Element
+        elif item.name == "Bfactor":
+            color_scheme = enums.ColorScheme.BFactor
+        elif item.name == "Chain":
+            color_scheme = enums.ColorScheme.Chain
+        return color_scheme
