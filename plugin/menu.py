@@ -166,6 +166,7 @@ class GroupDetailsMenu:
         self.set_opacity_ui(map_group.opacity)
         self.btn_show_hide_map.switch.active = True
         self.btn_show_hide_map.toggle_on_press = True
+        self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
         self.btn_wireframe.switch.active = True
         self.btn_wireframe.toggle_on_press = True
         self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
@@ -285,3 +286,11 @@ class GroupDetailsMenu:
         toggle = btn.selected
         Logs.message(f"Wireframe mode set to {toggle}")
         self.map_group.toggle_wireframe_mode(toggle)
+
+    @async_callback
+    async def toggle_map_visibility(self, btn):
+        toggle = btn.selected
+        Logs.message(f"Map visibility set to {toggle}")
+        opacity = self.opacity if toggle else 0
+        color = self.map_group.color_scheme
+        await self.map_group.update_color(color, opacity)

@@ -36,7 +36,7 @@ class OldMenu:
         self.btn_wireframe.switch.active = True
         self.btn_wireframe.toggle_on_press = True
         self.color_by = enums.ColorScheme.BFactor
-        self.shown = self.btn_show_hide_map.selected
+        self.shown = True
 
     @property
     def wireframe_mode(self):
