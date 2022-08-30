@@ -25,6 +25,10 @@ class MapGroup:
         self.limited_view_range = 15.0
         self.wireframe_mode = False
 
+        self.isovalue = 0.1
+        self.opacity = 0.65
+        self.color_scheme = enums.ColorScheme.BFactor
+
     def add_file(self, filepath: str):
         self.files.append(filepath)
         if not filepath.endswith('pdb'):

@@ -58,9 +58,9 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def render_mesh(self, map_group):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
-        iso = 0.1
-        opacity = 0.65
-        color_scheme = enums.ColorScheme.BFactor
+        iso = map_group.isovalue
+        opacity = map_group.opacity
+        color_scheme = map_group.color_scheme
 
         comps = await self.request_complex_list()
         deep_comp = await self.request_complexes([comps[0].index])

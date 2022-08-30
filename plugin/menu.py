@@ -4,7 +4,7 @@ import nanome
 import requests
 from os import path
 from nanome.api import ui
-from nanome.util import Logs, async_callback
+from nanome.util import Logs, async_callback, enums
 
 from .models import MapGroup
 
@@ -60,7 +60,7 @@ class MainMenu:
 
     def open_group_details(self, map_group, btn):
         Logs.message('Loading group details menu')
-        group_menu = GroupDetailsMenu(self._plugin)
+        group_menu = GroupDetailsMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
 
@@ -153,10 +153,32 @@ class EmbiDBMenu:
 
 class GroupDetailsMenu:
 
-    def __init__(self, plugin_instance):
+    def __init__(self, map_group, plugin_instance):
+        self.map_group = map_group
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
+        self.sld_isovalue.register_changed_callback(self.update_isovalue)
+        self.sld_isovalue.register_released_callback(self.redraw_map)
+
+    @property
+    def sld_isovalue(self):
+        return self._menu.root.find_node('sld_isovalue').get_content()
+    
+    @property
+    def lbl_isovalue(self):
+        return self._menu.root.find_node('lbl_isovalue').get_content()
+
+    def update_isovalue(self, sld):
+        self.lbl_isovalue.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_isovalue, sld)
+
+    @async_callback
+    async def redraw_map(self, sld):
+        self.map_group.isovalue = self.isovalue
+        self.map_group.opacity = self.opacity
+        self.map_group.color_scheme = self.color_scheme
+        await self._plugin.render_mesh(self.map_group)
 
     @property
     def ln_lst_files(self):
@@ -186,3 +208,15 @@ class GroupDetailsMenu:
         img_filepath = map_group.generate_histogram(self.temp_dir)
         self.img_histogram.file_path = img_filepath
         self._plugin.update_menu(self._menu)
+
+    @property
+    def isovalue(self):
+        return self.sld_isovalue.current_value
+    
+    @property
+    def opacity(self):
+        return 0.65
+    
+    @property
+    def color_scheme(self):
+        return enums.ColorScheme.BFactor
