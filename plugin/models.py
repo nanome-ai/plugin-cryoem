@@ -146,10 +146,10 @@ class MapGroup:
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.nanome_complex.index
 
-        # if self.menu.wireframe_mode:
-        #     self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
-        #     self.mesh.vertices = np.asarray(self.wire_vertices).flatten()
-        #     self.mesh.triangles = np.asarray(self.wire_triangles).flatten()
+        if self.wireframe_mode:
+            self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+            self.mesh.vertices = np.asarray(self.wire_vertices).flatten()
+            self.mesh.triangles = np.asarray(self.wire_triangles).flatten()
 
         self.color_by_scheme(self.mesh, color_scheme)
         return self.mesh
@@ -319,3 +319,134 @@ class MapGroup:
             np.asarray(new_normals),
             np.asarray(new_triangles),
         )
+
+    def toggle_wireframe_mode(self, toggle: bool):
+        self.wireframe_mode = toggle
+        if not self.mesh:
+            return
+        if toggle:
+            wire_vertices, wire_normals, wire_triangles = self.wireframe_mesh()
+            self.mesh.vertices = wire_vertices.flatten()
+            self.mesh.triangles = wire_triangles.flatten()
+        else:
+            self.mesh.vertices = np.asarray(self.computed_vertices).flatten()
+            self.mesh.triangles = np.asarray(self.computed_triangles).flatten()
+        self.mesh.upload()
+
+    def wireframe_mesh(self, wiresize=0.01):
+        ntri = len(self.computed_triangles) * 3
+        new_verts = np.zeros((ntri * 4, 3))
+        new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
+        new_norms = np.zeros((ntri * 4, 3))
+        # new_cols = np.zeros((ntri * 4, 3))
+        for i in range(int(ntri / 3)):
+            t1 = self.computed_triangles[i][0]
+            t2 = self.computed_triangles[i][1]
+            t3 = self.computed_triangles[i][2]
+
+            if t1 == t2 or t2 == t3 or t1 == t3:
+                continue
+
+            v1 = np.array(self.computed_vertices[t1])
+            v2 = np.array(self.computed_vertices[t2])
+            v3 = np.array(self.computed_vertices[t3])
+
+            n1 = np.array(self.computed_normals[t1])
+            n2 = np.array(self.computed_normals[t2])
+            n3 = np.array(self.computed_normals[t3])
+
+            v1v2 = v2 - v1
+            v2v3 = v3 - v2
+            v3v1 = v1 - v3
+
+            sidev1 = np.linalg.norm(np.cross(v1v2, n1))
+            sidev2 = np.linalg.norm(np.cross(v2v3, n2))
+            sidev3 = np.linalg.norm(np.cross(v3v1, n3))
+
+            newId = i * 3 * 4
+            newIdT = i * 6 * 2
+
+            new_verts[newId + 0] = v1 + sidev1 * wiresize
+            new_verts[newId + 1] = v1 - sidev1 * wiresize
+            new_verts[newId + 2] = v2 + sidev1 * wiresize
+            new_verts[newId + 3] = v2 - sidev1 * wiresize
+
+            new_verts[newId + 4] = v2 + sidev2 * wiresize
+            new_verts[newId + 5] = v2 - sidev2 * wiresize
+            new_verts[newId + 6] = v3 + sidev2 * wiresize
+            new_verts[newId + 7] = v3 - sidev2 * wiresize
+
+            new_verts[newId + 8] = v3 + sidev3 * wiresize
+            new_verts[newId + 9] = v3 - sidev3 * wiresize
+            new_verts[newId + 10] = v1 + sidev3 * wiresize
+            new_verts[newId + 11] = v1 - sidev3 * wiresize
+
+            new_norms[newId + 0] = n1
+            # new_cols[newId + 0] = cols[t1]
+            new_norms[newId + 1] = n1
+            # new_cols[newId + 1] = cols[t1]
+            new_norms[newId + 2] = n2
+            # new_cols[newId + 2] = cols[t2]
+            new_norms[newId + 3] = n2
+            # new_cols[newId + 3] = cols[t2]
+
+            new_norms[newId + 4] = n2
+            # new_cols[newId + 4] = cols[t2]
+            new_norms[newId + 5] = n2
+            # new_cols[newId + 5] = cols[t2]
+            new_norms[newId + 6] = n3
+            # new_cols[newId + 6] = cols[t3]
+            new_norms[newId + 7] = n3
+            # new_cols[newId + 7] = cols[t3]
+
+            new_norms[newId + 8] = n3
+            # new_cols[newId + 8] = cols[t3]
+            new_norms[newId + 9] = n3
+            # new_cols[newId + 9] = cols[t3]
+            new_norms[newId + 10] = n1
+            # new_cols[newId + 10] = cols[t1]
+            new_norms[newId + 11] = n1
+            # new_cols[newId + 11] = cols[t1]
+
+            new_tris[newIdT][0] = newId
+            new_tris[newIdT + 6] = newId + 1
+            new_tris[newIdT][1] = newId + 1
+            new_tris[newIdT + 6] = newId + 0
+            new_tris[newIdT][2] = newId + 2
+            new_tris[newIdT + 6] = newId + 2
+
+            new_tris[newIdT + 1][0] = newId + 1
+            new_tris[newIdT + 7] = newId + 3
+            new_tris[newIdT + 1][1] = newId + 3
+            new_tris[newIdT + 7] = newId + 1
+            new_tris[newIdT + 1][2] = newId + 2
+            new_tris[newIdT + 7] = newId + 2
+
+            new_tris[newIdT + 2][0] = newId + 4
+            new_tris[newIdT + 8][0] = newId + 5
+            new_tris[newIdT + 2][1] = newId + 5
+            new_tris[newIdT + 8][1] = newId + 4
+            new_tris[newIdT + 2][2] = newId + 6
+            new_tris[newIdT + 8][2] = newId + 6
+
+            new_tris[newIdT + 3][0] = newId + 5
+            new_tris[newIdT + 9][0] = newId + 7
+            new_tris[newIdT + 3][1] = newId + 7
+            new_tris[newIdT + 9][1] = newId + 5
+            new_tris[newIdT + 3][2] = newId + 6
+            new_tris[newIdT + 9][2] = newId + 6
+
+            new_tris[newIdT + 4][0] = newId + 8
+            new_tris[newIdT + 10][0] = newId + 9
+            new_tris[newIdT + 4][1] = newId + 9
+            new_tris[newIdT + 10][1] = newId + 8
+            new_tris[newIdT + 4][2] = newId + 10
+            new_tris[newIdT + 10][2] = newId + 10
+
+            new_tris[newIdT + 5][0] = newId + 9
+            new_tris[newIdT + 11][0] = newId + 11
+            new_tris[newIdT + 5][1] = newId + 11
+            new_tris[newIdT + 11][1] = newId + 9
+            new_tris[newIdT + 5][2] = newId + 10
+            new_tris[newIdT + 11][2] = newId + 10
+        return (new_verts, new_norms, new_tris)

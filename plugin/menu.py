@@ -164,6 +164,11 @@ class GroupDetailsMenu:
         self.sld_opacity.register_released_callback(self.update_color)
         self.set_isovalue_ui(map_group.isovalue)
         self.set_opacity_ui(map_group.opacity)
+        self.btn_show_hide_map.switch.active = True
+        self.btn_show_hide_map.toggle_on_press = True
+        self.btn_wireframe.switch.active = True
+        self.btn_wireframe.toggle_on_press = True
+        self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
 
     def set_isovalue_ui(self, isovalue):
         self.sld_isovalue.current_value = isovalue
@@ -189,6 +194,14 @@ class GroupDetailsMenu:
     def lbl_isovalue(self):
         return self._menu.root.find_node('lbl_isovalue').get_content()
 
+    @property
+    def btn_show_hide_map(self):
+        return self._menu.root.find_node('btn_show_hide_map').get_content()
+
+    @property
+    def btn_wireframe(self):
+        return self._menu.root.find_node('btn_wireframe').get_content()
+
     def update_isovalue_lbl(self, sld):
         self.lbl_isovalue.text_value = str(round(sld.current_value, 2))
         self._plugin.update_content(self.lbl_isovalue, sld)
@@ -202,7 +215,7 @@ class GroupDetailsMenu:
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
-    
+
     @async_callback
     async def redraw_map(self, content):
         self.map_group.isovalue = self.isovalue
@@ -234,8 +247,9 @@ class GroupDetailsMenu:
             btn.text.value.set_all(filename)
             lst.items.append(ln)
         # Generate histogram
-        img_filepath = map_group.generate_histogram(self.temp_dir)
-        self.img_histogram.file_path = img_filepath
+        if len(map_group.files) > 1:
+            img_filepath = map_group.generate_histogram(self.temp_dir)
+            self.img_histogram.file_path = img_filepath
 
         self.sld_isovalue.current_value = self.map_group.isovalue
         self.sld_opacity.current_value = self.map_group.opacity
@@ -266,3 +280,8 @@ class GroupDetailsMenu:
         elif item.name == "Chain":
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
+    
+    def set_wireframe_mode(self, btn):
+        toggle = btn.selected
+        Logs.message(f"Wireframe mode set to {toggle}")
+        self.map_group.toggle_wireframe_mode(toggle)
