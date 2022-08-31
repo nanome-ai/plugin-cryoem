@@ -162,6 +162,8 @@ class GroupDetailsMenu:
         self.sld_isovalue.register_released_callback(self.redraw_map)
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
         self.sld_opacity.register_released_callback(self.update_color)
+        self.sld_size.register_changed_callback(self.update_size_lbl)
+        self.sld_size.register_released_callback(self.redraw_map)
         self.set_isovalue_ui(map_group.isovalue)
         self.set_opacity_ui(map_group.opacity)
         self.btn_show_hide_map.switch.active = True
@@ -211,6 +213,10 @@ class GroupDetailsMenu:
         self.lbl_opacity_value.text_value = str(round(sld.current_value, 2))
         self._plugin.update_content(self.lbl_opacity_value, sld)
 
+    def update_size_lbl(self, sld):
+        self.lbl_size_value.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_size_value, sld)
+    
     @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
@@ -222,6 +228,7 @@ class GroupDetailsMenu:
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
+        self.map_group.limited_view_range = self.size
         await self._plugin.render_mesh(self.map_group)
 
     @property
@@ -254,6 +261,7 @@ class GroupDetailsMenu:
 
         self.sld_isovalue.current_value = self.map_group.isovalue
         self.sld_opacity.current_value = self.map_group.opacity
+        self.sld_size.current_value = self.map_group.limited_view_range
 
         self.dd_color_scheme.items = [
             nanome.ui.DropdownItem(name)
@@ -264,12 +272,24 @@ class GroupDetailsMenu:
         self._plugin.update_menu(self._menu)
 
     @property
+    def sld_size(self):
+        return self._menu.root.find_node('sld_size').get_content()
+
+    @property
+    def lbl_size_value(self):
+        return self._menu.root.find_node('lbl_size_value').get_content()
+
+    @property
     def isovalue(self):
         return self.sld_isovalue.current_value
     
     @property
     def opacity(self):
         return self.sld_opacity.current_value
+
+    @property
+    def size(self):
+        return self.sld_size.current_value
 
     @property
     def color_scheme(self):

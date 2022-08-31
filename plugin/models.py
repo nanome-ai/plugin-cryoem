@@ -22,7 +22,7 @@ class MapGroup:
         self._map_voxel_size = None
         self._map_origin = None
         self.nanome_complex = None
-        self.limited_view_range = 15.0
+        self.limited_view_range = 5
         self.wireframe_mode = False
 
         self.isovalue = 0.1
@@ -95,6 +95,12 @@ class MapGroup:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
             await self.mesh.upload()
+    
+    async def update_limited_view_range(self, size: float):
+        self.limited_view_range = size
+        if self.mesh is not None:
+            self.mesh.size = size
+            self.mesh.upload()
 
     def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
         # Compute iso-surface with marching cubes algorithm
@@ -281,7 +287,7 @@ class MapGroup:
                 colors += [0.0, 0.0, 0.0, 1.0]
         mesh.colors = np.array(colors)
 
-    def limit_view(self, mesh, position, range):
+    def limit_view(self, mesh: tuple, position: list, range: float):
         if range <= 0:
             return mesh
         vertices, normals, triangles = mesh
