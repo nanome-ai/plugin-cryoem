@@ -62,16 +62,14 @@ class LoadedMapGroupTestCase(unittest.TestCase):
         cls.map_group.generate_mesh(isovalue, color_scheme, opacity)
 
     def test_generate_mesh(self):
+        # Make sure setUpClass generated a mesh
         mesh = self.map_group.mesh
         self.assertTrue(isinstance(mesh, Mesh))
 
     def test_toggle_wireframe_mode(self):
-        breakpoint()
         # wireframe_mode = self.map_group.wireframe_mode
         self.assertEqual(self.map_group.wireframe_mode, False)
         self.map_group.toggle_wireframe_mode(True)
         self.assertEqual(self.map_group.wireframe_mode, True)
         self.map_group.toggle_wireframe_mode(False)
         self.assertEqual(self.map_group.wireframe_mode, False)
-        # self.assertTrue(self.map_group.wireframe_mode)
-        # self.assertFalse(self.map_group.wireframe_mode)
