@@ -216,12 +216,13 @@ class GroupDetailsMenu:
     def update_size_lbl(self, sld):
         self.lbl_size_value.text_value = str(round(sld.current_value, 2))
         self._plugin.update_content(self.lbl_size_value, sld)
-    
+
     @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
+        self.map_group.mesh.upload()
 
     @async_callback
     async def redraw_map(self, content):
@@ -306,6 +307,7 @@ class GroupDetailsMenu:
         toggle = btn.selected
         Logs.message(f"Wireframe mode set to {toggle}")
         self.map_group.toggle_wireframe_mode(toggle)
+        self.map_group.mesh.upload()
 
     @async_callback
     async def toggle_map_visibility(self, btn):
@@ -314,3 +316,4 @@ class GroupDetailsMenu:
         opacity = self.opacity if toggle else 0
         color = self.map_group.color_scheme
         await self.map_group.update_color(color, opacity)
+        self.map_group.mesh.upload()

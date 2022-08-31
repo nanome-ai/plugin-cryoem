@@ -94,14 +94,7 @@ class MapGroup:
         if self.mesh is not None:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
-            await self.mesh.upload()
     
-    async def update_limited_view_range(self, size: float):
-        self.limited_view_range = size
-        if self.mesh is not None:
-            self.mesh.size = size
-            self.mesh.upload()
-
     def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
         # Compute iso-surface with marching cubes algorithm
         self.set_limited_view_on_cog()
@@ -337,7 +330,6 @@ class MapGroup:
         else:
             self.mesh.vertices = np.asarray(self.computed_vertices).flatten()
             self.mesh.triangles = np.asarray(self.computed_triangles).flatten()
-        self.mesh.upload()
 
     def wireframe_mesh(self, wiresize=0.01):
         ntri = len(self.computed_triangles) * 3
