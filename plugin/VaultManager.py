@@ -2,6 +2,7 @@ import requests
 
 
 class VaultManager:
+
     def __init__(self, api_key, server_url):
         self.api_key = api_key
         if server_url.endswith('/'):

@@ -1,78 +1,201 @@
+import functools
+import os
 import nanome
 import requests
-import tempfile
 from os import path
 from nanome.api import ui
-from nanome.util import async_callback, enums, Logs
-import numpy as np
+from nanome.util import Logs, async_callback, enums
 
-BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
-MAIN_MENU_PATH = path.join(BASE_PATH, 'main_menu.json')
+from .models import MapGroup
 
+MENU_JSON_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'menu_json')
+MAIN_MENU_PATH = path.join(MENU_JSON_PATH, 'main_menu.json')
+EMBL_MENU_PATH = path.join(MENU_JSON_PATH, 'embl_search_menu.json')
+GROUP_DETAIL_MENU_PATH = path.join(MENU_JSON_PATH, 'group_details.json')
 MAP_FILETYPES = ['.map', '.map.gz']
+
+__all__ = ['MainMenu', 'EMBLMenu', 'GroupDetailMenu']
 
 
 class MainMenu:
-    nanome_complex = None
 
     def __init__(self, plugin_instance):
         self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
         self._plugin = plugin_instance
-        self.ti_pdb_id.register_submitted_callback(self.download_pdb)
-        self.sl_iso_value.register_released_callback(self.update_isosurface)
-        self.sl_opacity.register_released_callback(self.update_opacity)
-        self.sl_range_limit.register_released_callback(
-            self.update_limited_view_range
-        )
-        self.dd_color_scheme.register_item_clicked_callback(
-            self.change_color_scheme)
-        self.btn_show_hide_map.register_pressed_callback(self.show_hide_map)
-        self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
-        self.dd_complexes.register_item_clicked_callback(self.set_target_complex)
-        self.dd_vault_mol_files.register_item_clicked_callback(self.set_selected_file)
-        self.dd_vault_map_files.register_item_clicked_callback(self.set_selected_map_file)
+        self.btn_embi_db.register_pressed_callback(self.on_btn_embi_db_pressed)
+
+    @property
+    def btn_embi_db(self):
+        return self._menu.root.find_node('btn_embi_db').get_content()
+
+    @property
+    def ln_group_btns(self):
+        return self._menu.root.find_node('ln_group_btns')
+
+    def render(self, force_enable=False):
+        if force_enable:
+            self._menu.enabled = True
+        groups = self._plugin.groups
+        self.render_map_groups(groups)
+        self._plugin.update_menu(self._menu)
+
+    def on_btn_embi_db_pressed(self, btn):
+        Logs.message('Loading EMBiDB menu')
+        self._plugin.enable_embi_db_menu()
+        self.render(force_enable=False)
+
+    def render_map_groups(self, groups):
+        lst = ui.UIList()
+        lst.display_rows = 3
+        for map_group in groups.values():
+            group_name = map_group.group_name
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            btn.text.value.set_all(group_name)
+            btn.register_pressed_callback(
+                functools.partial(self.open_group_details, map_group))
+            lst.items.append(ln)
+        self.ln_group_btns.set_content(lst)
+        self._plugin.update_node(self.ln_group_btns)
+
+    def open_group_details(self, map_group, btn):
+        Logs.message('Loading group details menu')
+        group_menu = GroupDetailsMenu(map_group, self._plugin)
+        group_menu.render(map_group)
+
+
+class EmbiDBMenu:
+
+    def __init__(self, plugin_instance):
+        self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
+        self._menu.index = 2
+        self._plugin = plugin_instance
+        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+
+        self.current_group = "Group 1"
+        # For development only
+        self.ti_rcsb_query.input_text = '7q1u'
+        self.ti_embl_query.input_text = '13764'
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
+    @property
+    def btn_rcsb_submit(self):
+        return self._menu.root.find_node('btn_rcsb_submit').get_content()
+
+    @property
+    def btn_embl_submit(self):
+        return self._menu.root.find_node('btn_embl_submit').get_content()
+
+    @property
+    def ti_rcsb_query(self):
+        return self._menu.root.find_node('ti_rcsb_query').get_content()
+
+    @property
+    def ti_embl_query(self):
+        return self._menu.root.find_node('ti_embl_query').get_content()
+
+    def render(self, force_enable=False):
+        if force_enable:
+            self._menu.enabled = True
+        self._plugin.update_menu(self._menu)
+
+    @async_callback
+    async def on_rcsb_submit(self, btn):
+        pdb_id = self.ti_rcsb_query.input_text
+        Logs.debug(f"RCSB query: {pdb_id}")
+        pdb_path = self.download_pdb_from_rcsb(pdb_id)
+        if not pdb_path:
+            return
+        await self._plugin.add_to_group(pdb_path)
+
+    @async_callback
+    async def on_embl_submit(self, btn):
+        embid_id = self.ti_embl_query.input_text
+        Logs.debug(f"EMBL query: {embid_id}")
+        map_file = self.download_cryoem_map_from_emdbid(embid_id)
+        await self._plugin.add_to_group(map_file)
+
+    def download_pdb_from_rcsb(self, pdb_id):
+        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+        response = requests.get(url)
+        if response.status_code != 200:
+            Logs.warning(f"PDB for {pdb_id} not found")
+            self._plugin.send_notification(
+                nanome.util.enums.NotificationTypes.error,
+                f"{pdb_id} not found in RCSB")
+            return
+        file_path = f'{self.temp_dir}/{pdb_id}.pdb'
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        return file_path
+
+    def download_cryoem_map_from_emdbid(self, emdbid):
+        Logs.message("Downloading EM data for EMDBID:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
+        # Write the map to a .map file
+        file_path = f'{self.temp_dir}/{emdbid}.map.gz'
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(file_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            # self._plugin.map_file = map_tempfile
+            # self._plugin.load_map()
+            # self._plugin.generate_histogram()
+            # ws = await self._plugin.request_workspace()
+            # await self._plugin.set_current_complex_generate_surface(ws)
+        return file_path
+
+
+class GroupDetailsMenu:
+
+    def __init__(self, map_group, plugin_instance):
+        self.map_group = map_group
+        self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
+        self._plugin = plugin_instance
+        self._menu.index = 20
+        self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
+        self.sld_isovalue.register_released_callback(self.redraw_map)
+        self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
+        self.sld_opacity.register_released_callback(self.update_color)
+        self.sld_size.register_changed_callback(self.update_size_lbl)
+        self.sld_size.register_released_callback(self.redraw_map)
+        self.set_isovalue_ui(map_group.isovalue)
+        self.set_opacity_ui(map_group.opacity)
         self.btn_show_hide_map.switch.active = True
         self.btn_show_hide_map.toggle_on_press = True
+        self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
         self.btn_wireframe.switch.active = True
         self.btn_wireframe.toggle_on_press = True
-        self.color_by = enums.ColorScheme.BFactor
-        self.shown = self.btn_show_hide_map.selected
+        self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
+
+    def set_isovalue_ui(self, isovalue):
+        self.sld_isovalue.current_value = isovalue
+        self.lbl_isovalue.text_value = str(round(isovalue, 2))
+
+    def set_opacity_ui(self, opacity: float):
+        self.sld_opacity.current_value = opacity
+        self.lbl_opacity_value.text_value = str(round(opacity, 2))
 
     @property
-    def wireframe_mode(self):
-        return self._menu.root.find_node('btn_wireframe').get_content().selected
+    def sld_isovalue(self):
+        return self._menu.root.find_node('sld_isovalue').get_content()
 
     @property
-    def img_histo(self):
-        return self._menu.root.find_node('img_histo').get_content()
+    def sld_opacity(self):
+        return self._menu.root.find_node('sld_opacity').get_content()
 
     @property
-    def dd_complexes(self):
-        return self._menu.root.find_node('dd_complexes').get_content()
+    def lbl_opacity_value(self):
+        return self._menu.root.find_node('lbl_opacity_value').get_content()
 
     @property
-    def dd_vault_mol_files(self):
-        return self._menu.root.find_node('dd_vault_mol_files').get_content()
-
-    @property
-    def dd_vault_map_files(self):
-        return self._menu.root.find_node('dd_vault_map_files').get_content()
-
-    @property
-    def sl_iso_value(self):
-        return self._menu.root.find_node('sl_iso_value').get_content()
-
-    @property
-    def sl_opacity(self):
-        return self._menu.root.find_node('sl_opacity').get_content()
-
-    @property
-    def sl_range_limit(self):
-        return self._menu.root.find_node('sl_range_limit').get_content()
-
-    @property
-    def dd_color_scheme(self):
-        return self._menu.root.find_node('dd_color_scheme').get_content()
+    def lbl_isovalue(self):
+        return self._menu.root.find_node('lbl_isovalue').get_content()
 
     @property
     def btn_show_hide_map(self):
@@ -82,210 +205,95 @@ class MainMenu:
     def btn_wireframe(self):
         return self._menu.root.find_node('btn_wireframe').get_content()
 
-    @property
-    def ti_pdb_id(self):
-        return self._menu.root.find_node('ti_pdb_id').get_content()
+    def update_isovalue_lbl(self, sld):
+        self.lbl_isovalue.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_isovalue, sld)
+
+    def update_opacity_lbl(self, sld):
+        self.lbl_opacity_value.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_opacity_value, sld)
+
+    def update_size_lbl(self, sld):
+        self.lbl_size_value.text_value = str(round(sld.current_value, 2))
+        self._plugin.update_content(self.lbl_size_value, sld)
+
+    @async_callback
+    async def update_color(self, *args):
+        color_scheme = self.color_scheme
+        opacity = self.opacity
+        await self.map_group.update_color(color_scheme, opacity)
+        self.map_group.mesh.upload()
+
+    @async_callback
+    async def redraw_map(self, content):
+        self.map_group.isovalue = self.isovalue
+        self.map_group.opacity = self.opacity
+        self.map_group.color_scheme = self.color_scheme
+        self.map_group.limited_view_range = self.size
+        await self._plugin.render_mesh(self.map_group)
 
     @property
-    def lbl_iso_value(self):
-        return self._menu.root.find_node('lbl_iso_value').get_content()
+    def img_histogram(self):
+        return self._menu.root.find_node('img_histogram').get_content()
 
     @property
-    def lbl_opacity_value(self):
-        return self._menu.root.find_node('lbl_opacity_value').get_content()
+    def dd_color_scheme(self):
+        return self._menu.root.find_node('dd_color_scheme').get_content()
 
     @property
-    def lbl_limit_range_value(self):
-        return self._menu.root.find_node('lbl_limit_range_value').get_content()
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
 
-    @property
-    def nanome_mesh(self):
-        return self._plugin.nanome_mesh
+    def render(self, map_group: MapGroup):
+        self._menu.title = f'{map_group.group_name} Map'
+        # Populate file list
+        lst = ui.UIList()
+        lst.display_rows = 3
+        for filepath in map_group.files:
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            filename = os.path.basename(filepath)
+            btn.text.value.set_all(filename)
+            lst.items.append(ln)
+        # Generate histogram
+        if len(map_group.files) > 1:
+            img_filepath = map_group.generate_histogram(self.temp_dir)
+            self.img_histogram.file_path = img_filepath
 
-    @property
-    def nanome_complex(self):
-        return self._plugin.nanome_complex
+        self.sld_isovalue.current_value = self.map_group.isovalue
+        self.sld_opacity.current_value = self.map_group.opacity
+        self.sld_size.current_value = self.map_group.limited_view_range
 
-    def render(self):
-        Logs.message("Enabling menu")
-        self._menu.enabled = True
-        self._plugin.update_menu(self._menu)
         self.dd_color_scheme.items = [
             nanome.ui.DropdownItem(name)
             for name in ["Bfactor", "Element", "Chain"]
         ]
-        # self.dd_complexes.items = [
-        #     nanome.ui.DropdownItem(c.name)
-        #     for c in ws.complexes
-        # ]
-        # self.dd_vault_mol_files.items = [
-        #     nanome.ui.DropdownItem(file["name"])
-        #     for file in self._plugin.user_files
-        #     if file["name"] not in MAP_FILETYPES
-        # ]
-
-        # self.dd_vault_map_files.items = [
-        #     nanome.ui.DropdownItem(file["name"])
-        #     for file in self._plugin.user_files
-        #     if file["name"] in MAP_FILETYPES
-        # ]
+        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
         self.dd_color_scheme.items[0].selected = True
-        self.lbl_iso_value.text_value = str(round(self.sl_iso_value.current_value, 2))
-        self.lbl_opacity_value.text_value = str(round(self.sl_opacity.current_value, 2))
-        self.lbl_limit_range_value.text_value = str(round(self.sl_range_limit.current_value, 2))
         self._plugin.update_menu(self._menu)
 
-    async def download_cryoem_map_from_emdbid(self, emdbid):
-        Logs.message("Downloading EM data for EMDBID:", emdbid)
-        self._plugin.send_notification(
-            nanome.util.enums.NotificationTypes.message, "Downloading EM data"
-        )
+    @property
+    def sld_size(self):
+        return self._menu.root.find_node('sld_size').get_content()
 
-        new_url = (
-            "https://files.rcsb.org/pub/emdb/structures/"
-            + emdbid
-            + "/map/"
-            + emdbid.lower().replace("-", "_")
-            + ".map.gz"
-        )
+    @property
+    def lbl_size_value(self):
+        return self._menu.root.find_node('lbl_size_value').get_content()
 
-        # Write the map to a .map file
-        with requests.get(new_url, stream=True) as r:
-            r.raise_for_status()
-            map_tempfile = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".map.gz", dir=self._plugin.temp_dir.name
-            )
-            with open(map_tempfile.name, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            self._plugin.map_file = map_tempfile
-            self._plugin.load_map()
-            self._plugin.generate_histogram()
-            ws = await self._plugin.request_workspace()
-            await self._plugin.set_current_complex_generate_surface(ws)
+    @property
+    def isovalue(self):
+        return self.sld_isovalue.current_value
 
-    async def download_cryoem_map_from_pdbid(self, file):
-        Logs.message("Downloading EM data for PDBID:", self.pdbid)
-        self._plugin.send_notification(
-            nanome.util.enums.NotificationTypes.message, "Downloading EM data"
-        )
-        base = "https://data.rcsb.org/rest/v1/core/entry/"
-        rest_url = base + self.pdbid
-        response = requests.get(rest_url)
-        if response.status_code != 200:
-            Logs.error("Something went wrong fetching the EM data")
-            self._plugin.send_notification(
-                nanome.util.enums.NotificationTypes.error,
-                "No EMDB data for " + str(self.pdbid),
-            )
-            return
-        result = response.json()
-        k1 = "rcsb_entry_container_identifiers"
-        k2 = "emdb_ids"
-        if not k1 in result or not k2 in result[k1]:
-            Logs.error("No EM data found for", self.pdbid)
-            self._plugin.send_notification(
-                nanome.util.enums.NotificationTypes.error,
-                "No EMDB data for " + str(self.pdbid),
-            )
-            return
-        emdb_ids = result[k1][k2]
+    @property
+    def opacity(self):
+        return self.sld_opacity.current_value
 
-        if "pdbx_vrpt_summary" in result and "contour_level_primary_map" in result["pdbx_vrpt_summary"]:
-            self.map_prefered_level = float(
-                result["pdbx_vrpt_summary"]["contour_level_primary_map"])
-            Logs.debug("Found prevered level =", self.map_prefered_level)
+    @property
+    def size(self):
+        return self.sld_size.current_value
 
-        if len(emdb_ids) >= 1:
-            await self.download_cryoem_map_from_emdbid(emdb_ids[0])
-        else:
-            Logs.error("No EM data found for", self.pdbid)
-            self._plugin.send_notification(
-                nanome.util.enums.NotificationTypes.error,
-                "No EMDB data for ",
-                self.pdbid,
-            )
-
-    @async_callback
-    async def download_pdb(self, textinput):
-        if self.nanome_mesh is not None:
-            self.nanome_mesh.destroy()
-
-        self.pdbid = textinput.input_text.strip()
-
-        if self.nanome_complex is None and len(self.pdbid) != 4:
-            Logs.error("Wrong PDBID:", self.pdbid)
-            self._plugin.send_notification(
-                nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
-            )
-            return False
-        # Download the PDB only if no target complex set
-        if self.nanome_complex is not None:
-            if len(self.pdbid) == 4:
-                await self.download_cryoem_map_from_pdbid(None)
-            else:
-                if len(self.pdbid) > 4 and not "EMD" in self.pdbid and not "emd" in self.pdbid:
-                    self.pdbid = "EMD-" + self.pdbid
-                self.download_cryoem_map_from_emdbid(self.pdbid)
-            return True
-
-        base = "https://files.rcsb.org/download/"
-        full_url = base + self.pdbid + ".pdb.gz"
-        self._plugin.send_notification(
-            nanome.util.enums.NotificationTypes.message, "Downloading PDB"
-        )
-        Logs.message("Downloading PDB file from", full_url)
-
-        response = requests.get(full_url)
-        if response.status_code != 200:
-            Logs.error("Something went wrong fetching the PDB file")
-            self._plugin.send_notification(
-                nanome.util.enums.NotificationTypes.error, "Wrong PDB ID"
-            )
-            return False
-
-        pdb_tempfile = tempfile.NamedTemporaryFile(
-            delete=False,
-            prefix="CryoEM_plugin_" + self.pdbid,
-            suffix=".pdb.gz",
-            dir=self._plugin.temp_dir.name
-        )
-        open(pdb_tempfile.name, "wb").write(response.content)
-        pdb_path = pdb_tempfile.name.replace("\\", "/")
-        file = await self._plugin.send_files_to_load(pdb_path)
-        await self.download_cryoem_map_from_pdbid(file)
-        return True
-
-    def show_hide_map(self, toggle):
-        opacity = self.sl_opacity.current_value
-        if self.nanome_mesh is not None:
-            self.nanome_mesh.color.a = int(
-                opacity * 255) if toggle.selected else 0
-            self.shown = toggle.selected
-            self.nanome_mesh.upload()
-
-    def set_wireframe_mode(self, toggle):
-        if self.nanome_mesh is not None:
-            if self.wireframe_mode:
-                self._plugin.wire_vertices, self._plugin.wire_normals, self._plugin.wire_triangles = self._plugin.wireframe_mesh()
-                self.nanome_mesh.vertices = self._plugin.wire_vertices.flatten()
-                self.nanome_mesh.triangles = self._plugin.wire_triangles.flatten()
-            else:
-                self.nanome_mesh.vertices = np.asarray(self._plugin.computed_vertices).flatten()
-                self.nanome_mesh.triangles = np.asarray(self._plugin.computed_triangles).flatten()
-
-            self.change_color_scheme()
-            self.nanome_mesh.upload()
-
-    def change_color_scheme(self, **kwargs):
-        new_color_scheme = self.get_color_scheme()
-        if self.color_by != new_color_scheme:
-            self.color_by = new_color_scheme
-            self._plugin.color_by_scheme(new_color_scheme)
-            if self.nanome_mesh is not None:
-                self.nanome_mesh.upload()
-
-    def get_color_scheme(self):
+    @property
+    def color_scheme(self):
         item = next(item for item in self.dd_color_scheme.items if item.selected)
         if item.name == "Element":
             color_scheme = enums.ColorScheme.Element
@@ -295,84 +303,17 @@ class MainMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    def set_target_complex(self, dropdown, item):
-        self._plugin.update_content(dropdown)
-        # for c in self.nanome_workspace.complexes:
-        #     if c.name == item.name:
-        #         self.nanome_complex = c
-        #         return
-
-    def set_selected_file(self, dropdown, item):
-        self._Vault_mol_file_to_download = item.name
-        print(item.name)
-
-    def set_selected_map_file(self, dropdown, item):
-        self._Vault_map_file_to_download = item.name
-        print(item.name)
-
-    def load_map_from_vault(self):
-        if self._Vault_map_file_to_download is not None:
-            tfile = self.get_file_from_vault(
-                self._Vault_map_file_to_download)
-            self._plugin.map_file = tfile
+    def set_wireframe_mode(self, btn):
+        toggle = btn.selected
+        Logs.message(f"Wireframe mode set to {toggle}")
+        self.map_group.toggle_wireframe_mode(toggle)
+        self.map_group.mesh.upload()
 
     @async_callback
-    async def update_isosurface(self, iso):
-        self.lbl_iso_value.text_value = str(round(iso.current_value, 3))
-        self._plugin.update_content(self.lbl_iso_value)
-        if self._plugin._map_data is not None:
-            await self._plugin.generate_isosurface(iso.current_value)
-        Logs.debug("Setting iso-value to", str(round(iso.current_value, 3)))
-
-    def update_limited_view_x(self, slider):
-        self.limit_x = slider.current_value
-        self.label_limit_x.text_value = "Position.x: " + \
-            str(round(self.limit_x, 2))
-        self._plugin.update_content(self.label_limit_x)
-        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self._plugin.update_mesh_limited_view()
-        x = str(round(self.limit_x, 2))
-        y = str(round(self.limit_y, 2))
-        z = str(round(self.limit_z, 2))
-        Logs.debug("Setting limited view to (", x, y, z, ")")
-
-    def update_limited_view_y(self, slider):
-        self.limit_y = slider.current_value
-        self.label_limit_y.text_value = "Position.y: " + \
-            str(round(self.limit_y, 2))
-        self._plugin.update_content(self.label_limit_y)
-        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self._plugin.update_mesh_limited_view()
-        x = str(round(self.limit_x, 2))
-        y = str(round(self.limit_y, 2))
-        z = str(round(self.limit_z, 2))
-        Logs.debug("Setting limited view to (", x, y, z, ")")
-
-    def update_limited_view_z(self, slider):
-        self.limit_z = slider.current_value
-        self.label_limit_z.text_value = "Position.z: " + \
-            str(round(self.limit_z, 2))
-        self._plugin.update_content(self.label_limit_z)
-        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
-        self._plugin.update_mesh_limited_view()
-        x = str(round(self.limit_x, 2))
-        y = str(round(self.limit_y, 2))
-        z = str(round(self.limit_z, 2))
-        Logs.debug("Setting limited view to (", x, y, z, ")")
-
-    def update_limited_view_range(self, slider):
-        self.limited_view_range = slider.current_value
-        self.lbl_limit_range_value.text_value = str(round(self.limited_view_range, 2))
-        self._plugin.update_content(self.lbl_limit_range_value)
-        self._plugin.update_mesh_limited_view()
-        Logs.debug("Setting limited view range to",
-                   str(round(self.limited_view_range, 2)))
-
-    def update_opacity(self, alpha):
-        opacity = alpha.current_value
-        self.lbl_opacity_value.text_value = str(round(opacity, 2))
-        self._plugin.update_content(self.lbl_opacity_value)
-        Logs.debug(f"Setting opacity to {opacity}")
-        if self._plugin._map_data is not None and self.nanome_mesh and self.shown:
-            self.nanome_mesh.color.a = int(opacity * 255)
-            self.nanome_mesh.upload()
+    async def toggle_map_visibility(self, btn):
+        toggle = btn.selected
+        Logs.message(f"Map visibility set to {toggle}")
+        opacity = self.opacity if toggle else 0
+        color = self.map_group.color_scheme
+        await self.map_group.update_color(color, opacity)
+        self.map_group.mesh.upload()
