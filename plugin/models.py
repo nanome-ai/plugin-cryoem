@@ -45,11 +45,11 @@ class MapGroup:
 
             voxel_sizes = [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
             delta = np.diag(np.array(voxel_sizes))
-            
+
             axes_c_order = np.argsort(axes_order)
             nstarts = [h.nxstart, h.nystart, h.nzstart]
             offsets = np.hstack(nstarts)[axes_c_order] * np.diag(delta)
-            
+
             origin_coords = [h.origin.x, h.origin.y, h.origin.z]
             self._map_origin = np.hstack(origin_coords) + offsets
 
@@ -67,7 +67,7 @@ class MapGroup:
             delete=False, suffix=".png", dir=temp_dir)
         plt.savefig(self.png_tempfile.name)
         return self.png_tempfile.name
-    
+
     def set_limited_view_on_cog(self):
         # Compute center of gravity of structure
         cog = np.array([0.0, 0.0, 0.0])
@@ -94,7 +94,7 @@ class MapGroup:
         if self.mesh is not None:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
-    
+
     def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
         # Compute iso-surface with marching cubes algorithm
         self.set_limited_view_on_cog()
@@ -160,7 +160,7 @@ class MapGroup:
             self.color_by_bfactor(mesh)
         elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain(mesh)
-    
+
     def color_by_element(self, mesh):
         if self.nanome_complex is None:
             return

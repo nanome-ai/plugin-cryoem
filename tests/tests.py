@@ -21,7 +21,7 @@ def run_awaitable(awaitable, *args, **kwargs):
 
 
 class MapGroupTestCase(unittest.TestCase):
-    
+
     def setUp(self):
         self.map_group = MapGroup()
         self.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
@@ -30,12 +30,12 @@ class MapGroupTestCase(unittest.TestCase):
     def test_add_file_pdb(self):
         self.map_group.add_file(self.pdb_file)
         self.assertTrue(self.pdb_file in self.map_group.files)
-    
+
     def test_add_file_map(self):
         self.map_group.add_file(self.map_file)
         self.assertTrue(self.map_file in self.map_group.files)
         self.assertTrue(self.map_file in self.map_group.files)
-    
+
     def test_load_map(self):
         # Assert that attributes are set after load_map called.
         attrs_to_set = ['_map_data', '_map_voxel_size', '_map_origin']

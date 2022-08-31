@@ -23,7 +23,7 @@ class MainMenu:
         self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
         self._plugin = plugin_instance
         self.btn_embi_db.register_pressed_callback(self.on_btn_embi_db_pressed)
-    
+
     @property
     def btn_embi_db(self):
         return self._menu.root.find_node('btn_embi_db').get_content()
@@ -85,7 +85,7 @@ class EmbiDBMenu:
     @property
     def btn_rcsb_submit(self):
         return self._menu.root.find_node('btn_rcsb_submit').get_content()
-    
+
     @property
     def btn_embl_submit(self):
         return self._menu.root.find_node('btn_embl_submit').get_content()
@@ -93,7 +93,7 @@ class EmbiDBMenu:
     @property
     def ti_rcsb_query(self):
         return self._menu.root.find_node('ti_rcsb_query').get_content()
-    
+
     @property
     def ti_embl_query(self):
         return self._menu.root.find_node('ti_embl_query').get_content()
@@ -118,7 +118,7 @@ class EmbiDBMenu:
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
         await self._plugin.add_to_group(map_file)
-    
+
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
         response = requests.get(url)
@@ -132,7 +132,7 @@ class EmbiDBMenu:
         with open(file_path, 'wb') as f:
             f.write(response.content)
         return file_path
-    
+
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
@@ -188,11 +188,11 @@ class GroupDetailsMenu:
     @property
     def sld_opacity(self):
         return self._menu.root.find_node('sld_opacity').get_content()
-    
+
     @property
     def lbl_opacity_value(self):
         return self._menu.root.find_node('lbl_opacity_value').get_content()
-    
+
     @property
     def lbl_isovalue(self):
         return self._menu.root.find_node('lbl_isovalue').get_content()
@@ -283,7 +283,7 @@ class GroupDetailsMenu:
     @property
     def isovalue(self):
         return self.sld_isovalue.current_value
-    
+
     @property
     def opacity(self):
         return self.sld_opacity.current_value
@@ -302,7 +302,7 @@ class GroupDetailsMenu:
         elif item.name == "Chain":
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
-    
+
     def set_wireframe_mode(self, btn):
         toggle = btn.selected
         Logs.message(f"Wireframe mode set to {toggle}")
