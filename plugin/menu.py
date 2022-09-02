@@ -166,6 +166,7 @@ class GroupDetailsMenu:
         self.sld_size.register_released_callback(self.redraw_map)
         self.set_isovalue_ui(map_group.isovalue)
         self.set_opacity_ui(map_group.opacity)
+        self.set_size_ui(map_group.limited_view_range)
         self.btn_show_hide_map.switch.active = True
         self.btn_show_hide_map.toggle_on_press = True
         self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
@@ -180,6 +181,10 @@ class GroupDetailsMenu:
     def set_opacity_ui(self, opacity: float):
         self.sld_opacity.current_value = opacity
         self.lbl_opacity_value.text_value = str(round(opacity, 2))
+    
+    def set_size_ui(self, size: float):
+        self.sld_size.current_value = size
+        self.lbl_opacity_value.text_value = str(round(size, 2))
 
     @property
     def sld_isovalue(self):

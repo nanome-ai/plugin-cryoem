@@ -22,7 +22,7 @@ class MapGroup:
         self._map_voxel_size = None
         self._map_origin = None
         self.nanome_complex = None
-        self.limited_view_range = 5
+        self.limited_view_range = 15
         self.wireframe_mode = False
 
         self.isovalue = 0.1
