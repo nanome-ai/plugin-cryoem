@@ -1,11 +1,8 @@
 import asyncio
 import os
 import unittest
-from unittest.mock import MagicMock
 from nanome.api.shapes import Mesh
 from nanome.util import enums
-
-from plugin.CryoEM import CryoEM
 from plugin.models import MapGroup
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')

@@ -14,7 +14,7 @@ EMBL_MENU_PATH = path.join(MENU_JSON_PATH, 'embl_search_menu.json')
 GROUP_DETAIL_MENU_PATH = path.join(MENU_JSON_PATH, 'group_details.json')
 MAP_FILETYPES = ['.map', '.map.gz']
 
-__all__ = ['MainMenu', 'EMBLMenu', 'GroupDetailMenu']
+__all__ = ['MainMenu', 'EMBLMenu', 'EditMeshMenu']
 
 
 class MainMenu:
@@ -22,27 +22,30 @@ class MainMenu:
     def __init__(self, plugin_instance):
         self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
         self._plugin = plugin_instance
-        self.btn_embi_db.register_pressed_callback(self.on_btn_embi_db_pressed)
+        self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
 
     @property
-    def btn_embi_db(self):
+    def btn_search_menu(self):
         return self._menu.root.find_node('btn_embi_db').get_content()
 
     @property
     def ln_group_btns(self):
         return self._menu.root.find_node('ln_group_btns')
 
-    def render(self, force_enable=False):
+    def render(self, complexes, force_enable=False):
         if force_enable:
             self._menu.enabled = True
+
+        for comp in complexes:
+            pass
+
         groups = self._plugin.groups
         self.render_map_groups(groups)
         self._plugin.update_menu(self._menu)
 
-    def on_btn_embi_db_pressed(self, btn):
-        Logs.message('Loading EMBiDB menu')
-        self._plugin.enable_embi_db_menu()
-        self.render(force_enable=False)
+    def on_btn_search_menu_pressed(self, btn):
+        Logs.message('Loading Search menu')
+        self._plugin.enable_search_menu()
 
     def render_map_groups(self, groups):
         lst = ui.UIList()
@@ -60,11 +63,11 @@ class MainMenu:
 
     def open_group_details(self, map_group, btn):
         Logs.message('Loading group details menu')
-        group_menu = GroupDetailsMenu(map_group, self._plugin)
+        group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
 
-class EmbiDBMenu:
+class SearchMenu:
 
     def __init__(self, plugin_instance):
         self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
@@ -151,7 +154,7 @@ class EmbiDBMenu:
         return file_path
 
 
-class GroupDetailsMenu:
+class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance):
         self.map_group = map_group
@@ -184,7 +187,7 @@ class GroupDetailsMenu:
     
     def set_size_ui(self, size: float):
         self.sld_size.current_value = size
-        self.lbl_opacity_value.text_value = str(round(size, 2))
+        self.lbl_size_value.text_value = str(round(size, 2))
 
     @property
     def sld_isovalue(self):
@@ -227,7 +230,8 @@ class GroupDetailsMenu:
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
-        self.map_group.mesh.upload()
+        if self.map_group.mesh:
+            self.map_group.mesh.upload()
 
     @async_callback
     async def redraw_map(self, content):
@@ -235,7 +239,8 @@ class GroupDetailsMenu:
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         self.map_group.limited_view_range = self.size
-        await self._plugin.render_mesh(self.map_group)
+        if self.map_group.mesh:
+            await self._plugin.render_mesh(self.map_group)
 
     @property
     def img_histogram(self):

@@ -1,24 +1,10 @@
 import os
 import tempfile
-import matplotlib.pyplot as plt
-import mcubes
-import mrcfile
 import nanome
-import numpy as np
-import pyfqmr
-import randomcolor
-from matplotlib import cm
-from nanome.api.shapes import Mesh
-from nanome.util import Color, Logs, Vector3, async_callback, enums
-from scipy.spatial import KDTree
+from nanome.util import Logs, async_callback, enums
 
-# from .old_menu import OldMenu
-from .menu import MainMenu, EmbiDBMenu
+from .menu import MainMenu, SearchMenu
 from .models import MapGroup
-from .VaultManager import VaultManager
-
-API_KEY = os.environ.get('API_KEY', None)
-SERVER_URL = os.environ.get('SERVER_URL', None)
 
 
 class CryoEM(nanome.AsyncPluginInstance):
@@ -27,7 +13,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     async def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
-        self.embi_db_menu = EmbiDBMenu(self)
+        self.search_menu = SearchMenu(self)
         self.groups = {}
 
     def on_stop(self):
@@ -35,10 +21,11 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
-        self.menu.render(force_enable=True)
+        complexes = await self.request_complex_list()
+        self.menu.render(complexes, force_enable=True)
 
-    def enable_embi_db_menu(self):
-        self.embi_db_menu.render(force_enable=True)
+    def enable_search_menu(self):
+        self.search_menu.render(force_enable=True)
 
     async def add_to_group(self, filepath):
         path, ext = os.path.splitext(filepath)
@@ -51,10 +38,14 @@ class CryoEM(nanome.AsyncPluginInstance):
         else:
             # For now just add maps to first group
             # Will need to be fixed later
-            group = next(iter(self.groups.values()))
+            group = next(iter(self.groups.values()), None)
+            if not group:
+                group_name = os.path.basename(path)
+                group = MapGroup(group_name=group_name)
             group.add_file(filepath)
             await self.render_mesh(group)
-        self.menu.render()
+        complexes = await self.request_complex_list()
+        self.menu.render(complexes)
 
     async def render_mesh(self, map_group):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
@@ -63,8 +54,11 @@ class CryoEM(nanome.AsyncPluginInstance):
         color_scheme = map_group.color_scheme
 
         comps = await self.request_complex_list()
-        deep_comp = await self.request_complexes([comps[0].index])
-        map_group.nanome_complex = deep_comp[0]
+        if comps:
+            deep_comp = await self.request_complexes([comps[0].index])
+            map_group.nanome_complex = deep_comp[0]
+        else:
+            map_group.nanome_complex = None
         Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
         mesh = map_group.generate_mesh(iso, color_scheme, opacity)
         Logs.message(
