@@ -8,10 +8,15 @@ from nanome.util import Logs, async_callback, enums
 
 from .models import MapGroup
 
-MENU_JSON_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'menu_json')
-MAIN_MENU_PATH = path.join(MENU_JSON_PATH, 'main_menu.json')
-EMBL_MENU_PATH = path.join(MENU_JSON_PATH, 'embl_search_menu.json')
-GROUP_DETAIL_MENU_PATH = path.join(MENU_JSON_PATH, 'group_details.json')
+ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
+MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
+EMBL_MENU_PATH = path.join(ASSETS_PATH, 'embl_search_menu.json')
+GROUP_DETAIL_MENU_PATH = path.join(ASSETS_PATH, 'group_details.json')
+GROUP_ITEM_PATH = path.join(ASSETS_PATH, 'group_item.json')
+
+DELETE_ICON = path.join(ASSETS_PATH, 'delete.png')
+VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
+INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
 
 __all__ = ['MainMenu', 'EMBLMenu', 'EditMeshMenu']
@@ -19,18 +24,17 @@ __all__ = ['MainMenu', 'EMBLMenu', 'EditMeshMenu']
 
 class MainMenu:
 
-    def __init__(self, plugin_instance):
+    def __init__(self, plugin_instance: nanome.PluginInstance):
         self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
         self._plugin = plugin_instance
+
+        self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
+        self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
+
+        root: ui.LayoutNode = self._menu.root
+        self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
         self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
-
-    @property
-    def btn_search_menu(self):
-        return self._menu.root.find_node('btn_embi_db').get_content()
-
-    @property
-    def ln_group_btns(self):
-        return self._menu.root.find_node('ln_group_btns')
+        self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
     def render(self, complexes, force_enable=False):
         if force_enable:
@@ -48,58 +52,75 @@ class MainMenu:
         self._plugin.enable_search_menu()
 
     def render_map_groups(self, groups):
-        lst = ui.UIList()
-        lst.display_rows = 3
+        self.lst_groups.items.clear()
         for map_group in groups.values():
-            group_name = map_group.group_name
-            ln = ui.LayoutNode()
-            btn = ln.add_new_button()
-            btn.text.value.set_all(group_name)
+            ln: ui.LayoutNode = self.pfb_group_item.clone()
+            lbl: ui.Label = ln.find_node('Label').get_content()
+            lbl.text_value = map_group.group_name
+
+            btn: ui.Button = ln.get_content()
             btn.register_pressed_callback(
                 functools.partial(self.open_group_details, map_group))
-            lst.items.append(ln)
-        self.ln_group_btns.set_content(lst)
-        self._plugin.update_node(self.ln_group_btns)
+
+            btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
+            btn_delete.register_pressed_callback(
+                functools.partial(self.delete_group, map_group))
+
+            btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
+            btn_toggle.icon.value.set_all(
+                VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
+            btn_toggle.register_pressed_callback(
+                functools.partial(self.toggle_group, map_group))
+
+            self.lst_groups.items.append(ln)
+        self._plugin.update_content(self.lst_groups)
 
     def open_group_details(self, map_group, btn):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
+    def delete_group(self, map_group, btn):
+        Logs.message('Deleting group')
+        # TODO
+
+    def toggle_group(self, map_group, btn: ui.Button):
+        Logs.message('Toggling group')
+        map_group.visible = not map_group.visible
+        btn.icon.value.set_all(
+            VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
+        self._plugin.update_content(btn)
+        # TODO
+
 
 class SearchMenu:
 
-    def __init__(self, plugin_instance):
+    def __init__(self, plugin_instance: nanome.PluginInstance):
         self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
         self._menu.index = 2
         self._plugin = plugin_instance
+
+        root: ui.LayoutNode = self._menu.root
+        self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
+        self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
+        self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
+        self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
+
         self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
         self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
 
         self.current_group = "Group 1"
         # For development only
-        self.ti_rcsb_query.input_text = '7q1u'
-        self.ti_embl_query.input_text = '13764'
+        # self.ti_rcsb_query.input_text = '7q1u'
+        # self.ti_embl_query.input_text = '13764'
+        # self.ti_rcsb_query.input_text = '5k7n'
+        # self.ti_embl_query.input_text = '8216'
+        self.ti_rcsb_query.input_text = '7c4u'
+        self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):
         return self._plugin.temp_dir.name
-
-    @property
-    def btn_rcsb_submit(self):
-        return self._menu.root.find_node('btn_rcsb_submit').get_content()
-
-    @property
-    def btn_embl_submit(self):
-        return self._menu.root.find_node('btn_embl_submit').get_content()
-
-    @property
-    def ti_rcsb_query(self):
-        return self._menu.root.find_node('ti_rcsb_query').get_content()
-
-    @property
-    def ti_embl_query(self):
-        return self._menu.root.find_node('ti_embl_query').get_content()
 
     def render(self, force_enable=False):
         if force_enable:
@@ -156,74 +177,81 @@ class SearchMenu:
 
 class EditMeshMenu:
 
-    def __init__(self, map_group, plugin_instance):
+    def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
+
+        root: ui.LayoutNode = self._menu.root
+        self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
+
+        self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
         self.sld_isovalue.register_released_callback(self.redraw_map)
+
+        self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
         self.sld_opacity.register_released_callback(self.update_color)
-        self.sld_size.register_changed_callback(self.update_size_lbl)
-        self.sld_size.register_released_callback(self.redraw_map)
-        self.set_isovalue_ui(map_group.isovalue)
-        self.set_opacity_ui(map_group.opacity)
-        self.set_size_ui(map_group.limited_view_range)
-        self.btn_show_hide_map.switch.active = True
-        self.btn_show_hide_map.toggle_on_press = True
-        self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
-        self.btn_wireframe.switch.active = True
-        self.btn_wireframe.toggle_on_press = True
-        self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
 
-    def set_isovalue_ui(self, isovalue):
+        self.sld_radius: ui.Slider = root.find_node('sld_radius').get_content()
+        self.sld_radius.register_changed_callback(self.update_radius_lbl)
+        self.sld_radius.register_released_callback(self.redraw_map)
+
+        self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
+        self.lbl_opacity: ui.Label = root.find_node('lbl_opacity').get_content()
+        self.lbl_isovalue: ui.Label = root.find_node('lbl_isovalue').get_content()
+        self.lbl_radius: ui.Label = root.find_node('lbl_radius').get_content()
+
+        self.ln_isovalue_line: ui.LayoutNode = root.find_node('ln_isovalue_line')
+
+        # self.btn_show_hide_map: ui.Button = root.find_node('btn_show_hide_map').get_content()
+        # self.btn_show_hide_map.switch.active = True
+        # self.btn_show_hide_map.toggle_on_press = True
+        # self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
+
+        # self.btn_wireframe: ui.Button = root.find_node('btn_wireframe').get_content()
+        # self.btn_wireframe.switch.active = True
+        # self.btn_wireframe.toggle_on_press = True
+        # self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
+
+        self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
+        self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
+        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
+
+    def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
-        self.lbl_isovalue.text_value = str(round(isovalue, 2))
+        self.update_isovalue_lbl(self.sld_isovalue)
 
     def set_opacity_ui(self, opacity: float):
         self.sld_opacity.current_value = opacity
-        self.lbl_opacity_value.text_value = str(round(opacity, 2))
-    
-    def set_size_ui(self, size: float):
-        self.sld_size.current_value = size
-        self.lbl_size_value.text_value = str(round(size, 2))
+        self.update_opacity_lbl(self.sld_opacity)
 
-    @property
-    def sld_isovalue(self):
-        return self._menu.root.find_node('sld_isovalue').get_content()
-
-    @property
-    def sld_opacity(self):
-        return self._menu.root.find_node('sld_opacity').get_content()
-
-    @property
-    def lbl_opacity_value(self):
-        return self._menu.root.find_node('lbl_opacity_value').get_content()
-
-    @property
-    def lbl_isovalue(self):
-        return self._menu.root.find_node('lbl_isovalue').get_content()
-
-    @property
-    def btn_show_hide_map(self):
-        return self._menu.root.find_node('btn_show_hide_map').get_content()
-
-    @property
-    def btn_wireframe(self):
-        return self._menu.root.find_node('btn_wireframe').get_content()
+    def set_radius_ui(self, radius: float):
+        self.sld_radius.current_value = radius
+        self.update_radius_lbl(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
-        self.lbl_isovalue.text_value = str(round(sld.current_value, 2))
+        self.lbl_isovalue.text_value = f'{round(sld.current_value, 2)} A'
         self._plugin.update_content(self.lbl_isovalue, sld)
 
-    def update_opacity_lbl(self, sld):
-        self.lbl_opacity_value.text_value = str(round(sld.current_value, 2))
-        self._plugin.update_content(self.lbl_opacity_value, sld)
+        # /!\ calculation is sensitive to menu and image dimensions
+        # position histogram line based on isovalue
+        # plot width 800, left padding 100, right padding 80
+        x_min = self.map_group.hist_x_min
+        x_max = self.map_group.hist_x_max
+        x = (sld.current_value - x_min) / (x_max - x_min)
+        left = (100 + x * 620) / 800
+        self.ln_isovalue_line.set_padding(left=left)
+        self._plugin.update_node(self.ln_isovalue_line)
 
-    def update_size_lbl(self, sld):
-        self.lbl_size_value.text_value = str(round(sld.current_value, 2))
-        self._plugin.update_content(self.lbl_size_value, sld)
+    def update_opacity_lbl(self, sld):
+        self.lbl_opacity.text_value = str(round(100 * sld.current_value))
+        self._plugin.update_content(self.lbl_opacity, sld)
+
+    def update_radius_lbl(self, sld):
+        self.lbl_radius.text_value = f'{round(sld.current_value, 2)} A'
+        self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
     async def update_color(self, *args):
@@ -238,17 +266,9 @@ class EditMeshMenu:
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
-        self.map_group.limited_view_range = self.size
+        self.map_group.radius = self.radius
         if self.map_group.mesh:
             await self._plugin.render_mesh(self.map_group)
-
-    @property
-    def img_histogram(self):
-        return self._menu.root.find_node('img_histogram').get_content()
-
-    @property
-    def dd_color_scheme(self):
-        return self._menu.root.find_node('dd_color_scheme').get_content()
 
     @property
     def temp_dir(self):
@@ -256,39 +276,29 @@ class EditMeshMenu:
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map'
+
         # Populate file list
-        lst = ui.UIList()
-        lst.display_rows = 3
+        self.lst_files.items.clear()
         for filepath in map_group.files:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
             filename = os.path.basename(filepath)
             btn.text.value.set_all(filename)
-            lst.items.append(ln)
+            self.lst_files.items.append(ln)
+
         # Generate histogram
         if len(map_group.files) > 1:
             img_filepath = map_group.generate_histogram(self.temp_dir)
             self.img_histogram.file_path = img_filepath
 
-        self.sld_isovalue.current_value = self.map_group.isovalue
-        self.sld_opacity.current_value = self.map_group.opacity
-        self.sld_size.current_value = self.map_group.limited_view_range
+        self.sld_isovalue.min_value = map_group.hist_x_min
+        self.sld_isovalue.max_value = map_group.hist_x_max
 
-        self.dd_color_scheme.items = [
-            nanome.ui.DropdownItem(name)
-            for name in ["Bfactor", "Element", "Chain"]
-        ]
-        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
-        self.dd_color_scheme.items[0].selected = True
+        self.set_isovalue_ui(self.map_group.isovalue)
+        self.set_opacity_ui(self.map_group.opacity)
+        self.set_radius_ui(self.map_group.radius)
+
         self._plugin.update_menu(self._menu)
-
-    @property
-    def sld_size(self):
-        return self._menu.root.find_node('sld_size').get_content()
-
-    @property
-    def lbl_size_value(self):
-        return self._menu.root.find_node('lbl_size_value').get_content()
 
     @property
     def isovalue(self):
@@ -299,8 +309,8 @@ class EditMeshMenu:
         return self.sld_opacity.current_value
 
     @property
-    def size(self):
-        return self.sld_size.current_value
+    def radius(self):
+        return self.sld_radius.current_value
 
     @property
     def color_scheme(self):
@@ -313,17 +323,17 @@ class EditMeshMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    def set_wireframe_mode(self, btn):
-        toggle = btn.selected
-        Logs.message(f"Wireframe mode set to {toggle}")
-        self.map_group.toggle_wireframe_mode(toggle)
-        self.map_group.mesh.upload()
+    # def set_wireframe_mode(self, btn):
+    #     toggle = btn.selected
+    #     Logs.message(f"Wireframe mode set to {toggle}")
+    #     self.map_group.toggle_wireframe_mode(toggle)
+    #     self.map_group.mesh.upload()
 
-    @async_callback
-    async def toggle_map_visibility(self, btn):
-        toggle = btn.selected
-        Logs.message(f"Map visibility set to {toggle}")
-        opacity = self.opacity if toggle else 0
-        color = self.map_group.color_scheme
-        await self.map_group.update_color(color, opacity)
-        self.map_group.mesh.upload()
+    # @async_callback
+    # async def toggle_map_visibility(self, btn):
+    #     toggle = btn.selected
+    #     Logs.message(f"Map visibility set to {toggle}")
+    #     opacity = self.opacity if toggle else 0
+    #     color = self.map_group.color_scheme
+    #     await self.map_group.update_color(color, opacity)
+    #     self.map_group.mesh.upload()

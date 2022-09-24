@@ -59,13 +59,9 @@ class CryoEM(nanome.AsyncPluginInstance):
             map_group.nanome_complex = deep_comp[0]
         else:
             map_group.nanome_complex = None
-        Logs.message(f"Generating iso-surface for iso-value {str(round(iso, 3))}")
+        Logs.message(f"Generating iso-surface for iso-value {round(iso, 3)}")
         mesh = map_group.generate_mesh(iso, color_scheme, opacity)
-        Logs.message(
-            "Uploading iso-surface ("
-            + str(len(mesh.vertices))
-            + " vertices)"
-        )
+        Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
         await mesh.upload()
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
 
