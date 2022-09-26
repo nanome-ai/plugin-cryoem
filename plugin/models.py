@@ -18,16 +18,29 @@ class MapGroup:
         self.group_name = kwargs.get("group_name", "")
         self.files = kwargs.get("files", [])
         self.mesh = None
+        self.nanome_complex = None
+
         self._map_data = None
         self._map_voxel_size = None
         self._map_origin = None
-        self.nanome_complex = None
-        self.limited_view_range = 15
-        self.wireframe_mode = False
 
+        self.hist_x_min = 0.0
+        self.hist_x_max = 1.0
+
+        self.computed_vertices = []
+        self.computed_normals = []
+        self.computed_triangles = []
+        self.wire_vertices = []
+        self.wire_normals = []
+        self.wire_triangles = []
+
+        self.visible = True
+        self.position = [0.0, 0.0, 0.0]
         self.isovalue = 0.1
         self.opacity = 0.65
+        self.radius = 15
         self.color_scheme = enums.ColorScheme.BFactor
+        self.wireframe_mode = False
 
     def add_file(self, filepath: str):
         self.files.append(filepath)
@@ -59,10 +72,12 @@ class MapGroup:
         flat_offset = flat + abs(minmap) + 0.001
         hist, bins = np.histogram(flat_offset, bins=1000)
         logbins = np.logspace(np.log10(bins[0]), np.log10(bins[-1]), len(bins))
+        plt.figure(figsize=(8, 3))
         plt.hist(flat, bins=logbins - abs(minmap))
         plt.ylim(bottom=10)
         plt.yscale('log')
         plt.title("Level histogram")
+        self.hist_x_min, self.hist_x_max = plt.xlim()
         self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png", dir=temp_dir)
         plt.savefig(self.png_tempfile.name)
@@ -72,10 +87,7 @@ class MapGroup:
         # Compute center of gravity of structure
         cog = np.array([0.0, 0.0, 0.0])
         if self.nanome_complex is None:
-            self.limit_x = cog[0]
-            self.limit_y = cog[1]
-            self.limit_z = cog[2]
-            self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
+            self.position = cog.tolist()
             return
         count = 0
         for a in self.nanome_complex.atoms:
@@ -83,10 +95,7 @@ class MapGroup:
             cog += np.array([a.position.x, a.position.y, a.position.z])
         cog /= count
         cog -= self._map_origin
-        self.limit_x = cog[0]
-        self.limit_y = cog[1]
-        self.limit_z = cog[2]
-        self.limited_view_pos = [self.limit_x, self.limit_y, self.limit_z]
+        self.position = cog.tolist()
 
     async def update_color(self, color_scheme, opacity):
         self.opacity = opacity
@@ -118,8 +127,8 @@ class MapGroup:
         Logs.debug("Limiting View")
         vertices, normals, triangles = self.limit_view(
             (vertices, normals, triangles),
-            self.limited_view_pos,
-            self.limited_view_range,
+            self.position,
+            self.radius,
         )
 
         Logs.debug("Setting computed values")
@@ -178,7 +187,7 @@ class MapGroup:
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            verts + self._map_origin, distance_upper_bound=20)
+            verts + self._map_origin, distance_upper_bound=2)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
