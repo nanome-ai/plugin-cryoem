@@ -41,7 +41,7 @@ class MapGroup:
         self.opacity = 0.65
         self.radius = 15
         self.color_scheme = enums.ColorScheme.BFactor
-        self.wireframe_mode = False
+        self.wireframe_mode = True
 
     def add_file(self, filepath: str):
         self.files.append(filepath)
@@ -336,7 +336,7 @@ class MapGroup:
             self.mesh.vertices = np.asarray(self.computed_vertices).flatten()
             self.mesh.triangles = np.asarray(self.computed_triangles).flatten()
 
-    def wireframe_mesh(self, wiresize=0.01):
+    def wireframe_mesh(self, wiresize=0.03):
         ntri = len(self.computed_triangles) * 3
         new_verts = np.zeros((ntri * 4, 3))
         new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
