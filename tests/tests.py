@@ -17,12 +17,44 @@ def run_awaitable(awaitable, *args, **kwargs):
     return result
 
 
+class MapModelManagerTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+
+    def test_map_model_manager(self):
+        from iotbx.data_manager import DataManager
+        from iotbx.map_model_manager import map_model_manager
+        dm = DataManager()
+        dm.set_overwrite(True)
+        breakpoint()
+        mm = dm.get_real_map(self.map_file)
+        model = dm.get_model(self.pdb_file)
+        mmm = map_model_manager(
+            model=model,
+            map_manager=mm
+        )
+        dm.write_real_map_file(mm, filename=f'{self.map_file}')
+        dm.write_model_file(model, filename=self.pdb_file, extension="pdb")
+
+        box_mmm = mmm.extract_all_maps_around_model(selection_string="resseq 219:223")
+        dm.write_real_map_file(
+            box_mmm.map_manager(),
+            filename="box_around_219-223.mrc")
+
+        dm.write_model_file(
+            box_mmm.model(),
+            filename="box_around_219-223",
+            extension="pdb")
+
+
 class MapGroupTestCase(unittest.TestCase):
 
     def setUp(self):
         self.map_group = MapGroup()
-        self.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
+        self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
     def test_add_file_pdb(self):
         self.map_group.add_file(self.pdb_file)
@@ -61,6 +93,7 @@ class LoadedMapGroupTestCase(unittest.TestCase):
     def test_generate_mesh(self):
         # Make sure setUpClass generated a mesh
         mesh = self.map_group.mesh
+        breakpoint()
         self.assertTrue(isinstance(mesh, Mesh))
 
     def test_toggle_wireframe_mode(self):
