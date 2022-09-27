@@ -1,9 +1,15 @@
 import asyncio
 import os
+import tempfile
 import unittest
+from iotbx.data_manager import DataManager
+from iotbx.map_model_manager import map_model_manager
 from nanome.api.shapes import Mesh
+from nanome.api.structure import Complex
 from nanome.util import enums
+
 from plugin.models import MapGroup
+
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -22,31 +28,36 @@ class MapModelManagerTestCase(unittest.TestCase):
     def setUp(self):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.comp = Complex.io.from_pdb(path=self.pdb_file)
 
     def test_map_model_manager(self):
-        from iotbx.data_manager import DataManager
-        from iotbx.map_model_manager import map_model_manager
         dm = DataManager()
         dm.set_overwrite(True)
-        breakpoint()
         mm = dm.get_real_map(self.map_file)
         model = dm.get_model(self.pdb_file)
         mmm = map_model_manager(
             model=model,
             map_manager=mm
         )
-        dm.write_real_map_file(mm, filename=f'{self.map_file}')
-        dm.write_model_file(model, filename=self.pdb_file, extension="pdb")
 
-        box_mmm = mmm.extract_all_maps_around_model(selection_string="resseq 219:223")
-        dm.write_real_map_file(
-            box_mmm.map_manager(),
-            filename="box_around_219-223.mrc")
-
-        dm.write_model_file(
-            box_mmm.model(),
-            filename="box_around_219-223",
-            extension="pdb")
+        res_range = '201:210'
+        box_mmm = mmm.extract_all_maps_around_model(selection_string=f'resseq {res_range}')
+        # Write boxed residue range to files
+        with tempfile.TemporaryDirectory() as dirname:
+            boxed_map_filename = os.path.join(dirname, os.path.basename(self.map_file))
+            boxed_model_filename = os.path.join(dirname, os.path.basename(self.pdb_file))
+            # dm.write_real_map_file(mm, filename=boxed_map_filename)
+            # dm.write_model_file(model, filename=boxed_model_filename, extension="pdb")
+            dm.write_real_map_file(
+                box_mmm.map_manager(),
+                filename=boxed_map_filename)
+            dm.write_model_file(
+                box_mmm.model(),
+                filename=boxed_model_filename,
+                extension="pdb")
+            self.assertTrue(os.path.exists(boxed_map_filename))
+            self.assertTrue(os.path.exists(boxed_model_filename))
+            pass
 
 
 class MapGroupTestCase(unittest.TestCase):
