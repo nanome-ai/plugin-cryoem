@@ -39,7 +39,6 @@ class MapModelManagerTestCase(unittest.TestCase):
             model=model,
             map_manager=mm
         )
-
         res_range = '201:210'
         box_mmm = mmm.extract_all_maps_around_model(selection_string=f'resseq {res_range}')
         # Write boxed residue range to files
