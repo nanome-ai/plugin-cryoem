@@ -1,7 +1,10 @@
 import os
 import tempfile
 import nanome
+from nanome.api.structure import Complex
 from nanome.util import Logs, async_callback, enums
+from iotbx.data_manager import DataManager
+from iotbx.map_model_manager import map_model_manager
 
 from .menu import MainMenu, SearchMenu
 from .models import MapGroup
@@ -16,13 +19,43 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.search_menu = SearchMenu(self)
         self.groups = {}
 
+    async def load_map_and_model(self):
+        Logs.message("Loading Map file")
+        map_file = "emd_30288.map.gz"
+        pdb_file = "7c4u.pdb"
+        dm = DataManager()
+        dm.set_overwrite(True)
+        mm = dm.get_real_map(map_file)
+        Logs.message("loaded map")
+        model = dm.get_model(pdb_file)
+        Logs.message("loaded model")
+        mmm = map_model_manager(
+            model=model,
+            map_manager=mm
+        )
+        selection_string = 'resseq 1:1000'
+        box_mmm = mmm.extract_all_maps_around_model(selection_string=selection_string)
+        # Write boxed residue range to files
+        boxed_map_filename = os.path.join(self.temp_dir.name, os.path.basename(map_file))
+        dm.write_real_map_file(
+            box_mmm.map_manager(),
+            filename=boxed_map_filename)
+        boxed_model_filename = os.path.join(self.temp_dir.name, os.path.basename(pdb_file))
+        dm.write_model_file(
+            box_mmm.model(),
+            filename=boxed_model_filename,
+            extension="pdb")
+        await self.send_files_to_load([boxed_model_filename])
+
     def on_stop(self):
         self.temp_dir.cleanup()
 
     @async_callback
     async def on_run(self):
-        complexes = await self.request_complex_list()
-        self.menu.render(complexes, force_enable=True)
+        # complexes = await self.request_complex_list()
+        # self.menu.render(complexes, force_enable=True)
+        await self.load_map_and_model()
+        pass
 
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
@@ -47,7 +80,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         complexes = await self.request_complex_list()
         self.menu.render(complexes)
 
-    async def render_mesh(self, map_group):
+    async def render_mesh(self, map_group: map_model_manager):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
         iso = map_group.isovalue
         opacity = map_group.opacity
