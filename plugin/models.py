@@ -1,10 +1,10 @@
 import mcubes
-import mrcfile
 import matplotlib.pyplot as plt
 import numpy as np
 import pyfqmr
 import randomcolor
 import tempfile
+from gridData import Grid
 from matplotlib import cm
 from nanome.api.shapes import Mesh
 from nanome.util import Logs, enums, Vector3, Color
@@ -48,23 +48,14 @@ class MapGroup:
             self.load_map(filepath)
 
     def load_map(self, map_filepath: str):
-        with mrcfile.open(map_filepath) as mrc:
-            self._map_data = mrc.data
-            h = mrc.header
-            self._map_voxel_size = mrc.voxel_size
-            axes_order = np.hstack([h.mapc, h.mapr, h.maps])
-            transpose_order = np.argsort(axes_order[::-1])
-            self._map_data = np.transpose(self._map_data, axes=transpose_order)
+        try:
+            mrc = Grid(map_filepath)
+            self._map_data = mrc.grid
+            self._map_voxel_size = mrc.delta
+            self._map_origin = mrc.origin
+        except Exception as e:
+            Logs.error("Could not read file '{}': {}".format(map_filepath, e))
 
-            voxel_sizes = [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
-            delta = np.diag(np.array(voxel_sizes))
-
-            axes_c_order = np.argsort(axes_order)
-            nstarts = [h.nxstart, h.nystart, h.nzstart]
-            offsets = np.hstack(nstarts)[axes_c_order] * np.diag(delta)
-
-            origin_coords = [h.origin.x, h.origin.y, h.origin.z]
-            self._map_origin = np.hstack(origin_coords) + offsets
 
     def generate_histogram(self, temp_dir: str):
         flat = self._map_data.flatten()
@@ -118,10 +109,10 @@ class MapGroup:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        if self._map_voxel_size.x > 0.0001:
+        if self._map_voxel_size[0] > 0.0001:
             Logs.debug("Setting voxels")
             voxel_size = np.array(
-                [self._map_voxel_size.x, self._map_voxel_size.y, self._map_voxel_size.z]
+                [self._map_voxel_size[0], self._map_voxel_size[1], self._map_voxel_size[2]]
             )
             vertices *= voxel_size
         Logs.debug("Limiting View")
