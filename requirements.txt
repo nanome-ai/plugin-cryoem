@@ -1,5 +1,5 @@
 nanome==0.38.3
-mrcfile==1.4.2
+griddataformats==0.7.0
 PyMCubes==0.1.2
 pyfqmr==0.1.2
 randomcolor==0.4.4.6
