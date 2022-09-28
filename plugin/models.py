@@ -61,7 +61,7 @@ class MapGroup:
                 self._map_origin = mrc.origin
             except Exception as e:
                 Logs.error("Could not read file '{}': {}".format(mrc_filepath, e))
-  
+
     def generate_histogram(self, temp_dir: str):
         flat = self._map_data.flatten()
         minmap = np.min(flat)
