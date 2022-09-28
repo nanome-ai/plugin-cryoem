@@ -160,8 +160,8 @@ class SearchMenu:
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
-        # Write the map to a .mrc file
-        file_path = f'{self.temp_dir}/{emdbid}.mrc.gz'
+        # Write the map to a .map file
+        file_path = f'{self.temp_dir}/{emdbid}.map.gz'
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             with open(file_path, "wb") as f:
