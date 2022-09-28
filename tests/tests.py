@@ -1,5 +1,6 @@
 import asyncio
 import os
+import tempfile
 import unittest
 from nanome.api.shapes import Mesh
 from nanome.util import enums
@@ -44,19 +45,24 @@ class MapGroupTestCase(unittest.TestCase):
 
 
 class LoadedMapGroupTestCase(unittest.TestCase):
-    """Load map once and test different settings."""
+    """Load map once, and test different settings."""
 
     @classmethod
     def setUpClass(cls):
         cls.map_group = MapGroup()
+        cls.tempdir = tempfile.TemporaryDirectory()
         cls.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
-        cls.map_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
+        cls.map_gz_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
         cls.map_group.add_file(cls.pdb_file)
-        cls.map_group.add_file(cls.map_file)
+        cls.map_group.add_file(cls.map_gz_file)
         isovalue = 0.5
         opacity = 0.65
         color_scheme = enums.ColorScheme.BFactor
         cls.map_group.generate_mesh(isovalue, color_scheme, opacity)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tempdir.cleanup()
 
     def test_generate_mesh(self):
         # Make sure setUpClass generated a mesh

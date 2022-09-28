@@ -1,3 +1,4 @@
+import gzip
 import mcubes
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,15 +48,20 @@ class MapGroup:
         if not filepath.endswith('pdb'):
             self.load_map(filepath)
 
-    def load_map(self, map_filepath: str):
-        try:
-            mrc = Grid(map_filepath)
-            self._map_data = mrc.grid
-            self._map_voxel_size = mrc.delta
-            self._map_origin = mrc.origin
-        except Exception as e:
-            Logs.error("Could not read file '{}': {}".format(map_filepath, e))
-
+    def load_map(self, map_gz_file: str):
+        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+            mrc_filepath = mrc_file.name
+            with gzip.open(map_gz_file, 'rb') as f:
+                with open(mrc_filepath, 'wb') as out:
+                    out.write(f.read())
+            try:
+                mrc = Grid(mrc_filepath)
+                self._map_data = mrc.grid
+                self._map_voxel_size = mrc.delta
+                self._map_origin = mrc.origin
+            except Exception as e:
+                Logs.error("Could not read file '{}': {}".format(mrc_filepath, e))
+  
     def generate_histogram(self, temp_dir: str):
         flat = self._map_data.flatten()
         minmap = np.min(flat)
