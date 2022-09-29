@@ -18,23 +18,22 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.groups = {}
 
     async def load_map_and_model(self):
-        Logs.message("Loading Map file")
-        # map_gz_file = "emd_30288.map.gz"
+        Logs.message("Loading Map and PDB file")
+        map_gz_file = "emd_30288.map.gz"
         pdb_file = "7c4u.pdb"
 
         map_group = MapGroup()
         map_group.add_pdb(pdb_file)
-        map_group.generate_map()
+        map_group.add_map_gz(map_gz_file)
+        # map_group.generate_map()
 
         iso = 0.5
         opacity = 0.65
-        color_scheme = enums.ColorScheme.Element
-
         # Load pdb and associate resulting complex with MapGroup
         await self.send_files_to_load([pdb_file])
         comp = (await self.request_complex_list())[0]
         map_group.nanome_complex = (await self.request_complexes([comp.index]))[0]
-        mesh = map_group.generate_mesh(iso, color_scheme, opacity)
+        mesh = map_group.generate_mesh(iso, opacity=opacity)
 
         anchor = mesh.anchors[0]
         anchor.anchor_type = enums.ShapeAnchorType.Complex

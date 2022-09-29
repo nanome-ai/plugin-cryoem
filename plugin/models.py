@@ -1,4 +1,4 @@
-from turtle import color
+import gzip
 import mcubes
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,7 +23,6 @@ class MapGroup:
         self.mesh = None
         self.nanome_complex = None
         self._manager = map_model_manager()
-
         self._map_voxel_size = None
 
         self.hist_x_min = 0.0
@@ -60,6 +59,21 @@ class MapGroup:
         dm = DataManager()
         model = dm.get_model(pdb_file)
         self._manager.set_model(model)
+
+    def add_map_gz(self, map_gz_file):
+        dm = DataManager()
+        # Unpack map.gz
+        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+            mrc_filepath = mrc_file.name
+            with gzip.open(map_gz_file, 'rb') as f:
+                with open(mrc_filepath, 'wb') as out:
+                    out.write(f.read())
+            map_mgr = dm.get_real_map(mrc_filepath)
+            # Recreate manager, because I'm not sure how to
+            # add map after mmm initialization
+            self._manager = map_model_manager(
+                model=self._manager.model(),
+                map_manager=map_mgr)
 
     def generate_map(self):
         self._manager.generate_map()
@@ -114,8 +128,10 @@ class MapGroup:
         self.isovalue = isovalue
         self.opacity = opacity
         self.color_scheme = color_scheme
-        map_manager = self._manager.map_manager()
-        map_data = map_manager.map_data().as_numpy_array()
+
+        self._manager.box_all_maps_around_model_and_shift_origin(box_cushion=3)
+        map_mgr = self._manager.map_manager()
+        map_data = map_mgr.map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
@@ -127,7 +143,7 @@ class MapGroup:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        voxel_sizes = map_manager.pixel_sizes()
+        voxel_sizes = map_mgr.pixel_sizes()
         if voxel_sizes[0] > 0.0001:
             Logs.debug("Setting voxels")
             voxel_size = np.array(voxel_sizes)
