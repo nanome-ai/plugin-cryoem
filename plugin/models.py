@@ -6,7 +6,12 @@ import mcubes
 import numpy as np
 import pyfqmr
 import randomcolor
+<<<<<<< HEAD
 # from gridData import Grid
+=======
+import tempfile
+from gridData import Grid
+>>>>>>> 55ebede... Move manager code into MapGroup model
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
@@ -24,6 +29,12 @@ class MapGroup:
         self.files = kwargs.get("files", [])
         self.mesh = None
         self.nanome_complex = None
+<<<<<<< HEAD
+=======
+        self._manager = map_model_manager()
+
+        self._map_data = None
+>>>>>>> 55ebede... Move manager code into MapGroup model
         self._map_voxel_size = None
 
         self.hist_x_min = 0.0
@@ -43,6 +54,7 @@ class MapGroup:
         self.color_scheme = enums.ColorScheme.BFactor
         self.wireframe_mode = False
 
+<<<<<<< HEAD
         self._model = None
         self._map_manager = None
         self._manager = map_model_manager()
@@ -90,6 +102,37 @@ class MapGroup:
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self._map_manager.map_data().as_1d())
+=======
+    def add_pdb(self, pdb_file):
+        dm = DataManager()
+        model = dm.get_model(pdb_file)
+        self._manager.set_model(model)
+
+    def generate_map(self):
+        self._manager.generate_map()
+
+    def add_file(self, filepath: str):
+        self.files.append(filepath)
+        if not filepath.endswith('pdb'):
+            self.load_map(filepath)
+
+    # def load_map(self, map_gz_file: str):
+    #     with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+    #         mrc_filepath = mrc_file.name
+    #         with gzip.open(map_gz_file, 'rb') as f:
+    #             with open(mrc_filepath, 'wb') as out:
+    #                 out.write(f.read())
+    #         try:
+    #             mrc = Grid(mrc_filepath)
+    #             self._map_data = mrc.grid
+    #             self._map_voxel_size = mrc.delta
+    #             self._map_origin = mrc.origin
+    #         except Exception as e:
+    #             Logs.error("Could not read file '{}': {}".format(mrc_filepath, e))
+
+    def generate_histogram(self, temp_dir: str):
+        flat = list(self._manager.map_manager().map_data().as_1d())
+>>>>>>> 55ebede... Move manager code into MapGroup model
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
         hist, bins = np.histogram(flat_offset, bins=1000)
@@ -126,6 +169,7 @@ class MapGroup:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
 
+<<<<<<< HEAD
     def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
         if hasattr(self, '_model'):
@@ -138,6 +182,17 @@ class MapGroup:
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
         vertices += np.asarray(self._map_origin)
+=======
+    def generate_mesh(self, isovalue, color_scheme, opacity=0.65, decimation_factor=5):
+        # Compute iso-surface with marching cubes algorithm
+        # self.set_limited_view_on_cog()
+        self.isovalue = isovalue
+        self.opacity = opacity
+        self.color_scheme = color_scheme
+        map_manager = self._manager.map_manager()
+        map_data = map_manager.map_data().as_numpy_array()
+        vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
+>>>>>>> 55ebede... Move manager code into MapGroup model
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
         Logs.debug("Decimating mesh")
@@ -149,12 +204,20 @@ class MapGroup:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
         vertices, triangles, normals = mesh_simplifier.getMesh()
+<<<<<<< HEAD
         voxel_sizes = self._map_manager.pixel_sizes()
+=======
+        voxel_sizes = map_manager.pixel_sizes()
+>>>>>>> 55ebede... Move manager code into MapGroup model
         if voxel_sizes[0] > 0.0001:
             Logs.debug("Setting voxels")
             voxel_size = np.array(voxel_sizes)
             vertices *= voxel_size
 
+<<<<<<< HEAD
+=======
+        Logs.debug("Setting computed values")
+>>>>>>> 55ebede... Move manager code into MapGroup model
         computed_vertices = np.array(vertices)
         computed_normals = np.array(normals)
         computed_triangles = np.array(triangles)
@@ -164,10 +227,73 @@ class MapGroup:
         self.mesh.normals = computed_normals.flatten()
         self.mesh.triangles = computed_triangles.flatten()
 
+<<<<<<< HEAD
         self.mesh.color = Color(255, 255, 255, int(self.opacity * 255))
         self.color_by_scheme(self.mesh, self.color_scheme)
         Logs.message("Mesh generated")
+=======
+        self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+        self.color_by_scheme(self.mesh, color_scheme)
+>>>>>>> 55ebede... Move manager code into MapGroup model
         return self.mesh
+
+    # def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
+    #     # Compute iso-surface with marching cubes algorithm
+    #     self.set_limited_view_on_cog()
+    #     vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
+    #     np_vertices = np.asarray(vertices)
+    #     np_triangles = np.asarray(triangles)
+    #     Logs.debug("Decimating mesh")
+    #     target = max(1000, len(np_triangles) / decimation_factor)
+    #     mesh_simplifier = pyfqmr.Simplify()
+    #     mesh_simplifier.setMesh(np_vertices, np_triangles)
+    #     mesh_simplifier.simplify_mesh(
+    #         target_count=target, aggressiveness=7, preserve_border=True, verbose=0
+    #     )
+    #     vertices, triangles, normals = mesh_simplifier.getMesh()
+    #     if self._map_voxel_size[0] > 0.0001:
+    #         Logs.debug("Setting voxels")
+    #         voxel_size = np.array(
+    #             [self._map_voxel_size[0], self._map_voxel_size[1], self._map_voxel_size[2]]
+    #         )
+    #         vertices *= voxel_size
+    #     Logs.debug("Limiting View")
+    #     vertices, normals, triangles = self.limit_view(
+    #         (vertices, normals, triangles),
+    #         self.position,
+    #         self.radius,
+    #     )
+
+    #     Logs.debug("Setting computed values")
+    #     self.computed_vertices = np.array(vertices)
+    #     self.computed_normals = np.array(normals)
+    #     self.computed_triangles = np.array(triangles)
+
+    #     if self.mesh is None:
+    #         self.mesh = Mesh()
+    #     self.mesh.vertices = self.computed_vertices.flatten()
+    #     self.mesh.normals = self.computed_normals.flatten()
+    #     self.mesh.triangles = self.computed_triangles.flatten()
+
+    #     anchor = self.mesh.anchors[0]
+
+    #     anchor.anchor_type = enums.ShapeAnchorType.Workspace
+    #     anchor.local_offset = Vector3(
+    #         self._map_origin[0], self._map_origin[1], self._map_origin[2])
+
+    #     self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+
+    #     if self.nanome_complex is not None:
+    #         anchor.anchor_type = enums.ShapeAnchorType.Complex
+    #         anchor.target = self.nanome_complex.index
+
+    #     if self.wireframe_mode:
+    #         self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
+    #         self.mesh.vertices = np.asarray(self.wire_vertices).flatten()
+    #         self.mesh.triangles = np.asarray(self.wire_triangles).flatten()
+
+    #     self.color_by_scheme(self.mesh, color_scheme)
+    #     return self.mesh
 
     def color_by_scheme(self, mesh, scheme):
         if scheme == enums.ColorScheme.Element:
