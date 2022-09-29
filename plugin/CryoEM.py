@@ -28,7 +28,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
         iso = 0.5
         opacity = 0.65
-        color_scheme = enums.ColorScheme.BFactor
+        color_scheme = enums.ColorScheme.Element
 
         # Load pdb and associate resulting complex with MapGroup
         await self.send_files_to_load([pdb_file])
@@ -80,7 +80,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
         isovalue = map_group.isovalue
         opacity = map_group.opacity
-        color_scheme = enums.ColorScheme.BFactor
+        color_scheme = map_group.color_scheme
         Logs.message(f"Generating iso-surface for iso-value {round(isovalue, 3)}")
         mesh = map_group.generate_mesh(isovalue, color_scheme, opacity)
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")

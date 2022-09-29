@@ -1,3 +1,4 @@
+from turtle import color
 import mcubes
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,12 +25,10 @@ class MapGroup:
         self._manager = map_model_manager()
 
         self._map_voxel_size = None
-        self._map_origin = None
 
         self.hist_x_min = 0.0
         self.hist_x_max = 1.0
 
-        self.computed_vertices = []
         self.computed_normals = []
         self.computed_triangles = []
         self.wire_vertices = []
@@ -41,8 +40,21 @@ class MapGroup:
         self.isovalue = 0.1
         self.opacity = 0.65
         self.radius = 15
-        self.color_scheme = enums.ColorScheme.BFactor
+        self.color_scheme = enums.ColorScheme.Element
         self.wireframe_mode = False
+
+    @property
+    def _map_origin(self):
+        return self._manager.map_manager().get_origin()
+
+    @property
+    def computed_vertices(self):
+        # break up vertices list into list of lists
+        if hasattr(self, 'mesh') and self.mesh:
+            return np.asarray([
+                self.mesh.vertices[x:x + 3]
+                for x in range(0, len(self.mesh.vertices), 3)
+            ])
 
     def add_pdb(self, pdb_file):
         dm = DataManager()
@@ -95,8 +107,9 @@ class MapGroup:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
 
-    def generate_mesh(self, isovalue, color_scheme, opacity=0.65, decimation_factor=5):
+    def generate_mesh(self, isovalue, color_scheme=None, opacity=0.65, decimation_factor=5):
         # Compute iso-surface with marching cubes algorithm
+        color_scheme = color_scheme or self.color_scheme
         # self.set_limited_view_on_cog()
         self.isovalue = isovalue
         self.opacity = opacity
@@ -223,7 +236,7 @@ class MapGroup:
     def color_by_bfactor(self, mesh):
         if self.nanome_complex is None:
             return
-        verts = mesh.vertices if not self.wireframe_mode else self.wire_vertices
+        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
         if len(verts) < 3:
             return
 
@@ -241,9 +254,8 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
-        map_origin = list(self._manager.map_manager().get_origin())
         result, indices = kdtree.query(
-            verts + map_origin, distance_upper_bound=20)
+            verts + self._map_origin, distance_upper_bound=20)
 
         colors = []
         bfactors = np.array([a.bfactor for a in atoms])
