@@ -87,14 +87,6 @@ class MapGroup:
 
     def add_nanome_complex(self, comp):
         self.nanome_complex = comp
-        if self.mesh:
-            anchor = self.mesh.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = comp.index
-            self.mesh.upload()
-
-    def generate_map(self):
-        self._manager.generate_map()
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self._map_manager.map_data().as_1d())
@@ -140,6 +132,7 @@ class MapGroup:
             mmm = map_model_manager(model=self._model, map_manager=self._map_manager)
         else:
             mmm = map_model_manager(map_manager=self._map_manager)
+        self._manager.generate_map()
         map_data = mmm.map_manager().map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, self.isovalue)
         # offset the vertices using the map origin

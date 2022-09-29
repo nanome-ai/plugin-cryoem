@@ -25,7 +25,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         map_group = MapGroup()
         map_group.add_pdb(pdb_file)
         map_group.add_map_gz(map_gz_file)
-        map_group.generate_map()
 
         map_group.isovalue = 3.46
         map_group.opacity = 0.65
@@ -35,9 +34,9 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp = (await self.request_complexes([shallow_comp.index]))[0]
         map_group.add_nanome_complex(comp)
         mesh = map_group.generate_mesh()
-        # anchor = mesh.anchors[0]
-        # anchor.anchor_type = enums.ShapeAnchorType.Complex
-        # anchor.target = comp.index
+        anchor = mesh.anchors[0]
+        anchor.anchor_type = enums.ShapeAnchorType.Complex
+        anchor.target = comp.index
         await mesh.upload()
         return map_group
 
@@ -47,8 +46,8 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def on_run(self):
         await self.load_map_and_model()
-        complexes = await self.request_complex_list()
-        self.menu.render(complexes, force_enable=True)
+        # complexes = await self.request_complex_list()
+        # self.menu.render(complexes, force_enable=True)
 
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
