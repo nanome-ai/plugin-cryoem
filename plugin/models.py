@@ -1,16 +1,15 @@
-import gzip
 import mcubes
 import matplotlib.pyplot as plt
 import numpy as np
 import pyfqmr
 import randomcolor
 import tempfile
-from gridData import Grid
+# from gridData import Grid
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
 from nanome.api.shapes import Mesh
-from nanome.util import Logs, enums, Vector3, Color
+from nanome.util import Logs, enums, Color  # , Vector3
 from scipy.spatial import KDTree
 from .utils import cpk_colors
 
@@ -24,7 +23,6 @@ class MapGroup:
         self.nanome_complex = None
         self._manager = map_model_manager()
 
-        self._map_data = None
         self._map_voxel_size = None
         self._map_origin = None
 
@@ -58,20 +56,6 @@ class MapGroup:
         self.files.append(filepath)
         if not filepath.endswith('pdb'):
             self.load_map(filepath)
-
-    # def load_map(self, map_gz_file: str):
-    #     with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
-    #         mrc_filepath = mrc_file.name
-    #         with gzip.open(map_gz_file, 'rb') as f:
-    #             with open(mrc_filepath, 'wb') as out:
-    #                 out.write(f.read())
-    #         try:
-    #             mrc = Grid(mrc_filepath)
-    #             self._map_data = mrc.grid
-    #             self._map_voxel_size = mrc.delta
-    #             self._map_origin = mrc.origin
-    #         except Exception as e:
-    #             Logs.error("Could not read file '{}': {}".format(mrc_filepath, e))
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self._manager.map_manager().map_data().as_1d())
@@ -149,64 +133,6 @@ class MapGroup:
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
         self.color_by_scheme(self.mesh, color_scheme)
         return self.mesh
-
-    # def generate_mesh(self, iso, color_scheme, opacity=0.65, decimation_factor=5):
-    #     # Compute iso-surface with marching cubes algorithm
-    #     self.set_limited_view_on_cog()
-    #     vertices, triangles = mcubes.marching_cubes(self._map_data, iso)
-    #     np_vertices = np.asarray(vertices)
-    #     np_triangles = np.asarray(triangles)
-    #     Logs.debug("Decimating mesh")
-    #     target = max(1000, len(np_triangles) / decimation_factor)
-    #     mesh_simplifier = pyfqmr.Simplify()
-    #     mesh_simplifier.setMesh(np_vertices, np_triangles)
-    #     mesh_simplifier.simplify_mesh(
-    #         target_count=target, aggressiveness=7, preserve_border=True, verbose=0
-    #     )
-    #     vertices, triangles, normals = mesh_simplifier.getMesh()
-    #     if self._map_voxel_size[0] > 0.0001:
-    #         Logs.debug("Setting voxels")
-    #         voxel_size = np.array(
-    #             [self._map_voxel_size[0], self._map_voxel_size[1], self._map_voxel_size[2]]
-    #         )
-    #         vertices *= voxel_size
-    #     Logs.debug("Limiting View")
-    #     vertices, normals, triangles = self.limit_view(
-    #         (vertices, normals, triangles),
-    #         self.position,
-    #         self.radius,
-    #     )
-
-    #     Logs.debug("Setting computed values")
-    #     self.computed_vertices = np.array(vertices)
-    #     self.computed_normals = np.array(normals)
-    #     self.computed_triangles = np.array(triangles)
-
-    #     if self.mesh is None:
-    #         self.mesh = Mesh()
-    #     self.mesh.vertices = self.computed_vertices.flatten()
-    #     self.mesh.normals = self.computed_normals.flatten()
-    #     self.mesh.triangles = self.computed_triangles.flatten()
-
-    #     anchor = self.mesh.anchors[0]
-
-    #     anchor.anchor_type = enums.ShapeAnchorType.Workspace
-    #     anchor.local_offset = Vector3(
-    #         self._map_origin[0], self._map_origin[1], self._map_origin[2])
-
-    #     self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-
-    #     if self.nanome_complex is not None:
-    #         anchor.anchor_type = enums.ShapeAnchorType.Complex
-    #         anchor.target = self.nanome_complex.index
-
-    #     if self.wireframe_mode:
-    #         self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
-    #         self.mesh.vertices = np.asarray(self.wire_vertices).flatten()
-    #         self.mesh.triangles = np.asarray(self.wire_triangles).flatten()
-
-    #     self.color_by_scheme(self.mesh, color_scheme)
-    #     return self.mesh
 
     def color_by_scheme(self, mesh, scheme):
         if scheme == enums.ColorScheme.Element:
@@ -297,7 +223,7 @@ class MapGroup:
     def color_by_bfactor(self, mesh):
         if self.nanome_complex is None:
             return
-        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+        verts = mesh.vertices if not self.wireframe_mode else self.wire_vertices
         if len(verts) < 3:
             return
 
@@ -315,8 +241,9 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
+        map_origin = list(self._manager.map_manager().get_origin())
         result, indices = kdtree.query(
-            verts + self._map_origin, distance_upper_bound=20)
+            verts + map_origin, distance_upper_bound=20)
 
         colors = []
         bfactors = np.array([a.bfactor for a in atoms])

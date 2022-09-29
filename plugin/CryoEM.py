@@ -3,7 +3,6 @@ import tempfile
 import nanome
 
 from nanome.util import Logs, enums, async_callback
-from iotbx.map_model_manager import map_model_manager
 
 from .menu import EditMeshMenu, MainMenu, SearchMenu
 from .models import MapGroup
@@ -31,9 +30,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         opacity = 0.65
         color_scheme = enums.ColorScheme.BFactor
 
-        mesh = map_group.generate_mesh(iso, color_scheme, opacity)
+        # Load pdb and associate resulting complex with MapGroup
         await self.send_files_to_load([pdb_file])
         comp = (await self.request_complex_list())[0]
+        map_group.nanome_complex = (await self.request_complexes([comp.index]))[0]
+        mesh = map_group.generate_mesh(iso, color_scheme, opacity)
+
         anchor = mesh.anchors[0]
         anchor.anchor_type = enums.ShapeAnchorType.Complex
         anchor.target = comp.index
@@ -74,18 +76,11 @@ class CryoEM(nanome.AsyncPluginInstance):
         complexes = await self.request_complex_list()
         self.menu.render(complexes)
 
-    async def render_mesh(self, map_group: map_model_manager):
+    async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
-        isovalue = 0.1
-        opacity = 0.65
-        self.radius = 15
+        isovalue = map_group.isovalue
+        opacity = map_group.opacity
         color_scheme = enums.ColorScheme.BFactor
-        comps = await self.request_complex_list()
-        if comps:
-            deep_comp = await self.request_complexes([comps[0].index])
-            map_group.nanome_complex = deep_comp[0]
-        else:
-            map_group.nanome_complex = None
         Logs.message(f"Generating iso-surface for iso-value {round(isovalue, 3)}")
         mesh = map_group.generate_mesh(isovalue, color_scheme, opacity)
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
