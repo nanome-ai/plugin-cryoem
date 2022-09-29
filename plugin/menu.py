@@ -75,7 +75,7 @@ class MainMenu:
             self.lst_groups.items.append(ln)
         self._plugin.update_content(self.lst_groups)
 
-    def open_group_details(self, map_group, btn):
+    def open_group_details(self, map_group, btn=None):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
@@ -287,9 +287,9 @@ class EditMeshMenu:
             self.lst_files.items.append(ln)
 
         # Generate histogram
-        if len(map_group.files) > 1:
-            img_filepath = map_group.generate_histogram(self.temp_dir)
-            self.img_histogram.file_path = img_filepath
+        # if len(map_group.files) > 1:
+        img_filepath = map_group.generate_histogram(self.temp_dir)
+        self.img_histogram.file_path = img_filepath
 
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
