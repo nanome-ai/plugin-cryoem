@@ -92,7 +92,7 @@ class LoadedMapGroupTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.map_group = MapGroup()
         cls.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
-        cls.map_gz_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
+        cls.map_gz_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         cls.map_group.add_file(cls.pdb_file)
         cls.map_group.add_file(cls.map_gz_file)
         isovalue = 0.5

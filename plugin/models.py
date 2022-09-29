@@ -41,7 +41,7 @@ class MapGroup:
         self.opacity = 0.65
         self.radius = 15
         self.color_scheme = enums.ColorScheme.BFactor
-        self.wireframe_mode = True
+        self.wireframe_mode = False
 
     def add_file(self, filepath: str):
         self.files.append(filepath)
