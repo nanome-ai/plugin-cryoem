@@ -1,7 +1,6 @@
 import os
 import tempfile
 import nanome
-from nanome.api.structure import Complex
 from nanome.util import Logs, async_callback, enums
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
