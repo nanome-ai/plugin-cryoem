@@ -103,7 +103,6 @@ class LoadedMapGroupTestCase(unittest.TestCase):
     def test_generate_mesh(self):
         # Make sure setUpClass generated a mesh
         mesh = self.map_group.mesh
-        breakpoint()
         self.assertTrue(isinstance(mesh, Mesh))
 
     def test_toggle_wireframe_mode(self):
