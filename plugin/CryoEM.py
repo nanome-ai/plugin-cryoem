@@ -4,10 +4,9 @@ import nanome
 import numpy as np
 import mcubes
 import pyfqmr
-import gzip
 
 from nanome.api.shapes import Mesh
-from nanome.util import Logs, enums, Vector3, Color, async_callback
+from nanome.util import Logs, enums, Color, async_callback
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 
@@ -26,28 +25,38 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def load_map_and_model(self):
         Logs.message("Loading Map file")
-        map_gz_file = "emd_30288.map.gz"
+        # # map_gz_file = "emd_30288.map.gz"
         pdb_file = "7c4u.pdb"
+
         dm = DataManager()
         dm.set_overwrite(True)
 
-        mrc_file = tempfile.NamedTemporaryFile(suffix='.mrc')
-        mrc_filepath = mrc_file.name
-        with gzip.open(map_gz_file, 'rb') as f:
-            with open(mrc_filepath, 'wb') as out:
-                out.write(f.read())
-        mm = dm.get_real_map(mrc_filepath)
         model = dm.get_model(pdb_file)
+        mmm = map_model_manager(model=model)
+        mmm.generate_map()
 
-        mmm = map_model_manager(
-            model=model,
-            map_manager=mm
-        )
+        mrc_file = 'map.mrc'
+        pdb_file = 'model.pdb'
+        mmm.write_map(mrc_file)
+        mmm.write_model(pdb_file)
 
-        selection_string = 'resseq 1:1000'
+        iso = 0.5
+        opacity = 0.65
+        color_scheme = enums.ColorScheme.BFactor
+        mesh = self.generate_mesh(mmm.map_manager(), iso, color_scheme, opacity)
+        await self.send_files_to_load([pdb_file])
+        comp = (await self.request_complex_list())[0]
+        anchor = mesh.anchors[0]
+        anchor.anchor_type = enums.ShapeAnchorType.Complex
+        anchor.target = comp.index
+        await mesh.upload()
+        return
+
+        selection_string = 'resseq 1:100'
         box_mmm = mmm.extract_all_maps_around_model(selection_string=selection_string)
         # Write boxed residue range to files
-        boxed_map_filename = os.path.join(self.temp_dir.name, os.path.basename(mrc_filepath))
+        # boxed_map_filename = os.path.join(self.temp_dir.name, os.path.basename(mrc_file))
+        boxed_map_filename = os.path.join("map_boxed.mrc")
         dm.write_real_map_file(
             box_mmm.map_manager(),
             filename=boxed_map_filename)
@@ -58,10 +67,12 @@ class CryoEM(nanome.AsyncPluginInstance):
             filename=boxed_model_filename,
             extension="pdb")
         # Generate mesh to upload to Nanome
-        iso = 0.1
+        iso = 1.48
         opacity = 0.65
         color_scheme = enums.ColorScheme.BFactor
-        mesh = self.generate_mesh(box_mmm.map_manager(), iso, color_scheme, opacity)
+
+        mm = box_mmm.map_manager()
+        mesh = self.generate_mesh(mm, iso, color_scheme, opacity)
 
         await self.send_files_to_load([boxed_model_filename])
         comp = (await self.request_complex_list())[0]
@@ -91,13 +102,6 @@ class CryoEM(nanome.AsyncPluginInstance):
             voxel_size = np.array(voxel_sizes)
             vertices *= voxel_size
 
-        # Logs.debug("Limiting View")
-        # vertices, normals, triangles = self.limit_view(
-        #     (vertices, normals, triangles),
-        #     self.position,
-        #     self.radius,
-        # )
-
         Logs.debug("Setting computed values")
         computed_vertices = np.array(vertices)
         computed_normals = np.array(normals)
@@ -107,18 +111,11 @@ class CryoEM(nanome.AsyncPluginInstance):
         mesh.normals = computed_normals.flatten()
         mesh.triangles = computed_triangles.flatten()
 
-        # anchor = mesh.anchors[0]
-        # anchor.anchor_type = enums.ShapeAnchorType.Workspace
-        # anchor.local_offset = Vector3(
-        #     self._map_origin[0], self._map_origin[1], self._map_origin[2])
-        # anchor.local_offset = Vector3(0, 0, 0)
-
         mesh.color = Color(255, 255, 255, int(opacity * 255))
-
+        mesh
         # if self.nanome_complex is not None:
         #     anchor.anchor_type = enums.ShapeAnchorType.Complex
         #     anchor.target = self.nanome_complex.index
-
         # if self.wireframe_mode:
         #     self.wire_vertices, self.wire_normals, self.wire_triangles = self.wireframe_mesh()
         #     mesh.vertices = np.asarray(self.wire_vertices).flatten()
@@ -172,7 +169,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         else:
             map_group.nanome_complex = None
         Logs.message(f"Generating iso-surface for iso-value {round(iso, 3)}")
-        mesh = self.generate_mesh(mm, iso, color_scheme, opacity)
+        # mesh = self.generate_mesh(mm, iso, color_scheme, opacity)
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
         await mesh.upload()
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)

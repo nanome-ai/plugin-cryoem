@@ -13,4 +13,5 @@ docker run -d \
 --name cryo-em \
 --restart unless-stopped \
 -e ARGS="$*" \
+-v $(pwd)/../:/app \
 cryo-em
