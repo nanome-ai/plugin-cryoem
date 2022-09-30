@@ -27,7 +27,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         map_group.add_map_gz(map_gz_file)
         # map_group.generate_map()
 
-        iso = 0.5
+        iso = 3.46
         opacity = 0.65
         # Load pdb and associate resulting complex with MapGroup
         await self.send_files_to_load([pdb_file])
