@@ -41,12 +41,12 @@ class MapGroup:
         self.isovalue = 0.1
         self.opacity = 0.65
         self.radius = 15
-        self.color_scheme = enums.ColorScheme.Element
+        self.color_scheme = enums.ColorScheme.BFactor
         self.wireframe_mode = False
 
     @property
     def _map_origin(self):
-        return self._manager.map_manager().origin
+        return self._map_manager.origin
 
     @property
     def computed_vertices(self):
@@ -59,8 +59,7 @@ class MapGroup:
 
     def add_pdb(self, pdb_file):
         dm = DataManager()
-        model = dm.get_model(pdb_file)
-        self._manager.set_model(model)
+        self._model = dm.get_model(pdb_file)
 
     def add_map_gz(self, map_gz_file):
         dm = DataManager()
@@ -69,12 +68,7 @@ class MapGroup:
             mrc_filepath = mrc_file.name
             with gzip.open(map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
-            map_mgr = dm.get_real_map(mrc_filepath)
-            # Recreate manager, because I'm not sure how to
-            # add map after mmm initialization
-            self._manager = map_model_manager(
-                model=self._manager.model(),
-                map_manager=map_mgr)
+            self._map_manager = dm.get_real_map(mrc_filepath)
 
     def generate_map(self):
         self._manager.generate_map()
@@ -85,7 +79,7 @@ class MapGroup:
             self.load_map(filepath)
 
     def generate_histogram(self, temp_dir: str):
-        flat = list(self._manager.map_manager().map_data().as_1d())
+        flat = list(self._map_manager.map_data().as_1d())
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
         hist, bins = np.histogram(flat_offset, bins=1000)
@@ -130,8 +124,7 @@ class MapGroup:
         self.opacity = opacity
         self.color_scheme = color_scheme
 
-        # self._manager.box_all_maps_around_model_and_shift_origin(box_cushion=3)
-        map_mgr = self._manager.map_manager()
+        map_mgr = self._map_manager
         map_data = map_mgr.map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         # offset the vertices using the map origin
@@ -153,7 +146,6 @@ class MapGroup:
             voxel_size = np.array(voxel_sizes)
             vertices *= voxel_size
 
-        Logs.debug("Setting computed values")
         computed_vertices = np.array(vertices)
         computed_normals = np.array(normals)
         computed_triangles = np.array(triangles)
@@ -165,6 +157,7 @@ class MapGroup:
 
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
         self.color_by_scheme(self.mesh, color_scheme)
+        Logs.message("Mesh generated")
         return self.mesh
 
     def color_by_scheme(self, mesh, scheme):
@@ -190,9 +183,8 @@ class MapGroup:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
-        kdtree = KDTree(np.array(atom_positions))
-        result, indices = kdtree.query(
-            verts + self._map_origin, distance_upper_bound=2)
+        kdtree = KDTree(atom_positions)
+        result, indices = kdtree.query(verts, distance_upper_bound=2)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -245,7 +237,7 @@ class MapGroup:
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            verts + self._map_origin, distance_upper_bound=20)
+            verts, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
                 colors += color_per_atom[i]
@@ -275,7 +267,7 @@ class MapGroup:
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
         result, indices = kdtree.query(
-            verts + self._map_origin, distance_upper_bound=20)
+            verts, distance_upper_bound=20)
 
         colors = []
         bfactors = np.array([a.bfactor for a in atoms])

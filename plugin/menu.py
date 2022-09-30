@@ -286,6 +286,14 @@ class EditMeshMenu:
             btn.text.value.set_all(filename)
             self.lst_files.items.append(ln)
 
+        # Populate color scheme dropdown
+        current_scheme = map_group.color_scheme
+        for item in self.dd_color_scheme.items:
+            if item.name.lower() == current_scheme.name.lower():
+                item.selected = True
+            else:
+                item.selected = False
+
         # Generate histogram
         # if len(map_group.files) > 1:
         img_filepath = map_group.generate_histogram(self.temp_dir)
