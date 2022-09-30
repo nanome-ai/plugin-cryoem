@@ -1,17 +1,19 @@
 import gzip
-import mcubes
+import tempfile
+
 import matplotlib.pyplot as plt
+import mcubes
 import numpy as np
 import pyfqmr
 import randomcolor
-import tempfile
 # from gridData import Grid
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
 from nanome.api.shapes import Mesh
-from nanome.util import Logs, enums, Color  # , Vector3
+from nanome.util import Color, Logs, enums  # , Vector3
 from scipy.spatial import KDTree
+
 from .utils import cpk_colors
 
 
@@ -44,7 +46,7 @@ class MapGroup:
 
     @property
     def _map_origin(self):
-        return self._manager.map_manager().get_origin()
+        return self._manager.map_manager().origin
 
     @property
     def computed_vertices(self):
@@ -63,11 +65,10 @@ class MapGroup:
     def add_map_gz(self, map_gz_file):
         dm = DataManager()
         # Unpack map.gz
-        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+        with tempfile.NamedTemporaryFile(suffix='.mrc', delete=False) as mrc_file:
             mrc_filepath = mrc_file.name
             with gzip.open(map_gz_file, 'rb') as f:
-                with open(mrc_filepath, 'wb') as out:
-                    out.write(f.read())
+                mrc_file.write(f.read())
             map_mgr = dm.get_real_map(mrc_filepath)
             # Recreate manager, because I'm not sure how to
             # add map after mmm initialization
@@ -129,10 +130,13 @@ class MapGroup:
         self.opacity = opacity
         self.color_scheme = color_scheme
 
-        self._manager.box_all_maps_around_model_and_shift_origin(box_cushion=3)
+        # self._manager.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         map_mgr = self._manager.map_manager()
         map_data = map_mgr.map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
+        # offset the vertices using the map origin
+        # this makes sure the mesh is in the same coordinates as the molecule
+        vertices += np.asarray(self._map_origin)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
         Logs.debug("Decimating mesh")
