@@ -19,7 +19,7 @@ VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
 
-__all__ = ['MainMenu', 'EMBLMenu', 'EditMeshMenu']
+__all__ = ['MainMenu', 'SearchMenu', 'EditMeshMenu']
 
 
 class MainMenu:
@@ -39,9 +39,6 @@ class MainMenu:
     def render(self, complexes, force_enable=False):
         if force_enable:
             self._menu.enabled = True
-
-        for comp in complexes:
-            pass
 
         groups = self._plugin.groups
         self.render_map_groups(groups)
@@ -134,14 +131,14 @@ class SearchMenu:
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        await self._plugin.add_to_group(pdb_path)
+        await self._plugin.add_file_to_group(pdb_path)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        await self._plugin.add_to_group(map_file)
+        await self._plugin.add_file_to_group(map_file)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"

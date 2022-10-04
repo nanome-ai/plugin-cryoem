@@ -20,11 +20,10 @@ from .utils import cpk_colors
 class MapGroup:
 
     def __init__(self, **kwargs):
-        self.group_name = kwargs.get("group_name", "")
+        self.group_name = kwargs.get("group_name", [])
         self.files = kwargs.get("files", [])
         self.mesh = None
         self.nanome_complex = None
-        self._manager = map_model_manager()
         self._map_voxel_size = None
 
         self.hist_x_min = 0.0
@@ -43,6 +42,9 @@ class MapGroup:
         self.radius = 15
         self.color_scheme = enums.ColorScheme.BFactor
         self.wireframe_mode = False
+
+        self._model = None
+        self._map_manager = None
 
     @property
     def _map_origin(self):
@@ -123,9 +125,11 @@ class MapGroup:
         self.isovalue = isovalue
         self.opacity = opacity
         self.color_scheme = color_scheme
-
-        map_mgr = self._map_manager
-        map_data = map_mgr.map_data().as_numpy_array()
+        if hasattr(self, '_model'):
+            mmm = map_model_manager(model=self._model, map_manager=self._map_manager)
+        else:
+            mmm = map_model_manager(map_manager=self._map_manager)
+        map_data = mmm.map_manager().map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
@@ -140,7 +144,7 @@ class MapGroup:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        voxel_sizes = map_mgr.pixel_sizes()
+        voxel_sizes = self._map_manager.pixel_sizes()
         if voxel_sizes[0] > 0.0001:
             Logs.debug("Setting voxels")
             voxel_size = np.array(voxel_sizes)

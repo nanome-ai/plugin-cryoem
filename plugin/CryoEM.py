@@ -25,7 +25,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         map_group = MapGroup()
         map_group.add_pdb(pdb_file)
         map_group.add_map_gz(map_gz_file)
-        # map_group.generate_map()
+        map_group.generate_map()
 
         iso = 3.46
         opacity = 0.65
@@ -46,34 +46,34 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
-        # complexes = await self.request_complex_list()
-        # self.menu.render(complexes, force_enable=True)
-        map_group = await self.load_map_and_model()
-        group_menu = EditMeshMenu(map_group, self)
-        group_menu.render(map_group)
+        complexes = await self.request_complex_list()
+        self.menu.render(complexes, force_enable=True)
 
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
 
-    async def add_to_group(self, filepath):
+    async def add_file_to_group(self, filepath):
         path, ext = os.path.splitext(filepath)
+        group = next(iter(self.groups.values()), None)
         if ext == ".pdb":
-            group_name = os.path.basename(path)
-            group = MapGroup(group_name=group_name)
-            group.add_file(filepath)
-            self.groups[group_name] = group
-            self.send_files_to_load([filepath])
-        else:
             # For now just add maps to first group
             # Will need to be fixed later
-            group = next(iter(self.groups.values()), None)
+            group.add_pdb(filepath)
+            self.send_files_to_load([filepath])
+        else:
+            group_name = os.path.basename(path)
+            group = MapGroup(group_name=group_name)
+            group.add_map_gz(filepath)
+            self.groups[group_name] = group
             if not group:
                 group_name = os.path.basename(path)
                 group = MapGroup(group_name=group_name)
-            group.add_file(filepath)
+                self.groups.append(group)
+            group.add_map_gz(filepath)
             await self.render_mesh(group)
         complexes = await self.request_complex_list()
         self.menu.render(complexes)
+        self.update_menu(self.menu)
 
     async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
