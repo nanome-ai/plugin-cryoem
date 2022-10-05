@@ -36,10 +36,10 @@ class MainMenu:
         self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
-    def render(self, complexes, force_enable=False):
+    def render(self, force_enable=False):
         if force_enable:
             self._menu.enabled = True
-
+        
         groups = self._plugin.groups
         self.render_map_groups(groups)
         self._plugin.update_menu(self._menu)

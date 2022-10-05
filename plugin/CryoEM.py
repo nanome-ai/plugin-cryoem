@@ -24,8 +24,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     @async_callback
     async def on_run(self):
         # await self.load_map_and_model()
-        complexes = await self.request_complex_list()
-        self.menu.render(complexes, force_enable=True)
+        self.menu.render(force_enable=True)
 
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
@@ -62,6 +61,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             deep_comp = (await self.request_complexes([comp.index]))[0]
             group.add_nanome_complex(deep_comp)
         await self.render_mesh(group)
+        self.menu.render()
 
     async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
