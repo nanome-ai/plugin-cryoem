@@ -74,7 +74,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def load_map_and_model(self):
         """Function for development that loads a map and model from the fixtures folder.
-        
+
         This is useful for validating that a map and model can still aligned correctly in the worspace
         Having every step in one function can be useful for perspective
         """
