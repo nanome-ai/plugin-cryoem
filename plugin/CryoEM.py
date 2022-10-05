@@ -37,11 +37,13 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.send_files_to_load([filepath])
         # Get new complex, and associate to MapGroup
         if group:
-            time.sleep(1)  # Give time for PDB to load
+            time.sleep(3)  # Give time for PDB to load
             shallow_comp = (await self.request_complex_list())[0]
             comp = (await self.request_complexes([shallow_comp.index]))[0]
             group.add_nanome_complex(comp)
+            Logs.message("Regenerating mesh around new model")
             group.generate_mesh()
+            Logs.message("Mesh generated around new model")
             group.mesh.upload()
 
     async def create_mapgroup_for_file(self, map_gz_filepath):
