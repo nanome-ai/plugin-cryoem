@@ -6,12 +6,11 @@ import mcubes
 import numpy as np
 import pyfqmr
 import randomcolor
-# from gridData import Grid
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
 from nanome.api.shapes import Mesh
-from nanome.util import Color, Logs, enums  # , Vector3
+from nanome.util import Color, Logs, enums
 from scipy.spatial import KDTree
 
 from .utils import cpk_colors
@@ -45,7 +44,6 @@ class MapGroup:
 
         self._model = None
         self._map_manager = None
-        self._manager = map_model_manager()
 
     @property
     def _map_origin(self):
@@ -60,20 +58,9 @@ class MapGroup:
                 for x in range(0, len(self.mesh.vertices), 3)
             ])
 
-    def _remake_map_model_manager(self):
-        kwargs = {}
-        if self._model:
-            kwargs['model'] = self._model
-        if self._map_manager:
-            kwargs['map_manager'] = self._map_manager
-        self._manager = map_model_manager(**kwargs)
-
     def add_pdb(self, pdb_file):
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
-        self._remake_map_model_manager()
-        # model_file = dm.write_model_file(self._model)
-        # return model_file
 
     def add_map_gz(self, map_gz_file):
         dm = DataManager()
@@ -83,7 +70,6 @@ class MapGroup:
             with gzip.open(map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
             self._map_manager = dm.get_real_map(mrc_filepath)
-            self._remake_map_model_manager()
 
     def add_nanome_complex(self, comp):
         self.nanome_complex = comp
