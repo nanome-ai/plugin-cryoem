@@ -164,11 +164,6 @@ class SearchMenu:
             with open(file_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            # self._plugin.map_file = map_tempfile
-            # self._plugin.load_map()
-            # self._plugin.generate_histogram()
-            # ws = await self._plugin.request_workspace()
-            # await self._plugin.set_current_complex_generate_surface(ws)
         return file_path
 
 

@@ -37,7 +37,7 @@ class MapGroup:
 
         self.visible = True
         self.position = [0.0, 0.0, 0.0]
-        self.isovalue = 0.1
+        self.isovalue = 3.45
         self.opacity = 0.65
         self.radius = 15
         self.color_scheme = enums.ColorScheme.BFactor
@@ -45,6 +45,7 @@ class MapGroup:
 
         self._model = None
         self._map_manager = None
+        self._manager = map_model_manager()
 
     @property
     def _map_origin(self):
@@ -59,9 +60,20 @@ class MapGroup:
                 for x in range(0, len(self.mesh.vertices), 3)
             ])
 
+    def _remake_map_model_manager(self):
+        kwargs = {}
+        if self._model:
+            kwargs['model'] = self._model
+        if self._map_manager:
+            kwargs['map_manager'] = self._map_manager
+        self._manager = map_model_manager(**kwargs)
+
     def add_pdb(self, pdb_file):
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
+        self._remake_map_model_manager()
+        # model_file = dm.write_model_file(self._model)
+        # return model_file
 
     def add_map_gz(self, map_gz_file):
         dm = DataManager()
@@ -71,14 +83,18 @@ class MapGroup:
             with gzip.open(map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
             self._map_manager = dm.get_real_map(mrc_filepath)
+            self._remake_map_model_manager()
+
+    def add_nanome_complex(self, comp):
+        self.nanome_complex = comp
+        if self.mesh:
+            anchor = self.mesh.anchors[0]
+            anchor.anchor_type = enums.ShapeAnchorType.Complex
+            anchor.target = comp.index
+            self.mesh.upload()
 
     def generate_map(self):
         self._manager.generate_map()
-
-    def add_file(self, filepath: str):
-        self.files.append(filepath)
-        if not filepath.endswith('pdb'):
-            self.load_map(filepath)
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self._map_manager.map_data().as_1d())
@@ -118,25 +134,21 @@ class MapGroup:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.mesh, color_scheme)
 
-    def generate_mesh(self, isovalue, color_scheme=None, opacity=0.65, decimation_factor=5):
+    def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
-        color_scheme = color_scheme or self.color_scheme
-        # self.set_limited_view_on_cog()
-        self.isovalue = isovalue
-        self.opacity = opacity
-        self.color_scheme = color_scheme
         if hasattr(self, '_model'):
             mmm = map_model_manager(model=self._model, map_manager=self._map_manager)
         else:
             mmm = map_model_manager(map_manager=self._map_manager)
         map_data = mmm.map_manager().map_data().as_numpy_array()
-        vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
+        vertices, triangles = mcubes.marching_cubes(map_data, self.isovalue)
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
         vertices += np.asarray(self._map_origin)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
         Logs.debug("Decimating mesh")
+        decimation_factor = 5
         target = max(1000, len(np_triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(np_vertices, np_triangles)
@@ -159,8 +171,8 @@ class MapGroup:
         self.mesh.normals = computed_normals.flatten()
         self.mesh.triangles = computed_triangles.flatten()
 
-        self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-        self.color_by_scheme(self.mesh, color_scheme)
+        self.mesh.color = Color(255, 255, 255, int(self.opacity * 255))
+        self.color_by_scheme(self.mesh, self.color_scheme)
         Logs.message("Mesh generated")
         return self.mesh
 

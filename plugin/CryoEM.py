@@ -4,7 +4,7 @@ import nanome
 
 from nanome.util import Logs, enums, async_callback
 
-from .menu import EditMeshMenu, MainMenu, SearchMenu
+from .menu import MainMenu, SearchMenu
 from .models import MapGroup
 
 
@@ -27,17 +27,17 @@ class CryoEM(nanome.AsyncPluginInstance):
         map_group.add_map_gz(map_gz_file)
         map_group.generate_map()
 
-        iso = 3.46
-        opacity = 0.65
+        map_group.isovalue = 3.46
+        map_group.opacity = 0.65
         # Load pdb and associate resulting complex with MapGroup
         await self.send_files_to_load([pdb_file])
-        comp = (await self.request_complex_list())[0]
-        map_group.nanome_complex = (await self.request_complexes([comp.index]))[0]
-        mesh = map_group.generate_mesh(iso, opacity=opacity)
-
-        anchor = mesh.anchors[0]
-        anchor.anchor_type = enums.ShapeAnchorType.Complex
-        anchor.target = comp.index
+        shallow_comp = (await self.request_complex_list())[0]
+        comp = (await self.request_complexes([shallow_comp.index]))[0]
+        map_group.add_nanome_complex(comp)
+        mesh = map_group.generate_mesh()
+        # anchor = mesh.anchors[0]
+        # anchor.anchor_type = enums.ShapeAnchorType.Complex
+        # anchor.target = comp.index
         await mesh.upload()
         return map_group
 
@@ -46,6 +46,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
+        await self.load_map_and_model()
         complexes = await self.request_complex_list()
         self.menu.render(complexes, force_enable=True)
 
@@ -58,8 +59,14 @@ class CryoEM(nanome.AsyncPluginInstance):
         if ext == ".pdb":
             # For now just add maps to first group
             # Will need to be fixed later
-            group.add_pdb(filepath)
-            self.send_files_to_load([filepath])
+            model_file = group.add_pdb(filepath)
+            self.send_files_to_load([model_file])
+            import time
+            time.sleep(1)
+            shallow_comp = (await self.request_complex_list())[0]
+            comp = await self.request_complexes([shallow_comp.index])
+            group.add_nanome_complex(comp)
+
         else:
             group_name = os.path.basename(path)
             group = MapGroup(group_name=group_name)
@@ -73,17 +80,14 @@ class CryoEM(nanome.AsyncPluginInstance):
             await self.render_mesh(group)
         complexes = await self.request_complex_list()
         self.menu.render(complexes)
-        self.update_menu(self.menu)
 
     async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
-        isovalue = map_group.isovalue
-        opacity = map_group.opacity
-        color_scheme = map_group.color_scheme
-        Logs.message(f"Generating iso-surface for iso-value {round(isovalue, 3)}")
-        mesh = map_group.generate_mesh(isovalue, color_scheme, opacity)
+        Logs.message(f"Generating iso-surface for iso-value {round(map_group.isovalue, 3)}")
+        mesh = map_group.generate_mesh()
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
         await mesh.upload()
+        Logs.message("Uploading completed")
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
 
 
