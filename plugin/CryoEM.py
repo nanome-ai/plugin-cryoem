@@ -53,42 +53,38 @@ class CryoEM(nanome.AsyncPluginInstance):
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
 
-    async def add_file_to_group(self, filepath):
-        path, ext = os.path.splitext(filepath)
+    async def add_pdb_to_group(self, filepath):
+        # Look for a MapGroup to add the model to
         group = next(iter(self.groups.values()), None)
-        if ext == ".pdb":
-            # For now just add maps to first group
-            # Will need to be fixed later
-            if group:
-                group.add_pdb(filepath)
-            self.send_files_to_load([filepath])
+        if group:
+            group.add_pdb(filepath)
+        self.send_files_to_load([filepath])
+        # Get new complex, and associate to MapGroup
+        if group:
             time.sleep(1)  # Give time for PDB to load
             shallow_comp = (await self.request_complex_list())[0]
             comp = (await self.request_complexes([shallow_comp.index]))[0]
-            if group:
-                group.add_nanome_complex(comp)
-                group.generate_mesh()
-                group.mesh.upload()
+            group.add_nanome_complex(comp)
+            group.generate_mesh()
+            group.mesh.upload()
 
-        else:  # Import map.gz
-            group_name = os.path.basename(path)
-            group = MapGroup(group_name=group_name)
-            group.add_map_gz(filepath)
-            self.groups[group_name] = group
+    async def create_mapgroup_for_file(self, map_gz_filepath):
+        path, ext = os.path.splitext(map_gz_filepath)
+        group = next(iter(self.groups.values()), None)
+        group_name = os.path.basename(path)
+        group = MapGroup(group_name=group_name)
+        group.add_map_gz(map_gz_filepath)
+        self.groups[group_name] = group
 
-            # Check if theres a complex we can align to
-            group.add_map_gz(filepath)
-            complexes = await self.request_complex_list()
-            if complexes:
-                comp = complexes[0]
-                deep_comp = (await self.request_complexes([comp.index]))[0]
-                group.add_nanome_complex(deep_comp)
-                self.menu.render(complexes)
-            if not group:
-                group_name = os.path.basename(path)
-                group = MapGroup(group_name=group_name)
-                self.groups.append(group)
-            await self.render_mesh(group)
+        # Check if theres a complex we can align to
+        # Probably not the end behavior we want, but
+        # it works at this stage of prototyping
+        complexes = await self.request_complex_list()
+        if complexes:
+            comp = complexes[0]
+            deep_comp = (await self.request_complexes([comp.index]))[0]
+            group.add_nanome_complex(deep_comp)
+        await self.render_mesh(group)
 
     async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)

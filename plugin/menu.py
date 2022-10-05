@@ -131,14 +131,14 @@ class SearchMenu:
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        await self._plugin.add_file_to_group(pdb_path)
+        await self._plugin.add_pdb_to_group(pdb_path)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        await self._plugin.add_file_to_group(map_file)
+        await self._plugin.create_mapgroup_for_file(map_file)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
