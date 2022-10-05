@@ -18,29 +18,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.search_menu = SearchMenu(self)
         self.groups = {}
 
-    async def load_map_and_model(self):
-        Logs.message("Loading Map and PDB file")
-        map_gz_file = "emd_30288.map.gz"
-        pdb_file = "7c4u.pdb"
-
-        map_group = MapGroup()
-        map_group.add_pdb(pdb_file)
-        map_group.add_map_gz(map_gz_file)
-        map_group.isovalue = 3.46
-        map_group.opacity = 0.65
-
-        # Load pdb and associate resulting complex with MapGroup
-        await self.send_files_to_load([pdb_file])
-        shallow_comp = (await self.request_complex_list())[0]
-        comp = (await self.request_complexes([shallow_comp.index]))[0]
-        map_group.add_nanome_complex(comp)
-        mesh = map_group.generate_mesh()
-        anchor = mesh.anchors[0]
-        anchor.anchor_type = enums.ShapeAnchorType.Complex
-        anchor.target = comp.index
-        await mesh.upload()
-        return map_group
-
     def on_stop(self):
         self.temp_dir.cleanup()
 
@@ -94,6 +71,35 @@ class CryoEM(nanome.AsyncPluginInstance):
         await mesh.upload()
         Logs.message("Uploading completed")
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
+
+    async def load_map_and_model(self):
+        """Function for development that loads a map and model from the fixtures folder.
+        
+        This is useful for validating that a map and model can still aligned correctly in the worspace
+        Having every step in one function can be useful for perspective
+        """
+        Logs.message("Loading Map and PDB file")
+        fixtures_path = os.path.join(os.getcwd(), 'tests', 'fixtures')
+        map_gz_file = os.path.join(fixtures_path, 'emd_30288.map.gz')
+        pdb_file = os.path.join(fixtures_path, "7c4u.pdb")
+
+        map_group = MapGroup()
+        map_group.add_pdb(pdb_file)
+        map_group.add_map_gz(map_gz_file)
+        map_group.isovalue = 3.46
+        map_group.opacity = 0.65
+
+        # Load pdb and associate resulting complex with MapGroup
+        await self.send_files_to_load([pdb_file])
+        shallow_comp = (await self.request_complex_list())[0]
+        comp = (await self.request_complexes([shallow_comp.index]))[0]
+        map_group.add_nanome_complex(comp)
+        mesh = map_group.generate_mesh()
+        anchor = mesh.anchors[0]
+        anchor.anchor_type = enums.ShapeAnchorType.Complex
+        anchor.target = comp.index
+        await mesh.upload()
+        return map_group
 
 
 def main():
