@@ -19,7 +19,7 @@ VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
 
-__all__ = ['MainMenu', 'EMBLMenu', 'EditMeshMenu']
+__all__ = ['MainMenu', 'SearchMenu', 'EditMeshMenu']
 
 
 class MainMenu:
@@ -39,9 +39,6 @@ class MainMenu:
     def render(self, complexes, force_enable=False):
         if force_enable:
             self._menu.enabled = True
-
-        for comp in complexes:
-            pass
 
         groups = self._plugin.groups
         self.render_map_groups(groups)
@@ -75,7 +72,7 @@ class MainMenu:
             self.lst_groups.items.append(ln)
         self._plugin.update_content(self.lst_groups)
 
-    def open_group_details(self, map_group, btn):
+    def open_group_details(self, map_group, btn=None):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
@@ -134,14 +131,14 @@ class SearchMenu:
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        await self._plugin.add_to_group(pdb_path)
+        await self._plugin.add_pdb_to_group(pdb_path)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        await self._plugin.add_to_group(map_file)
+        await self._plugin.create_mapgroup_for_file(map_file)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -167,11 +164,6 @@ class SearchMenu:
             with open(file_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            # self._plugin.map_file = map_tempfile
-            # self._plugin.load_map()
-            # self._plugin.generate_histogram()
-            # ws = await self._plugin.request_workspace()
-            # await self._plugin.set_current_complex_generate_surface(ws)
         return file_path
 
 
@@ -286,10 +278,18 @@ class EditMeshMenu:
             btn.text.value.set_all(filename)
             self.lst_files.items.append(ln)
 
+        # Populate color scheme dropdown
+        current_scheme = map_group.color_scheme
+        for item in self.dd_color_scheme.items:
+            if item.name.lower() == current_scheme.name.lower():
+                item.selected = True
+            else:
+                item.selected = False
+
         # Generate histogram
-        if len(map_group.files) > 1:
-            img_filepath = map_group.generate_histogram(self.temp_dir)
-            self.img_histogram.file_path = img_filepath
+        # if len(map_group.files) > 1:
+        img_filepath = map_group.generate_histogram(self.temp_dir)
+        self.img_histogram.file_path = img_filepath
 
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max

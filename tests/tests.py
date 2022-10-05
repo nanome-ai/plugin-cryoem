@@ -1,9 +1,11 @@
 import asyncio
 import os
 import unittest
-from nanome.api.shapes import Mesh
-from nanome.util import enums
+from mmtbx.model.model import manager
+from iotbx.map_manager import map_manager
+
 from plugin.models import MapGroup
+
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -21,47 +23,23 @@ class MapGroupTestCase(unittest.TestCase):
 
     def setUp(self):
         self.map_group = MapGroup()
-        self.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
+        self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
-    def test_add_file_pdb(self):
-        self.map_group.add_file(self.pdb_file)
-        self.assertTrue(self.pdb_file in self.map_group.files)
+    def test_add_pdb(self):
+        self.map_group.add_pdb(self.pdb_file)
+        self.assertTrue(isinstance(self.map_group._model, manager))
 
-    def test_add_file_map(self):
-        self.map_group.add_file(self.map_file)
-        self.assertTrue(self.map_file in self.map_group.files)
-        self.assertTrue(self.map_file in self.map_group.files)
-
-    def test_load_map(self):
-        # Assert that attributes are set after load_map called.
-        attrs_to_set = ['_map_data', '_map_voxel_size', '_map_origin']
-        for attr in attrs_to_set:
-            self.assertTrue(getattr(self.map_group, attr) is None)
-        self.map_group.load_map(self.map_file)
-        for attr in attrs_to_set:
-            self.assertTrue(getattr(self.map_group, attr) is not None)
-
-
-class LoadedMapGroupTestCase(unittest.TestCase):
-    """Load map once, and test different settings."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.map_group = MapGroup()
-        cls.pdb_file = os.path.join(fixtures_dir, '7q1u.pdb')
-        cls.map_gz_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
-        cls.map_group.add_file(cls.pdb_file)
-        cls.map_group.add_file(cls.map_gz_file)
-        isovalue = 0.5
-        opacity = 0.65
-        color_scheme = enums.ColorScheme.BFactor
-        cls.map_group.generate_mesh(isovalue, color_scheme, opacity)
+    def test_add_map_gz(self):
+        self.map_group.add_map_gz(self.map_file)
+        self.assertTrue(isinstance(self.map_group._map_manager, map_manager))
 
     def test_generate_mesh(self):
-        # Make sure setUpClass generated a mesh
-        mesh = self.map_group.mesh
-        self.assertTrue(isinstance(mesh, Mesh))
+        # Assert that attributes are set after load_map called.
+        self.map_group.add_map_gz(self.map_file)
+        self.assertEqual(len(self.map_group.mesh.vertices), 0)
+        self.map_group.generate_mesh()
+        self.assertTrue(len(self.map_group.mesh.vertices) > 0)
 
     def test_toggle_wireframe_mode(self):
         # wireframe_mode = self.map_group.wireframe_mode
