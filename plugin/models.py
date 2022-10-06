@@ -118,15 +118,16 @@ class MapGroup:
 
     def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
+        Logs.message("Generating mesh...")
         if hasattr(self, '_model'):
             mmm = map_model_manager(model=self._model, map_manager=self._map_manager)
         else:
             mmm = map_model_manager(map_manager=self._map_manager)
-        Logs.debug("Generating Map")
+        Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
-        Logs.debug("Marching Cubes")
+        Logs.debug("Marching Cubes...")
         vertices, triangles = mcubes.marching_cubes(map_data, self.isovalue)
         Logs.debug("Cubes Marched")
         # offset the vertices using the map origin
@@ -134,7 +135,7 @@ class MapGroup:
         vertices += np.asarray(self._map_origin)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
-        Logs.debug("Decimating mesh")
+        Logs.debug("Simplifying mesh...")
         decimation_factor = 5
         target = max(1000, len(np_triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
@@ -142,6 +143,7 @@ class MapGroup:
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0
         )
+        Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
         voxel_sizes = self._map_manager.pixel_sizes()
         if voxel_sizes[0] > 0.0001:
