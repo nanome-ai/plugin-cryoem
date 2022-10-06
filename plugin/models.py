@@ -119,10 +119,15 @@ class MapGroup:
     def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
         Logs.message("Generating mesh...")
+        # Set up map model manager
+        kwargs = {
+            'ignore_symmetry_conflicts': True
+        }
         if hasattr(self, '_model'):
-            mmm = map_model_manager(model=self._model, map_manager=self._map_manager)
-        else:
-            mmm = map_model_manager(map_manager=self._map_manager)
+            kwargs['model'] = self._model
+        if hasattr(self, '_map_manager'):
+            kwargs['map_manager'] = self._map_manager
+        mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
