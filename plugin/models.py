@@ -146,8 +146,7 @@ class MapGroup:
         mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(np_vertices, np_triangles)
         mesh_simplifier.simplify_mesh(
-            target_count=target, aggressiveness=7, preserve_border=True, verbose=0
-        )
+            target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
         voxel_sizes = self._map_manager.pixel_sizes()
@@ -161,9 +160,14 @@ class MapGroup:
         computed_triangles = np.array(triangles)
         if not hasattr(self, 'mesh') or not self.mesh:
             self.mesh = Mesh()
-        self.mesh.vertices = computed_vertices.flatten()
-        self.mesh.normals = computed_normals.flatten()
-        self.mesh.triangles = computed_triangles.flatten()
+
+        Logs.debug("Limiting view...")
+        vertices, normals, triangles = self.limit_view(
+            computed_vertices, computed_normals, computed_triangles)
+
+        self.mesh.vertices = vertices.flatten()
+        self.mesh.normals = normals.flatten()
+        self.mesh.triangles = triangles.flatten()
 
         self.mesh.color = Color(255, 255, 255, int(self.opacity * 255))
         self.color_by_scheme(self.mesh, self.color_scheme)
@@ -296,22 +300,21 @@ class MapGroup:
                 colors += [0.0, 0.0, 0.0, 1.0]
         mesh.colors = np.array(colors)
 
-    def limit_view(self, mesh: tuple, position: list, range: float):
-        if range <= 0:
-            return mesh
-        vertices, normals, triangles = mesh
+    def limit_view(self, vertices, normals, triangles):
+        if self.radius <= 0:
+            return (vertices, normals, triangles)
 
-        pos = np.asarray(position)
+        pos = np.asarray(self.position)
         idv = 0
         to_keep = []
         for v in vertices:
             vert = np.asarray(v)
             dist = np.linalg.norm(vert - pos)
-            if dist <= range:
+            if dist <= self.radius:
                 to_keep.append(idv)
             idv += 1
         if len(to_keep) == len(vertices):
-            return mesh
+            return (vertices, normals, triangles)
 
         new_vertices = []
         new_triangles = []
