@@ -532,7 +532,7 @@ class ViewportEditor:
             sphere.upload()
 
         else:
-             # get viewport position, transform into map space and set map position
+            # get viewport position, transform into map space and set map position
             vp_complex = next(c for c in complexes if c.index == self.complex.index)
 
             # calculate viewport position
