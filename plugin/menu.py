@@ -6,7 +6,7 @@ from os import path
 from nanome.api import shapes, structure, ui
 from nanome.util import async_callback, enums, Color, Logs, Vector3
 
-from .models import MapGroup
+from .models import MapGroup, ViewportEditor
 
 ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
@@ -168,8 +168,7 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self.viewport_complex = None
-        self.viewport_sphere = None
+        self.viewport_editor = ViewportEditor(map_group, plugin_instance)
 
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
@@ -259,71 +258,9 @@ class EditMeshMenu:
         self.ln_edit_viewport.enabled = edit_viewport
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
 
-        complexes = await self._plugin.request_complex_list()
-        map_complex = next(c for c in complexes if c.index == self.map_group.nanome_complex.index)
+        await self.viewport_editor.toggle_edit(edit_viewport)
 
-        if edit_viewport:
-            # create viewport sphere and position at current map position
-            complex = structure.Complex()
-            molecule = structure.Molecule()
-            chain = structure.Chain()
-            residue = structure.Residue()
-
-            self.viewport_complex = complex
-            complex.name = self.map_group.nanome_complex.name + ' (viewport)'
-            complex.add_molecule(molecule)
-            molecule.add_chain(chain)
-            chain.add_residue(residue)
-
-            # create invisible atoms to create bounding box
-            for i in [-10, 10]:
-                atom = structure.Atom()
-                atom.set_visible(False)
-                atom.position.set(i, i, i)
-                residue.add_atom(atom)
-
-            # calculate viewport position
-            c_to_w = map_complex.get_complex_to_workspace_matrix()
-            complex.position = c_to_w * Vector3(*self.map_group.position)
-
-            # lock map position
-            map_complex.locked = True
-            self._plugin.update_structures_shallow([map_complex])
-
-            res = await self._plugin.add_to_workspace([complex])
-            complex.index = res[0].index
-
-            # create viewport sphere
-            sphere = shapes.Sphere()
-            self.viewport_sphere = sphere
-            sphere.radius = self.map_group.radius
-            sphere.color = Color(100, 100, 100, 127)
-
-            anchor = sphere.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = complex.index
-            sphere.upload()
-
-        else:
-            # get viewport position, transform into map space and set map position
-            vp_complex = next(c for c in complexes if c.index == self.viewport_complex.index)
-
-            # calculate viewport position
-            w_to_c = map_complex.get_workspace_to_complex_matrix()
-            vp_position = w_to_c * vp_complex.position
-            self.map_group.position = [*vp_position]
-
-            # unlock map position
-            map_complex.locked = False
-            map_complex.boxed = False
-            self._plugin.update_structures_shallow([map_complex])
-
-            # remove viewport sphere
-            self.viewport_sphere.destroy()
-            self._plugin.remove_from_workspace([self.viewport_complex])
-            self.viewport_complex = None
-            self.viewport_sphere = None
-
+        if not edit_viewport:
             self.redraw_map()
 
     @async_callback
@@ -336,9 +273,8 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_map(self, content=None):
-        if self.viewport_sphere is not None:
-            self.viewport_sphere.radius = self.radius
-            self.viewport_sphere.upload()
+        if self.viewport_editor.is_editing:
+            self.viewport_editor.update_radius(self.radius)
             return
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity

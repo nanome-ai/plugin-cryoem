@@ -13,6 +13,10 @@ from nanome.api.shapes import Mesh
 from nanome.util import Color, Logs, enums
 from scipy.spatial import KDTree
 
+import nanome
+from nanome.api import structure, shapes
+from nanome.util import Color, Vector3
+
 from .utils import cpk_colors
 
 
@@ -467,3 +471,86 @@ class MapGroup:
             new_tris[newIdT + 5][2] = newId + 10
             new_tris[newIdT + 11][2] = newId + 10
         return (new_verts, new_norms, new_tris)
+
+
+class ViewportEditor:
+
+    def __init__(self, map_group: MapGroup, plugin_instance: nanome.PluginInstance):
+        self.map_group = map_group
+        self.plugin = plugin_instance
+
+        self.is_editing = False
+        self.complex = None
+        self.sphere = None
+
+    async def toggle_edit(self, edit):
+        self.is_editing = edit
+
+        complexes = await self.plugin.request_complex_list()
+        map_complex = next(c for c in complexes if c.index == self.map_group.nanome_complex.index)
+
+        if edit:
+            # create viewport sphere and position at current map position
+            complex = structure.Complex()
+            molecule = structure.Molecule()
+            chain = structure.Chain()
+            residue = structure.Residue()
+
+            self.complex = complex
+            complex.name = self.map_group.nanome_complex.name + ' (viewport)'
+            complex.add_molecule(molecule)
+            molecule.add_chain(chain)
+            chain.add_residue(residue)
+
+            # create invisible atoms to create bounding box
+            for i in [-10, 10]:
+                atom = structure.Atom()
+                atom.set_visible(False)
+                atom.position.set(i, i, i)
+                residue.add_atom(atom)
+
+            # calculate viewport position
+            c_to_w = map_complex.get_complex_to_workspace_matrix()
+            complex.position = c_to_w * Vector3(*self.map_group.position)
+
+            # lock map position
+            map_complex.locked = True
+            self.plugin.update_structures_shallow([map_complex])
+
+            res = await self.plugin.add_to_workspace([complex])
+            complex.index = res[0].index
+
+            # create viewport sphere
+            sphere = shapes.Sphere()
+            self.sphere = sphere
+            sphere.radius = self.map_group.radius
+            sphere.color = Color(100, 100, 100, 127)
+
+            anchor = sphere.anchors[0]
+            anchor.anchor_type = enums.ShapeAnchorType.Complex
+            anchor.target = complex.index
+            sphere.upload()
+
+        else:
+             # get viewport position, transform into map space and set map position
+            vp_complex = next(c for c in complexes if c.index == self.complex.index)
+
+            # calculate viewport position
+            w_to_c = map_complex.get_workspace_to_complex_matrix()
+            vp_position = w_to_c * vp_complex.position
+            self.map_group.position = [*vp_position]
+
+            # unlock map position
+            map_complex.locked = False
+            map_complex.boxed = False
+            self.plugin.update_structures_shallow([map_complex])
+
+            # remove viewport sphere
+            self.sphere.destroy()
+            self.plugin.remove_from_workspace([self.complex])
+            self.complex = None
+            self.sphere = None
+
+    def update_radius(self, radius):
+        self.sphere.radius = radius
+        self.sphere.upload()
