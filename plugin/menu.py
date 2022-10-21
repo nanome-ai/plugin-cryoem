@@ -1,12 +1,12 @@
-import functools
 import os
 import nanome
 import requests
+from functools import partial
 from os import path
-from nanome.api import ui
-from nanome.util import Logs, async_callback, enums
+from nanome.api import shapes, structure, ui
+from nanome.util import async_callback, enums, Color, Logs, Vector3
 
-from .models import MapGroup
+from .models import MapGroup, ViewportEditor
 
 ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
@@ -39,7 +39,7 @@ class MainMenu:
     def render(self, force_enable=False):
         if force_enable:
             self._menu.enabled = True
-        
+
         groups = self._plugin.groups
         self.render_map_groups(groups)
         self._plugin.update_menu(self._menu)
@@ -56,18 +56,15 @@ class MainMenu:
             lbl.text_value = map_group.group_name
 
             btn: ui.Button = ln.get_content()
-            btn.register_pressed_callback(
-                functools.partial(self.open_group_details, map_group))
+            btn.register_pressed_callback(partial(self.open_group_details, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
-            btn_delete.register_pressed_callback(
-                functools.partial(self.delete_group, map_group))
+            btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
 
             btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
             btn_toggle.icon.value.set_all(
                 VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-            btn_toggle.register_pressed_callback(
-                functools.partial(self.toggle_group, map_group))
+            btn_toggle.register_pressed_callback(partial(self.toggle_group, map_group))
 
             self.lst_groups.items.append(ln)
         self._plugin.update_content(self.lst_groups)
@@ -110,10 +107,10 @@ class SearchMenu:
         # For development only
         # self.ti_rcsb_query.input_text = '7q1u'
         # self.ti_embl_query.input_text = '13764'
-        # self.ti_rcsb_query.input_text = '5k7n'
-        # self.ti_embl_query.input_text = '8216'
-        self.ti_rcsb_query.input_text = '7c4u'
-        self.ti_embl_query.input_text = '30288'
+        self.ti_rcsb_query.input_text = '5k7n'
+        self.ti_embl_query.input_text = '8216'
+        # self.ti_rcsb_query.input_text = '7c4u'
+        # self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):
@@ -171,11 +168,21 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
+        self.viewport_editor = ViewportEditor(map_group, plugin_instance)
+
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
 
         root: ui.LayoutNode = self._menu.root
+        self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
+        self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
+
+        self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
+        self.btn_edit_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, True))
+        self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
+        self.btn_save_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, False))
+
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
@@ -246,6 +253,17 @@ class EditMeshMenu:
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
+    async def toggle_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
+        self.ln_edit_map.enabled = not edit_viewport
+        self.ln_edit_viewport.enabled = edit_viewport
+        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+
+        await self.viewport_editor.toggle_edit(edit_viewport)
+
+        if not edit_viewport:
+            self.redraw_map()
+
+    @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
         opacity = self.opacity
@@ -254,7 +272,10 @@ class EditMeshMenu:
             self.map_group.mesh.upload()
 
     @async_callback
-    async def redraw_map(self, content):
+    async def redraw_map(self, content=None):
+        if self.viewport_editor.is_editing:
+            self.viewport_editor.update_radius(self.radius)
+            return
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
