@@ -3,8 +3,8 @@ import tempfile
 import time
 
 import nanome
-from nanome.util import Logs, enums, async_callback
-
+from nanome.util import Logs, enums, async_callback, Vector3
+from nanome.api import structure
 from .menu import MainMenu, SearchMenu
 from .models import MapGroup
 
@@ -69,6 +69,39 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
         Logs.message(f"Generating iso-surface for iso-value {round(map_group.isovalue, 3)}")
         mesh = map_group.generate_mesh()
+        if not map_group.nanome_complex:
+            # Create a nanome complex to attach the mesh to
+            # create viewport sphere and position at current map position
+            map_complex = structure.Complex()
+            molecule = structure.Molecule()
+            chain = structure.Chain()
+            residue = structure.Residue()
+
+            map_complex.name = map_group.group_name
+            map_complex.add_molecule(molecule)
+            molecule.add_chain(chain)
+            chain.add_residue(residue)
+
+            # create invisible atoms to create bounding box
+            for i in [-10, 10]:
+                atom = structure.Atom()
+                atom.set_visible(False)
+                atom.position.set(i, i, i)
+                residue.add_atom(atom)
+
+            # calculate map_complex position
+            c_to_w = map_complex.get_complex_to_workspace_matrix()
+            map_complex.position = c_to_w * Vector3(*map_group.position)
+
+            # lock map position
+            map_complex.locked = True
+            # self.plugin.update_structures_shallow([map_complex])
+            res = await self.add_to_workspace([map_complex])
+            anchor = mesh.anchors[0]
+            anchor.anchor_type = enums.ShapeAnchorType.Complex
+            anchor.target = res[0].index
+            pass
+
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
         await mesh.upload()
         Logs.message("Uploading completed")

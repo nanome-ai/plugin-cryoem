@@ -3,8 +3,8 @@ import nanome
 import requests
 from functools import partial
 from os import path
-from nanome.api import shapes, structure, ui
-from nanome.util import async_callback, enums, Color, Logs, Vector3
+from nanome.api import ui
+from nanome.util import async_callback, enums, Logs
 
 from .models import MapGroup, ViewportEditor
 
@@ -107,10 +107,10 @@ class SearchMenu:
         # For development only
         # self.ti_rcsb_query.input_text = '7q1u'
         # self.ti_embl_query.input_text = '13764'
-        self.ti_rcsb_query.input_text = '5k7n'
-        self.ti_embl_query.input_text = '8216'
-        # self.ti_rcsb_query.input_text = '7c4u'
-        # self.ti_embl_query.input_text = '30288'
+        # self.ti_rcsb_query.input_text = '5k7n'
+        # self.ti_embl_query.input_text = '8216'
+        self.ti_rcsb_query.input_text = '7c4u'
+        self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):

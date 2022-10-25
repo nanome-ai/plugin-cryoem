@@ -9,13 +9,11 @@ import randomcolor
 from iotbx.data_manager import DataManager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
-from nanome.api.shapes import Mesh
-from nanome.util import Color, Logs, enums
 from scipy.spatial import KDTree
 
 import nanome
 from nanome.api import structure, shapes
-from nanome.util import Color, Vector3
+from nanome.util import Color, Logs, enums, Vector3
 
 from .utils import cpk_colors
 
@@ -25,7 +23,7 @@ class MapGroup:
     def __init__(self, **kwargs):
         self.group_name = kwargs.get("group_name", [])
         self.files = kwargs.get("files", [])
-        self.mesh = Mesh()
+        self.mesh = shapes.Mesh()
         self.nanome_complex = None
         self._map_voxel_size = None
 
@@ -163,7 +161,7 @@ class MapGroup:
         computed_normals = np.array(normals)
         computed_triangles = np.array(triangles)
         if not hasattr(self, 'mesh') or not self.mesh:
-            self.mesh = Mesh()
+            self.mesh = shapes.Mesh()
 
         Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
