@@ -96,10 +96,8 @@ class CryoEM(nanome.AsyncPluginInstance):
             # lock map position
             map_complex.locked = True
             # self.plugin.update_structures_shallow([map_complex])
-            res = await self.add_to_workspace([map_complex])
-            anchor = mesh.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = res[0].index
+            comp = (await self.add_to_workspace([map_complex]))[0]
+            map_group.add_nanome_complex(comp)
             pass
 
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
