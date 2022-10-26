@@ -70,7 +70,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         Logs.message(f"Generating iso-surface for iso-value {round(map_group.isovalue, 3)}")
         mesh = map_group.generate_mesh()
         if not map_group.nanome_complex:
-            map_complex = create_hidden_complex()
+            map_complex = create_hidden_complex(map_group.group_name)
             # calculate map_complex position
             c_to_w = map_complex.get_complex_to_workspace_matrix()
             map_complex.position = c_to_w * Vector3(*map_group.position)
