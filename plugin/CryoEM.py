@@ -3,10 +3,9 @@ import tempfile
 import time
 
 import nanome
-from nanome.util import Logs, enums, async_callback, Vector3
+from nanome.util import Logs, enums, async_callback
 from .menu import MainMenu, SearchMenu
 from .models import MapGroup
-from .utils import create_hidden_complex
 
 
 class CryoEM(nanome.AsyncPluginInstance):
