@@ -12,10 +12,10 @@ from matplotlib import cm
 from scipy.spatial import KDTree
 
 import nanome
-from nanome.api import structure, shapes
+from nanome.api import shapes
 from nanome.util import Color, Logs, enums, Vector3
 
-from .utils import cpk_colors
+from .utils import cpk_colors, create_hidden_complex
 
 
 class MapGroup:
@@ -120,6 +120,7 @@ class MapGroup:
         mmm.generate_map()
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
+        Logs.debug("Generating Mesh from map...")
         Logs.debug("Marching Cubes...")
         vertices, triangles = mcubes.marching_cubes(map_data, self.isovalue)
         Logs.debug("Cubes Marched")
@@ -474,24 +475,9 @@ class ViewportEditor:
         map_complex = next(c for c in complexes if c.index == self.map_group.nanome_complex.index)
 
         if edit:
-            # create viewport sphere and position at current map position
-            complex = structure.Complex()
-            molecule = structure.Molecule()
-            chain = structure.Chain()
-            residue = structure.Residue()
-
-            self.complex = complex
-            complex.name = self.map_group.nanome_complex.name + ' (viewport)'
-            complex.add_molecule(molecule)
-            molecule.add_chain(chain)
-            chain.add_residue(residue)
-
-            # create invisible atoms to create bounding box
-            for i in [-10, 10]:
-                atom = structure.Atom()
-                atom.set_visible(False)
-                atom.position.set(i, i, i)
-                residue.add_atom(atom)
+            # create viewport sphere and position at current map position  
+            comp_name = self.map_group.nanome_complex.name + ' (viewport)'
+            self.complex = create_hidden_complex(comp_name)
 
             # calculate viewport position
             c_to_w = map_complex.get_complex_to_workspace_matrix()

@@ -1,3 +1,6 @@
+from nanome.api import structure
+
+
 def cpk_colors(a):
     colors = {}
     colors["xx"] = "#030303"
@@ -124,3 +127,26 @@ def cpk_colors(a):
         return [1.0, 0, 1.0, 1.0]  # Pink unknown
     h = colors[a_type].lstrip('#')
     return list(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + [1.0]
+
+
+def create_hidden_complex(comp_name=None):
+    # Create a nanome complex to attach the mesh to
+    # create viewport sphere and position at current map position
+    comp = structure.Complex()
+    molecule = structure.Molecule()
+    chain = structure.Chain()
+    residue = structure.Residue()
+
+    if comp_name:
+        comp.name = comp_name
+    comp.add_molecule(molecule)
+    molecule.add_chain(chain)
+    chain.add_residue(residue)
+
+    # create invisible atoms to create bounding box
+    for i in [-10, 10]:
+        atom = structure.Atom()
+        atom.set_visible(False)
+        atom.position.set(i, i, i)
+        residue.add_atom(atom)
+    return comp
