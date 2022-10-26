@@ -268,8 +268,6 @@ class EditMeshMenu:
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
-        if self.map_group.mesh:
-            self.map_group.mesh.upload()
 
     @async_callback
     async def redraw_map(self, content=None):
@@ -281,7 +279,7 @@ class EditMeshMenu:
         self.map_group.color_scheme = self.color_scheme
         self.map_group.radius = self.radius
         if self.map_group.mesh:
-            await self._plugin.render_mesh(self.map_group)
+            await self.map_group.generate_mesh()
 
     @property
     def temp_dir(self):

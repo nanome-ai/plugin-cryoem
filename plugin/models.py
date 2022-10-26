@@ -27,6 +27,8 @@ class MapMesh:
         self.mesh_complex: structure.Complex = None
         self.mesh: shapes.Mesh = None
         self.map_manager = None
+        self.wireframe_mode = False
+        self.wireframe_vertices = []
 
     async def load(self, isovalue, opacity, radius, position, map_data=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -46,7 +48,6 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.mesh_complex.index
-        self.mesh.upload()
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")
@@ -76,19 +77,18 @@ class MapMesh:
 
         if not hasattr(self, 'mesh') or not self.mesh:
             self.mesh = shapes.Mesh()
-        computed_vertices = np.array(vertices)
-        computed_normals = np.array(normals)
-        computed_triangles = np.array(triangles)
+        self.computed_vertices = np.array(vertices)
+        self.computed_normals = np.array(normals)
+        self.computed_triangles = np.array(triangles)
         Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
-            computed_vertices, computed_normals, computed_triangles, radius, position)
+            self.computed_vertices, self.computed_normals, self.computed_triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
         self.mesh.triangles = triangles.flatten()
 
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-        # self.color_by_scheme(self.mesh, self.color_scheme)
         Logs.message("Mesh generated")
         return self.mesh
 
@@ -144,18 +144,12 @@ class MapGroup:
         self.hist_x_min = 0.0
         self.hist_x_max = 1.0
 
-        self.computed_normals = []
-        self.computed_triangles = []
-        self.wire_vertices = []
-        self.wire_normals = []
-        self.wire_triangles = []
-
         self.visible = True
         self.position = [0.0, 0.0, 0.0]
-        self.isovalue = 3.45
+        self.isovalue = 2.5
         self.opacity = 0.65
         self.radius = 15
-        self.color_scheme = enums.ColorScheme.BFactor
+        self.color_scheme = enums.ColorScheme.Element
         self.wireframe_mode = False
 
         self._model = None
@@ -182,13 +176,13 @@ class MapGroup:
         # Unpack map.gz
         self.map_mesh = MapMesh(map_gz_file, self._plugin)
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position)
+        self.map_mesh.mesh.upload()
 
     def add_nanome_complex(self, comp):
         self.nanome_complex = comp
-        if self.mesh:
-            anchor = self.mesh.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = comp.index
+        if self.map_mesh.mesh:
+            self.color_by_scheme(self.map_mesh, self.color_scheme)
+            self.map_mesh.mesh.upload()
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -212,7 +206,7 @@ class MapGroup:
         self.color_scheme = color_scheme
         if self.mesh is not None:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-            self.color_by_scheme(self.mesh, color_scheme)
+            self.color_by_scheme(self.map_mesh, color_scheme)
 
     async def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
@@ -232,26 +226,27 @@ class MapGroup:
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
 
-    def color_by_scheme(self, mesh, scheme):
-        if scheme == enums.ColorScheme.Element:
-            self.color_by_element(mesh)
-        elif scheme == enums.ColorScheme.BFactor:
-            self.color_by_bfactor(mesh)
-        elif scheme == enums.ColorScheme.Chain:
-            self.color_by_chain(mesh)
-
-    def color_by_element(self, mesh):
-        if self.nanome_complex is None:
+    def color_by_scheme(self, map_mesh, scheme):
+        if not self.nanome_complex:
             return
+        Logs.message(f"Coloring Mesh with scheme {scheme.name}")
+        comp = self.nanome_complex
+        if scheme == enums.ColorScheme.Element:
+            self.color_by_element(map_mesh, comp)
+        elif scheme == enums.ColorScheme.BFactor:
+            self.color_by_bfactor(map_mesh, comp)
+        elif scheme == enums.ColorScheme.Chain:
+            self.color_by_chain(map_mesh, comp)
+        Logs.message("Mesh colored")
 
-        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
-
+    def color_by_element(self, map_mesh, comp):
+        mesh = map_mesh.mesh
+        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
-
         atom_positions = []
         atoms = []
-        for a in self.nanome_complex.atoms:
+        for a in comp.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
@@ -265,14 +260,13 @@ class MapGroup:
                 colors += [0.0, 0.0, 0.0, 1.0]
         mesh.colors = np.array(colors)
 
-    def color_by_chain(self, mesh):
-        if self.nanome_complex is None:
-            return
-        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+    def color_by_chain(self, map_mesh, comp):
+        mesh = map_mesh.mesh
+        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
 
-        molecule = self.nanome_complex._molecules[self.nanome_complex.current_frame]
+        molecule = comp._molecules[comp.current_frame]
         n_chain = len(list(molecule.chains))
 
         rdcolor = randomcolor.RandomColor(seed=1234)
@@ -300,7 +294,7 @@ class MapGroup:
 
         atom_positions = []
         atoms = []
-        for a in self.nanome_complex.atoms:
+        for a in comp.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
@@ -317,10 +311,9 @@ class MapGroup:
                 colors += [0.0, 0.0, 0.0, 1.0]
         mesh.colors = np.array(colors)
 
-    def color_by_bfactor(self, mesh):
-        if self.nanome_complex is None:
-            return
-        verts = self.computed_vertices if not self.wireframe_mode else self.wire_vertices
+    def color_by_bfactor(self, map_mesh, comp):
+        mesh = map_mesh.mesh
+        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
 
@@ -330,7 +323,7 @@ class MapGroup:
 
         atom_positions = []
         atoms = []
-        for a in self.nanome_complex.atoms:
+        for a in comp.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
