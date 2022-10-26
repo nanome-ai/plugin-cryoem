@@ -41,6 +41,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             shallow_comp = (await self.request_complex_list())[0]
             comp = (await self.request_complexes([shallow_comp.index]))[0]
             group.add_nanome_complex(comp)
+
             Logs.debug("Regenerating mesh around new model")
             group.generate_mesh()
             Logs.debug("Mesh generated around new model")
@@ -50,36 +51,36 @@ class CryoEM(nanome.AsyncPluginInstance):
         path, ext = os.path.splitext(map_gz_filepath)
         group = next(iter(self.groups.values()), None)
         group_name = os.path.basename(path)
-        group = MapGroup(group_name=group_name)
-        group.add_map_gz(map_gz_filepath)
+        group = MapGroup(self, group_name=group_name)
+        await group.add_map_gz(map_gz_filepath)
         self.groups[group_name] = group
 
-        # Check if theres a complex we can align to
-        # Probably not the end behavior we want, but
-        # it works at this stage of prototyping
-        complexes = await self.request_complex_list()
-        if complexes:
-            comp = complexes[0]
-            deep_comp = (await self.request_complexes([comp.index]))[0]
-            group.add_nanome_complex(deep_comp)
-        await self.render_mesh(group)
+        # # Check if theres a complex we can align to
+        # # Probably not the end behavior we want, but
+        # # it works at this stage of prototyping
+        # complexes = await self.request_complex_list()
+        # if complexes:
+        #     comp = complexes[0]
+        #     deep_comp = (await self.request_complexes([comp.index]))[0]
+        #     group.add_nanome_complex(deep_comp)
+        # await self.render_mesh(group)
         self.menu.render()
 
     async def render_mesh(self, map_group: MapGroup):
         self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
         Logs.message(f"Generating iso-surface for iso-value {round(map_group.isovalue, 3)}")
         mesh = map_group.generate_mesh()
-        if not map_group.nanome_complex:
-            map_complex = create_hidden_complex(map_group.group_name)
-            # calculate map_complex position
-            c_to_w = map_complex.get_complex_to_workspace_matrix()
-            map_complex.position = c_to_w * Vector3(*map_group.position)
+        # if not map_group.nanome_complex:
+        #     map_complex = create_hidden_complex(map_group.group_name)
+        #     # calculate map_complex position
+        #     c_to_w = map_complex.get_complex_to_workspace_matrix()
+        #     map_complex.position = c_to_w * Vector3(*map_group.position)
 
-            # lock map position
-            map_complex.locked = True
-            # self.plugin.update_structures_shallow([map_complex])
-            comp = (await self.add_to_workspace([map_complex]))[0]
-            map_group.add_nanome_complex(comp)
+        #     # lock map position
+        #     map_complex.locked = True
+        #     # self.plugin.update_structures_shallow([map_complex])
+        #     comp = (await self.add_to_workspace([map_complex]))[0]
+        #     map_group.add_nanome_complex(comp)
 
         Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
         await mesh.upload()

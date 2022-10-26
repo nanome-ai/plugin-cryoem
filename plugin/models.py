@@ -1,4 +1,5 @@
 import gzip
+import os
 import tempfile
 
 import matplotlib.pyplot as plt
@@ -12,15 +13,84 @@ from matplotlib import cm
 from scipy.spatial import KDTree
 
 import nanome
-from nanome.api import shapes
+from nanome.api import shapes, structure
 from nanome.util import Color, Logs, enums, Vector3
 
 from .utils import cpk_colors, create_hidden_complex
 
 
+class MapMesh:
+
+    def __init__(self, map_gz_file, plugin):
+        self.map_gz_file: str = map_gz_file
+        self._plugin = plugin
+        self.mesh_complex: structure.Complex = None
+        self.mesh: shapes.Mesh = None
+        self.map_manager = None
+
+    async def load(self, isovalue, opacity):
+        """Create complex, Generate Mesh, and attach mesh to complex."""
+        dm = DataManager()
+        self.map_manager = dm.get_real_map(self.mrc_filepath)
+        map_data = self.map_manager.map_data().as_numpy_array()
+        self.mesh = self.generate_mesh(map_data, isovalue, opacity)
+        self.mesh_complex = create_hidden_complex(self.group_name)
+        self.mesh_complex.boxed = True
+        [self.mesh_complex] = await self._plugin.add_to_workspace([self.mesh_complex])
+        anchor = self.mesh.anchors[0]
+        anchor.anchor_type = enums.ShapeAnchorType.Complex
+        anchor.target = self.mesh_complex.index
+        self.mesh.upload()
+
+    def generate_mesh(self, map_data, isovalue, opacity):
+        Logs.debug("Generating Mesh from map...")
+        Logs.debug("Marching Cubes...")
+        vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
+        Logs.debug("Cubes Marched")
+        # offset the vertices using the map origin
+        # this makes sure the mesh is in the same coordinates as the molecule
+        map_origin = self.map_manager.origin
+        vertices += np.asarray(map_origin)
+        np_vertices = np.asarray(vertices)
+        np_triangles = np.asarray(triangles)
+        Logs.debug("Simplifying mesh...")
+        decimation_factor = 5
+        target = max(1000, len(np_triangles) / decimation_factor)
+        mesh_simplifier = pyfqmr.Simplify()
+        mesh_simplifier.setMesh(np_vertices, np_triangles)
+        mesh_simplifier.simplify_mesh(
+            target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
+        Logs.debug("Mesh Simplified")
+        vertices, triangles, normals = mesh_simplifier.getMesh()
+        voxel_sizes = self.map_manager.pixel_sizes()
+        if voxel_sizes[0] > 0.0001:
+            Logs.debug("Setting voxels")
+            voxel_size = np.array(voxel_sizes)
+            vertices *= voxel_size
+
+        if not hasattr(self, 'mesh') or not self.mesh:
+            self.mesh = shapes.Mesh()
+        # computed_vertices = np.array(vertices)
+        # computed_normals = np.array(normals)
+        # computed_triangles = np.array(triangles)
+        # Logs.debug("Limiting view...")
+        # vertices, normals, triangles = self.limit_view(
+        #     computed_vertices, computed_normals, computed_triangles)
+
+        self.mesh.vertices = vertices.flatten()
+        self.mesh.normals = normals.flatten()
+        self.mesh.triangles = triangles.flatten()
+
+        self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+        # self.color_by_scheme(self.mesh, self.color_scheme)
+        Logs.message("Mesh generated")
+        return self.mesh
+
+
 class MapGroup:
 
-    def __init__(self, **kwargs):
+    def __init__(self, plugin, **kwargs):
+        self._plugin = plugin
         self.group_name = kwargs.get("group_name", [])
         self.files = kwargs.get("files", [])
         self.mesh = shapes.Mesh()
@@ -64,14 +134,14 @@ class MapGroup:
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
 
-    def add_map_gz(self, map_gz_file):
-        dm = DataManager()
+    async def add_map_gz(self, map_gz_file):
         # Unpack map.gz
         with tempfile.NamedTemporaryFile(suffix='.mrc', delete=False) as mrc_file:
             mrc_filepath = mrc_file.name
             with gzip.open(map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
-            self._map_manager = dm.get_real_map(mrc_filepath)
+            self.map_mesh = MapMesh(mrc_filepath, self._plugin)
+            await self.map_mesh.load(self.isovalue, self.opacity)
 
     def add_nanome_complex(self, comp):
         self.nanome_complex = comp
@@ -120,48 +190,7 @@ class MapGroup:
         mmm.generate_map()
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
-        Logs.debug("Generating Mesh from map...")
-        Logs.debug("Marching Cubes...")
-        vertices, triangles = mcubes.marching_cubes(map_data, self.isovalue)
-        Logs.debug("Cubes Marched")
-        # offset the vertices using the map origin
-        # this makes sure the mesh is in the same coordinates as the molecule
-        vertices += np.asarray(self._map_origin)
-        np_vertices = np.asarray(vertices)
-        np_triangles = np.asarray(triangles)
-        Logs.debug("Simplifying mesh...")
-        decimation_factor = 5
-        target = max(1000, len(np_triangles) / decimation_factor)
-        mesh_simplifier = pyfqmr.Simplify()
-        mesh_simplifier.setMesh(np_vertices, np_triangles)
-        mesh_simplifier.simplify_mesh(
-            target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
-        Logs.debug("Mesh Simplified")
-        vertices, triangles, normals = mesh_simplifier.getMesh()
-        voxel_sizes = self._map_manager.pixel_sizes()
-        if voxel_sizes[0] > 0.0001:
-            Logs.debug("Setting voxels")
-            voxel_size = np.array(voxel_sizes)
-            vertices *= voxel_size
-
-        computed_vertices = np.array(vertices)
-        computed_normals = np.array(normals)
-        computed_triangles = np.array(triangles)
-        if not hasattr(self, 'mesh') or not self.mesh:
-            self.mesh = shapes.Mesh()
-
-        Logs.debug("Limiting view...")
-        vertices, normals, triangles = self.limit_view(
-            computed_vertices, computed_normals, computed_triangles)
-
-        self.mesh.vertices = vertices.flatten()
-        self.mesh.normals = normals.flatten()
-        self.mesh.triangles = triangles.flatten()
-
-        self.mesh.color = Color(255, 255, 255, int(self.opacity * 255))
-        self.color_by_scheme(self.mesh, self.color_scheme)
-        Logs.message("Mesh generated")
-        return self.mesh
+        self.map_mesh.generate_mesh(map_data, self.isovalue, self.opacity)
 
     def color_by_scheme(self, mesh, scheme):
         if scheme == enums.ColorScheme.Element:
