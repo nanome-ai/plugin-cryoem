@@ -97,20 +97,6 @@ class MapGroup:
         plt.savefig(self.png_tempfile.name)
         return self.png_tempfile.name
 
-    def set_limited_view_on_cog(self):
-        # Compute center of gravity of structure
-        cog = np.array([0.0, 0.0, 0.0])
-        if self.nanome_complex is None:
-            self.position = cog.tolist()
-            return
-        count = 0
-        for a in self.nanome_complex.atoms:
-            count += 1
-            cog += np.array([a.position.x, a.position.y, a.position.z])
-        cog /= count
-        cog -= self._map_origin
-        self.position = cog.tolist()
-
     async def update_color(self, color_scheme, opacity):
         self.opacity = opacity
         self.color_scheme = color_scheme
