@@ -1,6 +1,6 @@
 *
 !plugin
 !tests
-!requirements.txt
+!environment.yml
 !run_tests.py
 !run.py
