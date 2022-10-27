@@ -40,6 +40,13 @@ class CryoEM(nanome.AsyncPluginInstance):
             shallow_comp = (await self.request_complex_list())[-1]
             comp = (await self.request_complexes([shallow_comp.index]))[0]
             group.add_nanome_complex(comp)
+            # align complex to mapmesh
+            mesh_complex = group.map_mesh.mesh_complex
+            comp.position = mesh_complex.position
+            comp.rotation = mesh_complex.rotation
+            comp.locked = True
+            comp.boxed = False
+            self.update_structures_deep([comp])
 
     async def create_mapgroup_for_file(self, map_gz_filepath):
         path, ext = os.path.splitext(map_gz_filepath)

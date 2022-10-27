@@ -44,6 +44,7 @@ class MapMesh:
         if not self.mesh_complex:
             self.mesh_complex = create_hidden_complex(os.path.basename(self.map_gz_file))
             self.mesh_complex.boxed = True
+            self.mesh_complex.locked = True
             [self.mesh_complex] = await self._plugin.add_to_workspace([self.mesh_complex])
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
@@ -207,6 +208,7 @@ class MapGroup:
         if self.mesh is not None:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
+            await self.mesh.upload()
 
     async def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
@@ -499,7 +501,7 @@ class ViewportEditor:
         map_complex = next(c for c in complexes if c.index == self.map_group.nanome_complex.index)
 
         if edit:
-            # create viewport sphere and position at current map position  
+            # create viewport sphere and position at current map position
             comp_name = self.map_group.nanome_complex.name + ' (viewport)'
             self.complex = create_hidden_complex(comp_name)
 
