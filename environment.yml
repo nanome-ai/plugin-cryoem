@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - cctbx-base
+  - openbabel=3.1.1
   - pip
   - pip:
       - nanome==0.38.7

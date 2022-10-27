@@ -1,9 +1,10 @@
 import os
 import tempfile
-import time
+from pathlib import Path
 
 import nanome
 from nanome.util import Logs, enums, async_callback
+from nanome.api import structure
 from .menu import MainMenu, SearchMenu
 from .models import MapGroup
 
@@ -33,12 +34,10 @@ class CryoEM(nanome.AsyncPluginInstance):
         group = next(iter(self.groups.values()), None)
         if group:
             group.add_pdb(filepath)
-        self.send_files_to_load([filepath])
         # Get new complex, and associate to MapGroup
+        comp = structure.Complex.io.from_pdb(path=filepath)
+        comp.name = Path(filepath).stem
         if group:
-            time.sleep(3)  # Give time for PDB to load
-            shallow_comp = (await self.request_complex_list())[-1]
-            comp = (await self.request_complexes([shallow_comp.index]))[0]
             group.add_nanome_complex(comp)
             # align complex to mapmesh
             mesh_complex = group.map_mesh.mesh_complex
@@ -46,7 +45,8 @@ class CryoEM(nanome.AsyncPluginInstance):
             comp.rotation = mesh_complex.rotation
             comp.locked = True
             comp.boxed = False
-            self.update_structures_deep([comp])
+            await self.add_bonds([comp])
+        await self.add_to_workspace([comp])
 
     async def create_mapgroup_for_file(self, map_gz_filepath):
         path, ext = os.path.splitext(map_gz_filepath)
