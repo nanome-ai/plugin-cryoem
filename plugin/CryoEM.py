@@ -32,18 +32,18 @@ class CryoEM(nanome.AsyncPluginInstance):
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
         group = next(iter(self.groups.values()), None)
-        if group:
-            group.add_pdb(filepath)
-        # Get new complex, and associate to MapGroup
         comp = structure.Complex.io.from_pdb(path=filepath)
+        # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
-        # align complex to mapmesh
-        mesh_complex = group.map_mesh.complex
-        comp.position = mesh_complex.position
-        comp.rotation = mesh_complex.rotation
-        comp.locked = True
-        comp.boxed = False
+        if group:
+            group.add_pdb(filepath)
+            # align complex to mapmesh
+            mesh_complex = group.map_mesh.complex
+            comp.position = mesh_complex.position
+            comp.rotation = mesh_complex.rotation
+            comp.locked = True
+            comp.boxed = False
         [created_comp] = await self.add_to_workspace([comp])
         if group:
             group.add_model_complex(created_comp)
@@ -56,15 +56,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         await group.add_map_gz(map_gz_filepath)
         self.groups[group_name] = group
         self.menu.render()
-
-    async def render_mesh(self, map_group: MapGroup):
-        self.set_plugin_list_button(enums.PluginListButtonType.run, "Running...", False)
-        Logs.message(f"Generating iso-surface for iso-value {round(map_group.isovalue, 3)}")
-        mesh = map_group.generate_mesh()
-        Logs.message(f"Uploading iso-surface ({len(mesh.vertices)} vertices)")
-        await mesh.upload()
-        Logs.message("Uploading completed")
-        self.set_plugin_list_button(enums.PluginListButtonType.run, "Run", True)
 
     async def load_map_and_model(self):
         """Function for development that loads a map and model from the fixtures folder.
