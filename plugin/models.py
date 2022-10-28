@@ -11,6 +11,8 @@ from typing import List
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
+from mmtbx.model.model import manager
+
 from matplotlib import cm
 from scipy.spatial import KDTree
 
@@ -152,7 +154,6 @@ class MapGroup:
         self.group_name: str = kwargs.get("group_name", [])
         self.files: List[str] = kwargs.get("files", [])
         self.mesh = shapes.Mesh()
-        self._map_voxel_size = None
 
         self.hist_x_min = 0.0
         self.hist_x_max = 1.0
@@ -163,9 +164,9 @@ class MapGroup:
         self.opacity = 0.65
         self.radius = 15
         self.color_scheme = enums.ColorScheme.Element
-        self.wireframe_mode = False
+        self.wireframe_mode: bool = False
 
-        self._model = None
+        self._model: manager = None
         self.__model_complex: structure.Complex = None
 
     @property
@@ -214,7 +215,7 @@ class MapGroup:
         self.opacity = opacity
         self.color_scheme = color_scheme
         if self.mesh is not None:
-            self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+            self.map_mesh.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
 
     async def generate_mesh(self):
