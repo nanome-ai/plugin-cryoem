@@ -257,7 +257,7 @@ class MapGroup:
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
         if not self.model_complex:
-            Logs.warning("No model set to color by. Returning")
+            Logs.debug("No model set to color by. Returning")
             return
         comp = self.model_complex
         if scheme == enums.ColorScheme.Element:
