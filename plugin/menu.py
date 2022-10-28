@@ -153,6 +153,7 @@ class SearchMenu:
 
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
+        # return 'tests/fixtures/emd_30288.map.gz'  # Use this when emdb starts timing out.
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
@@ -306,7 +307,6 @@ class EditMeshMenu:
                 item.selected = False
 
         # Generate histogram
-        # if len(map_group.files) > 1:
         img_filepath = map_group.generate_histogram(self.temp_dir)
         self.img_histogram.file_path = img_filepath
 
