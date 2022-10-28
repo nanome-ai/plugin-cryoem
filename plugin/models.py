@@ -30,7 +30,7 @@ class MapMesh:
         self.map_gz_file: str = map_gz_file
         self._plugin = plugin
         self.mesh_complex: structure.Complex = None
-        self.mesh: shapes.Mesh = None
+        self.mesh: shapes.Mesh = shapes.Mesh()
         self.map_manager: map_manager = None
         self.wireframe_mode: bool = False
         self.wireframe_vertices: List[float] = []
@@ -45,7 +45,7 @@ class MapMesh:
                     mrc_file.write(f.read())
                     self.map_manager = dm.get_real_map(mrc_filepath)
             map_data = self.map_manager.map_data().as_numpy_array()
-        self.mesh = self._generate_mesh(map_data, isovalue, opacity, radius, position)
+        self._generate_mesh(map_data, isovalue, opacity, radius, position)
         if not self.mesh_complex:
             self.mesh_complex = create_hidden_complex(os.path.basename(self.map_gz_file))
             self.mesh_complex.boxed = True
@@ -81,22 +81,20 @@ class MapMesh:
             voxel_size = np.array(voxel_sizes)
             vertices *= voxel_size
 
-        if not hasattr(self, 'mesh') or not self.mesh:
-            self.mesh = shapes.Mesh()
-        self.computed_vertices = np.array(vertices)
-        self.computed_normals = np.array(normals)
-        self.computed_triangles = np.array(triangles)
+        computed_vertices = np.array(vertices)
+        computed_normals = np.array(normals)
+        computed_triangles = np.array(triangles)
         Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
-            self.computed_vertices, self.computed_normals, self.computed_triangles, radius, position)
+            computed_vertices, computed_normals, computed_triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
         self.mesh.triangles = triangles.flatten()
 
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+        self.mesh.upload()
         Logs.message("Mesh generated")
-        return self.mesh
 
     def limit_view(self, vertices, normals, triangles, radius, position):
         if radius <= 0:
@@ -136,13 +134,23 @@ class MapMesh:
             np.asarray(new_triangles),
         )
 
+    @property
+    def computed_vertices(self):
+        # break up vertices list into list of lists
+        if hasattr(self, 'mesh') and self.mesh:
+            return np.asarray([
+                self.mesh.vertices[x:x + 3]
+                for x in range(0, len(self.mesh.vertices), 3)
+            ])
+
 
 class MapGroup:
+    """Aggregates a MapMesh and its associated model complex."""
 
     def __init__(self, plugin, **kwargs):
         self._plugin = plugin
-        self.group_name = kwargs.get("group_name", [])
-        self.files = kwargs.get("files", [])
+        self.group_name: str = kwargs.get("group_name", [])
+        self.files: List[str] = kwargs.get("files", [])
         self.mesh = shapes.Mesh()
         self._map_voxel_size = None
 
@@ -167,11 +175,8 @@ class MapGroup:
     @property
     def computed_vertices(self):
         # break up vertices list into list of lists
-        if hasattr(self, 'mesh') and self.mesh:
-            return np.asarray([
-                self.mesh.vertices[x:x + 3]
-                for x in range(0, len(self.mesh.vertices), 3)
-            ])
+        Logs.warning("Accessing computed vertices from MapGroup")
+        return self.map_mesh.computed_vertices
 
     def add_pdb(self, pdb_file):
         dm = DataManager()
@@ -187,7 +192,6 @@ class MapGroup:
         self.__model_complex = comp
         if self.map_mesh.mesh:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
-            self.map_mesh.mesh.upload()
 
     def generate_histogram(self, temp_dir: str):
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -212,7 +216,6 @@ class MapGroup:
         if self.mesh is not None:
             self.mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
-            await self.mesh.upload()
 
     async def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
@@ -233,9 +236,10 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
 
     def color_by_scheme(self, map_mesh, scheme):
-        if not self.model_complex:
-            return
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
+        if not self.model_complex:
+            Logs.warning("No model set to color by. Returning")
+            return
         comp = self.model_complex
         if scheme == enums.ColorScheme.Element:
             self.color_by_element(map_mesh, comp)
@@ -243,6 +247,7 @@ class MapGroup:
             self.color_by_bfactor(map_mesh, comp)
         elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain(map_mesh, comp)
+        map_mesh.mesh.upload()
         Logs.message("Mesh colored")
 
     def color_by_element(self, map_mesh, comp):
@@ -357,135 +362,135 @@ class MapGroup:
                 colors += [0.0, 0.0, 0.0, 1.0]
         mesh.colors = np.array(colors)
 
-    def toggle_wireframe_mode(self, toggle: bool):
-        self.wireframe_mode = toggle
-        if not self.mesh:
-            return
-        if toggle:
-            wire_vertices, wire_normals, wire_triangles = self.wireframe_mesh()
-            self.mesh.vertices = wire_vertices.flatten()
-            self.mesh.triangles = wire_triangles.flatten()
-        else:
-            self.mesh.vertices = np.asarray(self.computed_vertices).flatten()
-            self.mesh.triangles = np.asarray(self.computed_triangles).flatten()
+    # def toggle_wireframe_mode(self, toggle: bool):
+    #     self.wireframe_mode = toggle
+    #     if not self.mesh:
+    #         return
+    #     if toggle:
+    #         wire_vertices, wire_normals, wire_triangles = self.wireframe_mesh()
+    #         self.mesh.vertices = wire_vertices.flatten()
+    #         self.mesh.triangles = wire_triangles.flatten()
+    #     else:
+    #         self.mesh.vertices = np.asarray(self.computed_vertices).flatten()
+    #         self.mesh.triangles = np.asarray(self.computed_triangles).flatten()
 
-    def wireframe_mesh(self, wiresize=0.03):
-        ntri = len(self.computed_triangles) * 3
-        new_verts = np.zeros((ntri * 4, 3))
-        new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
-        new_norms = np.zeros((ntri * 4, 3))
-        # new_cols = np.zeros((ntri * 4, 3))
-        for i in range(int(ntri / 3)):
-            t1 = self.computed_triangles[i][0]
-            t2 = self.computed_triangles[i][1]
-            t3 = self.computed_triangles[i][2]
+    # def wireframe_mesh(self, wiresize=0.03):
+    #     ntri = len(self.computed_triangles) * 3
+    #     new_verts = np.zeros((ntri * 4, 3))
+    #     new_tris = np.zeros((ntri * 4, 3), dtype=np.int32)
+    #     new_norms = np.zeros((ntri * 4, 3))
+    #     # new_cols = np.zeros((ntri * 4, 3))
+    #     for i in range(int(ntri / 3)):
+    #         t1 = self.computed_triangles[i][0]
+    #         t2 = self.computed_triangles[i][1]
+    #         t3 = self.computed_triangles[i][2]
 
-            if t1 == t2 or t2 == t3 or t1 == t3:
-                continue
+    #         if t1 == t2 or t2 == t3 or t1 == t3:
+    #             continue
 
-            v1 = np.array(self.computed_vertices[t1])
-            v2 = np.array(self.computed_vertices[t2])
-            v3 = np.array(self.computed_vertices[t3])
+    #         v1 = np.array(self.computed_vertices[t1])
+    #         v2 = np.array(self.computed_vertices[t2])
+    #         v3 = np.array(self.computed_vertices[t3])
 
-            n1 = np.array(self.computed_normals[t1])
-            n2 = np.array(self.computed_normals[t2])
-            n3 = np.array(self.computed_normals[t3])
+    #         n1 = np.array(self.computed_normals[t1])
+    #         n2 = np.array(self.computed_normals[t2])
+    #         n3 = np.array(self.computed_normals[t3])
 
-            v1v2 = v2 - v1
-            v2v3 = v3 - v2
-            v3v1 = v1 - v3
+    #         v1v2 = v2 - v1
+    #         v2v3 = v3 - v2
+    #         v3v1 = v1 - v3
 
-            sidev1 = np.linalg.norm(np.cross(v1v2, n1))
-            sidev2 = np.linalg.norm(np.cross(v2v3, n2))
-            sidev3 = np.linalg.norm(np.cross(v3v1, n3))
+    #         sidev1 = np.linalg.norm(np.cross(v1v2, n1))
+    #         sidev2 = np.linalg.norm(np.cross(v2v3, n2))
+    #         sidev3 = np.linalg.norm(np.cross(v3v1, n3))
 
-            newId = i * 3 * 4
-            newIdT = i * 6 * 2
+    #         newId = i * 3 * 4
+    #         newIdT = i * 6 * 2
 
-            new_verts[newId + 0] = v1 + sidev1 * wiresize
-            new_verts[newId + 1] = v1 - sidev1 * wiresize
-            new_verts[newId + 2] = v2 + sidev1 * wiresize
-            new_verts[newId + 3] = v2 - sidev1 * wiresize
+    #         new_verts[newId + 0] = v1 + sidev1 * wiresize
+    #         new_verts[newId + 1] = v1 - sidev1 * wiresize
+    #         new_verts[newId + 2] = v2 + sidev1 * wiresize
+    #         new_verts[newId + 3] = v2 - sidev1 * wiresize
 
-            new_verts[newId + 4] = v2 + sidev2 * wiresize
-            new_verts[newId + 5] = v2 - sidev2 * wiresize
-            new_verts[newId + 6] = v3 + sidev2 * wiresize
-            new_verts[newId + 7] = v3 - sidev2 * wiresize
+    #         new_verts[newId + 4] = v2 + sidev2 * wiresize
+    #         new_verts[newId + 5] = v2 - sidev2 * wiresize
+    #         new_verts[newId + 6] = v3 + sidev2 * wiresize
+    #         new_verts[newId + 7] = v3 - sidev2 * wiresize
 
-            new_verts[newId + 8] = v3 + sidev3 * wiresize
-            new_verts[newId + 9] = v3 - sidev3 * wiresize
-            new_verts[newId + 10] = v1 + sidev3 * wiresize
-            new_verts[newId + 11] = v1 - sidev3 * wiresize
+    #         new_verts[newId + 8] = v3 + sidev3 * wiresize
+    #         new_verts[newId + 9] = v3 - sidev3 * wiresize
+    #         new_verts[newId + 10] = v1 + sidev3 * wiresize
+    #         new_verts[newId + 11] = v1 - sidev3 * wiresize
 
-            new_norms[newId + 0] = n1
-            # new_cols[newId + 0] = cols[t1]
-            new_norms[newId + 1] = n1
-            # new_cols[newId + 1] = cols[t1]
-            new_norms[newId + 2] = n2
-            # new_cols[newId + 2] = cols[t2]
-            new_norms[newId + 3] = n2
-            # new_cols[newId + 3] = cols[t2]
+    #         new_norms[newId + 0] = n1
+    #         # new_cols[newId + 0] = cols[t1]
+    #         new_norms[newId + 1] = n1
+    #         # new_cols[newId + 1] = cols[t1]
+    #         new_norms[newId + 2] = n2
+    #         # new_cols[newId + 2] = cols[t2]
+    #         new_norms[newId + 3] = n2
+    #         # new_cols[newId + 3] = cols[t2]
 
-            new_norms[newId + 4] = n2
-            # new_cols[newId + 4] = cols[t2]
-            new_norms[newId + 5] = n2
-            # new_cols[newId + 5] = cols[t2]
-            new_norms[newId + 6] = n3
-            # new_cols[newId + 6] = cols[t3]
-            new_norms[newId + 7] = n3
-            # new_cols[newId + 7] = cols[t3]
+    #         new_norms[newId + 4] = n2
+    #         # new_cols[newId + 4] = cols[t2]
+    #         new_norms[newId + 5] = n2
+    #         # new_cols[newId + 5] = cols[t2]
+    #         new_norms[newId + 6] = n3
+    #         # new_cols[newId + 6] = cols[t3]
+    #         new_norms[newId + 7] = n3
+    #         # new_cols[newId + 7] = cols[t3]
 
-            new_norms[newId + 8] = n3
-            # new_cols[newId + 8] = cols[t3]
-            new_norms[newId + 9] = n3
-            # new_cols[newId + 9] = cols[t3]
-            new_norms[newId + 10] = n1
-            # new_cols[newId + 10] = cols[t1]
-            new_norms[newId + 11] = n1
-            # new_cols[newId + 11] = cols[t1]
+    #         new_norms[newId + 8] = n3
+    #         # new_cols[newId + 8] = cols[t3]
+    #         new_norms[newId + 9] = n3
+    #         # new_cols[newId + 9] = cols[t3]
+    #         new_norms[newId + 10] = n1
+    #         # new_cols[newId + 10] = cols[t1]
+    #         new_norms[newId + 11] = n1
+    #         # new_cols[newId + 11] = cols[t1]
 
-            new_tris[newIdT][0] = newId
-            new_tris[newIdT + 6] = newId + 1
-            new_tris[newIdT][1] = newId + 1
-            new_tris[newIdT + 6] = newId + 0
-            new_tris[newIdT][2] = newId + 2
-            new_tris[newIdT + 6] = newId + 2
+    #         new_tris[newIdT][0] = newId
+    #         new_tris[newIdT + 6] = newId + 1
+    #         new_tris[newIdT][1] = newId + 1
+    #         new_tris[newIdT + 6] = newId + 0
+    #         new_tris[newIdT][2] = newId + 2
+    #         new_tris[newIdT + 6] = newId + 2
 
-            new_tris[newIdT + 1][0] = newId + 1
-            new_tris[newIdT + 7] = newId + 3
-            new_tris[newIdT + 1][1] = newId + 3
-            new_tris[newIdT + 7] = newId + 1
-            new_tris[newIdT + 1][2] = newId + 2
-            new_tris[newIdT + 7] = newId + 2
+    #         new_tris[newIdT + 1][0] = newId + 1
+    #         new_tris[newIdT + 7] = newId + 3
+    #         new_tris[newIdT + 1][1] = newId + 3
+    #         new_tris[newIdT + 7] = newId + 1
+    #         new_tris[newIdT + 1][2] = newId + 2
+    #         new_tris[newIdT + 7] = newId + 2
 
-            new_tris[newIdT + 2][0] = newId + 4
-            new_tris[newIdT + 8][0] = newId + 5
-            new_tris[newIdT + 2][1] = newId + 5
-            new_tris[newIdT + 8][1] = newId + 4
-            new_tris[newIdT + 2][2] = newId + 6
-            new_tris[newIdT + 8][2] = newId + 6
+    #         new_tris[newIdT + 2][0] = newId + 4
+    #         new_tris[newIdT + 8][0] = newId + 5
+    #         new_tris[newIdT + 2][1] = newId + 5
+    #         new_tris[newIdT + 8][1] = newId + 4
+    #         new_tris[newIdT + 2][2] = newId + 6
+    #         new_tris[newIdT + 8][2] = newId + 6
 
-            new_tris[newIdT + 3][0] = newId + 5
-            new_tris[newIdT + 9][0] = newId + 7
-            new_tris[newIdT + 3][1] = newId + 7
-            new_tris[newIdT + 9][1] = newId + 5
-            new_tris[newIdT + 3][2] = newId + 6
-            new_tris[newIdT + 9][2] = newId + 6
+    #         new_tris[newIdT + 3][0] = newId + 5
+    #         new_tris[newIdT + 9][0] = newId + 7
+    #         new_tris[newIdT + 3][1] = newId + 7
+    #         new_tris[newIdT + 9][1] = newId + 5
+    #         new_tris[newIdT + 3][2] = newId + 6
+    #         new_tris[newIdT + 9][2] = newId + 6
 
-            new_tris[newIdT + 4][0] = newId + 8
-            new_tris[newIdT + 10][0] = newId + 9
-            new_tris[newIdT + 4][1] = newId + 9
-            new_tris[newIdT + 10][1] = newId + 8
-            new_tris[newIdT + 4][2] = newId + 10
-            new_tris[newIdT + 10][2] = newId + 10
+    #         new_tris[newIdT + 4][0] = newId + 8
+    #         new_tris[newIdT + 10][0] = newId + 9
+    #         new_tris[newIdT + 4][1] = newId + 9
+    #         new_tris[newIdT + 10][1] = newId + 8
+    #         new_tris[newIdT + 4][2] = newId + 10
+    #         new_tris[newIdT + 10][2] = newId + 10
 
-            new_tris[newIdT + 5][0] = newId + 9
-            new_tris[newIdT + 11][0] = newId + 11
-            new_tris[newIdT + 5][1] = newId + 11
-            new_tris[newIdT + 11][1] = newId + 9
-            new_tris[newIdT + 5][2] = newId + 10
-            new_tris[newIdT + 11][2] = newId + 10
-        return (new_verts, new_norms, new_tris)
+    #         new_tris[newIdT + 5][0] = newId + 9
+    #         new_tris[newIdT + 11][0] = newId + 11
+    #         new_tris[newIdT + 5][1] = newId + 11
+    #         new_tris[newIdT + 11][1] = newId + 9
+    #         new_tris[newIdT + 5][2] = newId + 10
+    #         new_tris[newIdT + 11][2] = newId + 10
+    #     return (new_verts, new_norms, new_tris)
 
 
 class ViewportEditor:
@@ -504,7 +509,7 @@ class ViewportEditor:
             return
         self.is_editing = edit
         complexes = await self.plugin.request_complex_list()
-        map_complex = next(c for c in complexes if c.index == self.map_group.model_complex.index)
+        map_complex = next(c for c in complexes if c.index == self.map_group.map_mesh.mesh_complex.index)
 
         if edit:
             Logs.debug("Creating Viewport...")
@@ -545,7 +550,6 @@ class ViewportEditor:
             self.map_group.position = [*vp_position]
 
             # unlock map position
-            map_complex.locked = False
             map_complex.boxed = False
             self.plugin.update_structures_shallow([map_complex])
 
