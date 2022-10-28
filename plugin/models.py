@@ -7,7 +7,9 @@ import mcubes
 import numpy as np
 import pyfqmr
 import randomcolor
+from typing import List
 from iotbx.data_manager import DataManager
+from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
 from matplotlib import cm
 from scipy.spatial import KDTree
@@ -20,15 +22,18 @@ from .utils import cpk_colors, create_hidden_complex
 
 
 class MapMesh:
+    """Manages generated map from .map.gz file and renders as Mesh in workspace.
 
+    Mesh is attached to a hidden complex, so that it is movable and scalable on its own.
+    """
     def __init__(self, map_gz_file, plugin):
         self.map_gz_file: str = map_gz_file
         self._plugin = plugin
         self.mesh_complex: structure.Complex = None
         self.mesh: shapes.Mesh = None
-        self.map_manager = None
-        self.wireframe_mode = False
-        self.wireframe_vertices = []
+        self.map_manager: map_manager = None
+        self.wireframe_mode: bool = False
+        self.wireframe_vertices: List[float] = []
 
     async def load(self, isovalue, opacity, radius, position, map_data=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -139,7 +144,6 @@ class MapGroup:
         self.group_name = kwargs.get("group_name", [])
         self.files = kwargs.get("files", [])
         self.mesh = shapes.Mesh()
-        self.nanome_complex = None
         self._map_voxel_size = None
 
         self.hist_x_min = 0.0
@@ -154,11 +158,11 @@ class MapGroup:
         self.wireframe_mode = False
 
         self._model = None
-        self._map_manager = None
+        self.__model_complex: structure.Complex = None
 
     @property
-    def _map_origin(self):
-        return self._map_manager.origin
+    def model_complex(self):
+        return self.__model_complex
 
     @property
     def computed_vertices(self):
@@ -179,8 +183,8 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position)
         self.map_mesh.mesh.upload()
 
-    def add_nanome_complex(self, comp):
-        self.nanome_complex = comp
+    def add_model_complex(self, comp):
+        self.__model_complex = comp
         if self.map_mesh.mesh:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
             self.map_mesh.mesh.upload()
@@ -229,10 +233,10 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
 
     def color_by_scheme(self, map_mesh, scheme):
-        if not self.nanome_complex:
+        if not self.model_complex:
             return
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
-        comp = self.nanome_complex
+        comp = self.model_complex
         if scheme == enums.ColorScheme.Element:
             self.color_by_element(map_mesh, comp)
         elif scheme == enums.ColorScheme.BFactor:
@@ -495,26 +499,29 @@ class ViewportEditor:
         self.sphere = None
 
     async def toggle_edit(self, edit):
+        if not self.map_group.model_complex:
+            Logs.warning("No model complex found")
+            return
         self.is_editing = edit
-
         complexes = await self.plugin.request_complex_list()
-        map_complex = next(c for c in complexes if c.index == self.map_group.nanome_complex.index)
+        map_complex = next(c for c in complexes if c.index == self.map_group.model_complex.index)
 
         if edit:
+            Logs.debug("Creating Viewport...")
             # create viewport sphere and position at current map position
-            comp_name = self.map_group.nanome_complex.name + ' (viewport)'
+            comp_name = self.map_group.model_complex.name + ' (viewport)'
             self.complex = create_hidden_complex(comp_name)
 
             # calculate viewport position
             c_to_w = map_complex.get_complex_to_workspace_matrix()
-            complex.position = c_to_w * Vector3(*self.map_group.position)
+            self.complex.position = c_to_w * Vector3(*self.map_group.position)
 
             # lock map position
             map_complex.locked = True
             self.plugin.update_structures_shallow([map_complex])
 
-            res = await self.plugin.add_to_workspace([complex])
-            complex.index = res[0].index
+            res = await self.plugin.add_to_workspace([self.complex])
+            self.complex.index = res[0].index
 
             # create viewport sphere
             sphere = shapes.Sphere()
@@ -524,8 +531,9 @@ class ViewportEditor:
 
             anchor = sphere.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = complex.index
+            anchor.target = self.complex.index
             sphere.upload()
+            Logs.debug("Viewport created")
 
         else:
             # get viewport position, transform into map space and set map position

@@ -37,16 +37,16 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Get new complex, and associate to MapGroup
         comp = structure.Complex.io.from_pdb(path=filepath)
         comp.name = Path(filepath).stem
+        await self.add_bonds([comp])
+        # align complex to mapmesh
+        mesh_complex = group.map_mesh.mesh_complex
+        comp.position = mesh_complex.position
+        comp.rotation = mesh_complex.rotation
+        comp.locked = True
+        comp.boxed = False
+        [created_comp] = await self.add_to_workspace([comp])
         if group:
-            group.add_nanome_complex(comp)
-            # align complex to mapmesh
-            mesh_complex = group.map_mesh.mesh_complex
-            comp.position = mesh_complex.position
-            comp.rotation = mesh_complex.rotation
-            comp.locked = True
-            comp.boxed = False
-            await self.add_bonds([comp])
-        await self.add_to_workspace([comp])
+            group.add_model_complex(created_comp)
 
     async def create_mapgroup_for_file(self, map_gz_filepath):
         path, ext = os.path.splitext(map_gz_filepath)
@@ -87,7 +87,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         await self.send_files_to_load([pdb_file])
         shallow_comp = (await self.request_complex_list())[0]
         comp = (await self.request_complexes([shallow_comp.index]))[0]
-        map_group.add_nanome_complex(comp)
+        map_group.add_model_complex(comp)
         mesh = map_group.generate_mesh()
         anchor = mesh.anchors[0]
         anchor.anchor_type = enums.ShapeAnchorType.Complex
