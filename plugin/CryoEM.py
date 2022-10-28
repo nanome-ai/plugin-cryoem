@@ -86,6 +86,16 @@ class CryoEM(nanome.AsyncPluginInstance):
         await mesh.upload()
         return map_group
 
+    async def delete_mapgroup(self, map_group: MapGroup):
+        map_comp = map_group.map_mesh.complex
+        model_comp = map_group.model_complex
+        comps_to_delete = [map_comp]
+        if model_comp:
+            comps_to_delete.append(model_comp)
+        await self.remove_from_workspace(comps_to_delete)
+        del self.groups[map_group.group_name]
+        self.menu.render()
+
 
 def main():
     plugin = nanome.Plugin(

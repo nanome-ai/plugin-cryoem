@@ -74,9 +74,10 @@ class MainMenu:
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
-    def delete_group(self, map_group, btn):
-        Logs.message('Deleting group')
-        # TODO
+    @async_callback
+    async def delete_group(self, map_group, btn):
+        Logs.message(f'Deleting group {map_group.group_name}')
+        await self._plugin.delete_mapgroup(map_group)
 
     def toggle_group(self, map_group, btn: ui.Button):
         Logs.message('Toggling group')
@@ -84,7 +85,7 @@ class MainMenu:
         btn.icon.value.set_all(
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
         self._plugin.update_content(btn)
-        # TODO
+        self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
 
 class SearchMenu:

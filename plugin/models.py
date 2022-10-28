@@ -179,7 +179,7 @@ class MapGroup:
         self.hist_x_min = 0.0
         self.hist_x_max = 1.0
 
-        self.visible = True
+        self.__visible = True
         self.position = [0.0, 0.0, 0.0]
         self.isovalue = 2.5
         self.opacity = 0.65
@@ -202,6 +202,7 @@ class MapGroup:
         # Unpack map.gz
         self.map_mesh = MapMesh(map_gz_file, self._plugin)
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
 
     def add_model_complex(self, comp):
@@ -250,6 +251,7 @@ class MapGroup:
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -374,6 +376,16 @@ class MapGroup:
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
         map_mesh.colors = np.array(colors)
+
+    @property
+    def visible(self):
+        return self.__visible
+
+    @visible.setter
+    def visible(self, value):
+        self.__visible = value
+        self.map_mesh.complex.visible = value
+        self.model_complex.visible = value
 
 
 class ViewportEditor:
