@@ -31,11 +31,30 @@ class MapMesh:
     def __init__(self, map_gz_file, plugin):
         self.map_gz_file: str = map_gz_file
         self._plugin = plugin
-        self.mesh_complex: structure.Complex = None
+        self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.map_manager: map_manager = None
         self.wireframe_mode: bool = False
         self.wireframe_vertices: List[float] = []
+
+    @property
+    def color(self):
+        return self.mesh.color
+
+    @color.setter
+    def color(self, value: Color):
+        self.mesh.color = value
+
+    @property
+    def colors(self):
+        return self.mesh.colors
+
+    @colors.setter
+    def colors(self, value: Color):
+        self.mesh.colors = value
+
+    def upload(self):
+        self.mesh.upload()
 
     async def load(self, isovalue, opacity, radius, position, map_data=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -48,14 +67,14 @@ class MapMesh:
                     self.map_manager = dm.get_real_map(mrc_filepath)
             map_data = self.map_manager.map_data().as_numpy_array()
         self._generate_mesh(map_data, isovalue, opacity, radius, position)
-        if not self.mesh_complex:
-            self.mesh_complex = create_hidden_complex(os.path.basename(self.map_gz_file))
-            self.mesh_complex.boxed = True
-            self.mesh_complex.locked = True
-            [self.mesh_complex] = await self._plugin.add_to_workspace([self.mesh_complex])
+        if not self.complex:
+            self.complex = create_hidden_complex(os.path.basename(self.map_gz_file))
+            self.complex.boxed = True
+            self.complex.locked = True
+            [self.complex] = await self._plugin.add_to_workspace([self.complex])
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = self.mesh_complex.index
+            anchor.target = self.complex.index
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")
@@ -187,7 +206,7 @@ class MapGroup:
         # Unpack map.gz
         self.map_mesh = MapMesh(map_gz_file, self._plugin)
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position)
-        self.map_mesh.mesh.upload()
+        self.map_mesh.upload()
 
     def add_model_complex(self, comp):
         self.__model_complex = comp
@@ -215,7 +234,7 @@ class MapGroup:
         self.opacity = opacity
         self.color_scheme = color_scheme
         if self.mesh is not None:
-            self.map_mesh.mesh.color = Color(255, 255, 255, int(opacity * 255))
+            self.map_mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
 
     async def generate_mesh(self):
@@ -251,14 +270,13 @@ class MapGroup:
         map_mesh.mesh.upload()
         Logs.message("Mesh colored")
 
-    def color_by_element(self, map_mesh, comp):
-        mesh = map_mesh.mesh
+    def color_by_element(self, map_mesh, model_complex):
         verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
         atom_positions = []
         atoms = []
-        for a in comp.atoms:
+        for a in model_complex.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
@@ -270,15 +288,14 @@ class MapGroup:
                 colors += cpk_colors(atoms[i])
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
-        mesh.colors = np.array(colors)
+        map_mesh.colors = np.array(colors)
 
-    def color_by_chain(self, map_mesh, comp):
-        mesh = map_mesh.mesh
+    def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
 
-        molecule = comp._molecules[comp.current_frame]
+        molecule = model_complex.molecules[model_complex.current_frame]
         n_chain = len(list(molecule.chains))
 
         rdcolor = randomcolor.RandomColor(seed=1234)
@@ -301,12 +318,12 @@ class MapGroup:
         if n_chain == 1:
             for i in range(len(verts)):
                 colors += color_per_atom[0]
-            mesh.colors = np.array(colors)
+            map_mesh.colors = np.array(colors)
             return
 
         atom_positions = []
         atoms = []
-        for a in comp.atoms:
+        for a in model_complex.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
@@ -321,10 +338,9 @@ class MapGroup:
                 colors += color_per_atom[i]
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
-        mesh.colors = np.array(colors)
+        map_mesh.colors = np.array(colors)
 
-    def color_by_bfactor(self, map_mesh, comp):
-        mesh = map_mesh.mesh
+    def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
         if len(verts) < 3:
             return
@@ -335,7 +351,7 @@ class MapGroup:
 
         atom_positions = []
         atoms = []
-        for a in comp.atoms:
+        for a in model_complex.atoms:
             atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
@@ -361,7 +377,7 @@ class MapGroup:
                 colors += colors_rainbow[int(id_color)]
             else:
                 colors += [0.0, 0.0, 0.0, 1.0]
-        mesh.colors = np.array(colors)
+        map_mesh.colors = np.array(colors)
 
     # def toggle_wireframe_mode(self, toggle: bool):
     #     self.wireframe_mode = toggle
@@ -504,13 +520,17 @@ class ViewportEditor:
         self.complex = None
         self.sphere = None
 
-    async def toggle_edit(self, edit):
+    async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
             Logs.warning("No model complex found")
             return
         self.is_editing = edit
+        # Get latest position for map_mesh complex
+        map_mesh_comp = self.map_group.map_mesh.complex
         complexes = await self.plugin.request_complex_list()
-        map_complex = next(c for c in complexes if c.index == self.map_group.map_mesh.mesh_complex.index)
+        mesh_complex = next(
+            c for c in complexes
+            if c.index == map_mesh_comp.index)
 
         if edit:
             Logs.debug("Creating Viewport...")
@@ -519,12 +539,12 @@ class ViewportEditor:
             self.complex = create_hidden_complex(comp_name)
 
             # calculate viewport position
-            c_to_w = map_complex.get_complex_to_workspace_matrix()
+            c_to_w = mesh_complex.get_complex_to_workspace_matrix()
             self.complex.position = c_to_w * Vector3(*self.map_group.position)
 
-            # lock map position
-            map_complex.locked = True
-            self.plugin.update_structures_shallow([map_complex])
+            # lock mesh position
+            mesh_complex.locked = True
+            self.plugin.update_structures_shallow([mesh_complex])
 
             res = await self.plugin.add_to_workspace([self.complex])
             self.complex.index = res[0].index
@@ -546,13 +566,11 @@ class ViewportEditor:
             vp_complex = next(c for c in complexes if c.index == self.complex.index)
 
             # calculate viewport position
-            w_to_c = map_complex.get_workspace_to_complex_matrix()
+            w_to_c = mesh_complex.get_workspace_to_complex_matrix()
             vp_position = w_to_c * vp_complex.position
             self.map_group.position = [*vp_position]
-
-            # unlock map position
-            map_complex.boxed = False
-            self.plugin.update_structures_shallow([map_complex])
+            mesh_complex.boxed = False
+            self.plugin.update_structures_shallow([mesh_complex])
 
             # remove viewport sphere
             self.sphere.destroy()

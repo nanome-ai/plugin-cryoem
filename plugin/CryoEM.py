@@ -39,7 +39,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
         # align complex to mapmesh
-        mesh_complex = group.map_mesh.mesh_complex
+        mesh_complex = group.map_mesh.complex
         comp.position = mesh_complex.position
         comp.rotation = mesh_complex.rotation
         comp.locked = True
