@@ -29,6 +29,7 @@ class MapMesh:
     Mesh is attached to a hidden complex, so that it is movable and scalable on its own.
     Map mesh also exposes mesh attributes such as upload and color(s).
     """
+
     def __init__(self, map_gz_file, plugin):
         self.map_gz_file: str = map_gz_file
         self._plugin = plugin
