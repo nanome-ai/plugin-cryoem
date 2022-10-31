@@ -54,6 +54,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         group_name = os.path.basename(path)
         group = MapGroup(self, group_name=group_name)
         if isovalue:
+            Logs.debug(f"Setting isovalue to {isovalue}")
             group.isovalue = isovalue
         await group.add_map_gz(map_gz_filepath)
         self.groups[group_name] = group

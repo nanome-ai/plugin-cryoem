@@ -119,6 +119,7 @@ class MapMesh:
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
         self.mesh.upload()
         Logs.message("Mesh generated")
+        Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
     def limit_view(self, vertices, normals, triangles, radius, position):
         if radius <= 0:
