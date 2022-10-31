@@ -60,7 +60,7 @@ class MapGroupTestCase(unittest.TestCase):
         plugin_mock.add_to_workspace.return_value = asyncio.Future()
         with patch('plugin.models.MapGroup._plugin', plugin_mock) as m1:
             with patch('nanome.api.plugin_instance.PluginInstance._instance') as m2:
-                run_awaitable(validate_generate_mesh, self) 
+                run_awaitable(validate_generate_mesh, self)
         # run_awaitable(validate_generate_mesh, self)
 
     # def test_toggle_wireframe_mode(self):
