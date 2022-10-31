@@ -174,7 +174,7 @@ class MapGroup:
 
     def __init__(self, plugin, **kwargs):
         self._plugin = plugin
-        self.group_name: str = kwargs.get("group_name", [])
+        self.group_name: str = kwargs.get("group_name", "")
         self.files: List[str] = kwargs.get("files", [])
         self.mesh = shapes.Mesh()
 
