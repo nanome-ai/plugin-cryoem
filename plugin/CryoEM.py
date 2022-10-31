@@ -48,11 +48,13 @@ class CryoEM(nanome.AsyncPluginInstance):
         if group:
             group.add_model_complex(created_comp)
 
-    async def create_mapgroup_for_file(self, map_gz_filepath):
+    async def create_mapgroup_for_file(self, map_gz_filepath, isovalue=None):
         path, ext = os.path.splitext(map_gz_filepath)
         group = next(iter(self.groups.values()), None)
         group_name = os.path.basename(path)
         group = MapGroup(self, group_name=group_name)
+        if isovalue:
+            group.isovalue = isovalue
         await group.add_map_gz(map_gz_filepath)
         self.groups[group_name] = group
         self.menu.render()

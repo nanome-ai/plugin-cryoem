@@ -1,12 +1,13 @@
 import os
 import nanome
 import requests
+import xml.etree.ElementTree as ET
 from functools import partial
 from os import path
 from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
-
 from .models import MapGroup, ViewportEditor
+
 
 ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
@@ -136,7 +137,8 @@ class SearchMenu:
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        await self._plugin.create_mapgroup_for_file(map_file)
+        isovalue = self.get_preferred_isovalue(embid_id)
+        await self._plugin.create_mapgroup_for_file(map_file, isovalue)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -151,6 +153,26 @@ class SearchMenu:
         with open(file_path, 'wb') as f:
             f.write(response.content)
         return file_path
+
+    def get_preferred_isovalue(self, emdbid):
+        # Get the isovalue that is closest to the mean of the map data
+        # This is a hack to get a good isovalue for the map
+        Logs.message("Downloading EM metadata for EMDBID:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
+        response = requests.get(url)
+        # Parse xml and get resolution value
+        xml_root = ET.fromstring(response.content)
+        fr_ele = next(xml_root.iter("final_reconstruction"))
+        for child in fr_ele:
+            if child.tag == "resolution":
+                isovalue = child.text
+                break
+        try:
+            isovalue = float(isovalue)
+        except ValueError:
+            Logs.warning("Could not parse resolution value from XML")
+            isovalue = None
+        return isovalue
 
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
