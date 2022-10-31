@@ -1,4 +1,4 @@
-FROM continuumio/miniconda3:4.12.0
+FROM nanome/plugin-env
 
 ENV ARGS=''
 WORKDIR /app
