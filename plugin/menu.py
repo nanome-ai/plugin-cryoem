@@ -162,10 +162,11 @@ class SearchMenu:
         response = requests.get(url)
         # Parse xml and get resolution value
         xml_root = ET.fromstring(response.content)
-        fr_ele = next(xml_root.iter("final_reconstruction"))
-        for child in fr_ele:
-            if child.tag == "resolution":
-                isovalue = child.text
+        contour_list_ele = next(xml_root.iter("contour_list"))
+        for child in contour_list_ele:
+            if child.tag == "contour" and child.attrib["primary"].lower() == 'true':
+                level_ele = next(child.iter("level"))
+                isovalue = level_ele.text
                 break
         try:
             isovalue = float(isovalue)

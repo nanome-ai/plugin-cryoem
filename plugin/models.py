@@ -38,6 +38,15 @@ class MapMesh:
         self.map_manager: map_manager = None
         self.wireframe_mode: bool = False
         self.wireframe_vertices: List[float] = []
+        self._load_map_file()
+
+    def _load_map_file(self):
+        dm = DataManager()
+        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+            mrc_filepath = mrc_file.name
+            with gzip.open(self.map_gz_file, 'rb') as f:
+                mrc_file.write(f.read())
+                self.map_manager = dm.get_real_map(mrc_filepath)
 
     @property
     def color(self):
@@ -61,12 +70,6 @@ class MapMesh:
     async def load(self, isovalue, opacity, radius, position, map_data=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
         if map_data is None:
-            dm = DataManager()
-            with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
-                mrc_filepath = mrc_file.name
-                with gzip.open(self.map_gz_file, 'rb') as f:
-                    mrc_file.write(f.read())
-                    self.map_manager = dm.get_real_map(mrc_filepath)
             map_data = self.map_manager.map_data().as_numpy_array()
         self._generate_mesh(map_data, isovalue, opacity, radius, position)
         if not self.complex:
@@ -203,8 +206,7 @@ class MapGroup:
     async def add_map_gz(self, map_gz_file):
         # Unpack map.gz
         self.map_mesh = MapMesh(map_gz_file, self._plugin)
-        await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position)
-        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        await self.generate_mesh()
         self.map_mesh.upload()
 
     def add_model_complex(self, comp):

@@ -57,6 +57,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             Logs.debug(f"Setting isovalue to {isovalue}")
             group.isovalue = isovalue
         await group.add_map_gz(map_gz_filepath)
+        await group.generate_mesh()
         self.groups[group_name] = group
         self.menu.render()
 
