@@ -57,8 +57,20 @@ class CryoEM(nanome.AsyncPluginInstance):
             Logs.debug(f"Setting isovalue to {isovalue}")
             group.isovalue = isovalue
         await group.add_map_gz(map_gz_filepath)
-        await group.generate_mesh()
         self.groups[group_name] = group
+
+        # Check if theres a complex we can align to
+        # Probably not the end behavior we want, but
+        # it works at this stage of prototyping
+        complexes = await self.request_complex_list()
+        if complexes:
+            comp = complexes[0]
+            deep_comp = (await self.request_complexes([comp.index]))[0]
+            group.add_model_complex(deep_comp)
+            group.map_mesh.complex.position = deep_comp.position
+            group.map_mesh.complex.rotation = deep_comp.rotation
+            self.update_structures_deep([group.map_mesh.complex])
+        await group.generate_mesh()
         self.menu.render()
 
     async def load_map_and_model(self):
