@@ -29,6 +29,17 @@ class CryoEM(nanome.AsyncPluginInstance):
     def enable_search_menu(self):
         self.search_menu.render(force_enable=True)
 
+    def add_mapgroup(self):
+        group_num = 1
+        while True:
+            group_name = f'MapGroup {group_num}'
+            if group_name not in self.groups:
+                map_group = MapGroup(self, group_name=group_name)
+                break
+            group_num += 1
+        self.groups[map_group.group_name] = map_group
+        self.menu.render(selected_mapgroup=map_group)
+
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
         group = next(iter(self.groups.values()), None)
@@ -50,27 +61,27 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def create_mapgroup_for_file(self, map_gz_filepath, isovalue=None):
         path, ext = os.path.splitext(map_gz_filepath)
-        group = next(iter(self.groups.values()), None)
+        mapgroup = next(iter(self.groups.values()), None)
         group_name = os.path.basename(path)
-        group = MapGroup(self, group_name=group_name)
+        mapgroup = MapGroup(self, group_name=group_name)
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
-            group.isovalue = isovalue
-        await group.add_map_gz(map_gz_filepath)
-        self.groups[group_name] = group
+            mapgroup.isovalue = isovalue
+        await mapgroup.add_map_gz(map_gz_filepath)
+        self.groups[group_name] = mapgroup
 
         # Check if theres a complex we can align to
         # Probably not the end behavior we want, but
         # it works at this stage of prototyping
         complexes = await self.request_complex_list()
-        if complexes:
+        if complexes and complexes[0].index != mapgroup.map_mesh.complex.index:
             comp = complexes[0]
             deep_comp = (await self.request_complexes([comp.index]))[0]
-            group.add_model_complex(deep_comp)
-            group.map_mesh.complex.position = deep_comp.position
-            group.map_mesh.complex.rotation = deep_comp.rotation
-            self.update_structures_deep([group.map_mesh.complex])
-        await group.generate_mesh()
+            mapgroup.add_model_complex(deep_comp)
+            mapgroup.map_mesh.complex.position = deep_comp.position
+            mapgroup.map_mesh.complex.rotation = deep_comp.rotation
+            self.update_structures_deep([mapgroup.map_mesh.complex])
+        await mapgroup.generate_mesh()
         self.menu.render()
 
     async def load_map_and_model(self):
@@ -105,10 +116,13 @@ class CryoEM(nanome.AsyncPluginInstance):
     async def delete_mapgroup(self, map_group: MapGroup):
         map_comp = map_group.map_mesh.complex
         model_comp = map_group.model_complex
-        comps_to_delete = [map_comp]
+        comps_to_delete = []
+        if map_comp:
+            comps_to_delete.append(map_comp)
         if model_comp:
             comps_to_delete.append(model_comp)
-        await self.remove_from_workspace(comps_to_delete)
+        if comps_to_delete:
+            await self.remove_from_workspace(comps_to_delete)
         del self.groups[map_group.group_name]
         self.menu.render()
 

@@ -36,24 +36,35 @@ class MainMenu:
         self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
         self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+        self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
+        self.btn_add_group.register_pressed_callback(self.add_mapgroup)
 
-    def render(self, force_enable=False):
+    def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
             self._menu.enabled = True
 
         groups = self._plugin.groups
-        self.render_map_groups(groups)
+        self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
+
+    def add_mapgroup(self, btn):
+        Logs.message('Adding new map group')
+        self._plugin.add_mapgroup()
 
     def on_btn_search_menu_pressed(self, btn):
         Logs.message('Loading Search menu')
         self._plugin.enable_search_menu()
 
-    def render_map_groups(self, groups):
+    def render_map_groups(self, groups, selected_mapgroup=None):
         self.lst_groups.items.clear()
         for map_group in groups.values():
             ln: ui.LayoutNode = self.pfb_group_item.clone()
             lbl: ui.Label = ln.find_node('Label').get_content()
+
+            btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
+            btn_add_to_map.toggle_on_press = True
+            btn_add_to_map.register_pressed_callback(self.select_mapgroup)
+            btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
             btn: ui.Button = ln.get_content()
@@ -68,6 +79,13 @@ class MainMenu:
             btn_toggle.register_pressed_callback(partial(self.toggle_group, map_group))
 
             self.lst_groups.items.append(ln)
+        self._plugin.update_content(self.lst_groups)
+
+    def select_mapgroup(self, selected_btn: ui.Button):
+        Logs.message('Selecting map group')
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            btn.selected = btn._content_id == selected_btn._content_id
         self._plugin.update_content(self.lst_groups)
 
     def open_group_details(self, map_group, btn=None):

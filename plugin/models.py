@@ -30,7 +30,7 @@ class MapMesh:
     Map mesh also exposes mesh attributes such as upload and color(s).
     """
 
-    def __init__(self, map_gz_file, plugin):
+    def __init__(self, plugin, map_gz_file=None):
         self.map_gz_file: str = map_gz_file
         self._plugin = plugin
         self.complex: structure.Complex = None
@@ -38,7 +38,8 @@ class MapMesh:
         self.map_manager: map_manager = None
         self.wireframe_mode: bool = False
         self.wireframe_vertices: List[float] = []
-        self._load_map_file()
+        if map_gz_file:
+            self._load_map_file()
 
     def _load_map_file(self):
         dm = DataManager()
@@ -179,7 +180,7 @@ class MapGroup:
         self._plugin = plugin
         self.group_name: str = kwargs.get("group_name", "")
         self.files: List[str] = kwargs.get("files", [])
-        self.mesh = shapes.Mesh()
+        self.map_mesh = MapMesh(plugin)
 
         self.hist_x_min = 0.0
         self.hist_x_max = 1.0
@@ -205,7 +206,7 @@ class MapGroup:
 
     async def add_map_gz(self, map_gz_file):
         # Unpack map.gz
-        self.map_mesh = MapMesh(map_gz_file, self._plugin)
+        self.map_mesh = MapMesh(self._plugin, map_gz_file)
         await self.generate_mesh()
         self.map_mesh.upload()
 
@@ -388,8 +389,10 @@ class MapGroup:
     @visible.setter
     def visible(self, value):
         self.__visible = value
-        self.map_mesh.complex.visible = value
-        self.model_complex.visible = value
+        if self.map_mesh.complex:
+            self.map_mesh.complex.visible = value
+        if self.model_complex:
+            self.model_complex.visible = value
 
 
 class ViewportEditor:
