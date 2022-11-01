@@ -268,6 +268,8 @@ class EditMeshMenu:
         self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
+        self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
+        self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
 
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
@@ -344,13 +346,16 @@ class EditMeshMenu:
 
         group_objs = []
         if map_group.map_gz_file:
-            group_objs.append(os.path.basename(map_group.map_gz_file))
+            map_comp = map_group.map_mesh.complex
+            group_objs.append(map_comp)
         if map_group.model_complex:
-            group_objs.append(map_group.model_complex.name)
-        for obj_name in group_objs:
+            group_objs.append(map_group.model_complex)
+
+        for comp in group_objs:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
-            btn.text.value.set_all(obj_name)
+            btn.text.value.set_all(comp.full_name)
+            btn.comp = comp
             btn.toggle_on_press = True
             self.lst_files.items.append(ln)
 
@@ -398,6 +403,16 @@ class EditMeshMenu:
         elif item.name == "Chain":
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
+
+    def zoom_to_struct(self, btn: ui.Button):
+        strucs = []
+        for item in self.lst_files.items:
+            item_btn = item.get_content()
+            if item_btn.selected:
+                item_comp = getattr(item_btn, 'comp', None)
+                if item_comp:
+                    strucs.append(item_comp)
+        self._plugin.zoom_on_structures(strucs)
 
     # def set_wireframe_mode(self, btn):
     #     toggle = btn.selected
