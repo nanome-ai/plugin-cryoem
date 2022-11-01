@@ -50,12 +50,11 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
-        try:
-            selected_mapgroup_name = self.menu.get_selected_mapgroup()
-        except Exception:
+        selected_mapgroup_name = self.menu.get_selected_mapgroup()
+        mapgroup = self.get_group(selected_mapgroup_name)
+        if not mapgroup:
             self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
             return
-        mapgroup = self.get_group(selected_mapgroup_name)
         comp = structure.Complex.io.from_pdb(path=filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
@@ -76,6 +75,9 @@ class CryoEM(nanome.AsyncPluginInstance):
     async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
+        if not mapgroup:
+            self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+            return
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
