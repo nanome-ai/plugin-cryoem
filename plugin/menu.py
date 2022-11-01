@@ -55,9 +55,9 @@ class MainMenu:
         Logs.message('Loading Search menu')
         self._plugin.enable_search_menu()
 
-    def render_map_groups(self, groups, selected_mapgroup=None):
+    def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
-        for map_group in groups.values():
+        for map_group in mapgroups:
             ln: ui.LayoutNode = self.pfb_group_item.clone()
             lbl: ui.Label = ln.find_node('Label').get_content()
 
@@ -135,10 +135,10 @@ class SearchMenu:
         # For development only
         # self.ti_rcsb_query.input_text = '7q1u'
         # self.ti_embl_query.input_text = '13764'
-        # self.ti_rcsb_query.input_text = '5k7n'
-        # self.ti_embl_query.input_text = '8216'
-        self.ti_rcsb_query.input_text = '7c4u'
-        self.ti_embl_query.input_text = '30288'
+        self.ti_rcsb_query.input_text = '5k7n'
+        self.ti_embl_query.input_text = '8216'
+        # self.ti_rcsb_query.input_text = '7c4u'
+        # self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):

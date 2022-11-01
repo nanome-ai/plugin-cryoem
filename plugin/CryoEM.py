@@ -16,7 +16,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.search_menu = SearchMenu(self)
-        self.groups = {}
+        self.groups = []
         self.add_mapgroup()
 
     def on_stop(self):
@@ -32,19 +32,27 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     def add_mapgroup(self):
         group_num = 1
+        existing_group_names = [group.group_name for group in self.groups]
         while True:
             group_name = f'MapGroup {group_num}'
-            if group_name not in self.groups:
+            if group_name not in existing_group_names:
                 map_group = MapGroup(self, group_name=group_name)
                 break
             group_num += 1
-        self.groups[map_group.group_name] = map_group
+        self.groups.append(map_group)
         self.menu.render(selected_mapgroup=map_group)
+
+    def get_group(self, group_name):
+        return next(group for group in self.groups if group.group_name == group_name)
 
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
-        selected_mapgroup_name = self.menu.get_selected_mapgroup()
-        mapgroup = self.groups[selected_mapgroup_name]
+        try:
+            selected_mapgroup_name = self.menu.get_selected_mapgroup()
+        except Exception:
+            self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+            return
+        mapgroup = self.get_group(selected_mapgroup_name)
         comp = structure.Complex.io.from_pdb(path=filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
@@ -64,7 +72,7 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
-        mapgroup = self.groups[selected_mapgroup_name]
+        mapgroup = self.get_group(selected_mapgroup_name)
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
@@ -115,7 +123,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             comps_to_delete.append(model_comp)
         if comps_to_delete:
             await self.remove_from_workspace(comps_to_delete)
-        del self.groups[map_group.group_name]
+        self.groups.remove(map_group)
         self.menu.render()
 
 
