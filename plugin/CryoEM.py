@@ -82,7 +82,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
             mapgroup.add_model_complex(deep_comp)
         await mapgroup.generate_mesh()
-        self.menu.render()
+        self.menu.render(selected_mapgroup=mapgroup)
 
     async def load_map_and_model(self):
         """Function for development that loads a map and model from the fixtures folder.

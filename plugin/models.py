@@ -209,6 +209,10 @@ class MapGroup:
     def model_complex(self):
         return self.__model_complex
 
+    @property
+    def map_gz_file(self):
+        return self.map_mesh.map_gz_file
+
     def add_pdb(self, pdb_file):
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
@@ -246,7 +250,7 @@ class MapGroup:
     async def update_color(self, color_scheme, opacity):
         self.opacity = opacity
         self.color_scheme = color_scheme
-        if self.mesh is not None:
+        if self.map_mesh.mesh is not None:
             self.map_mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
 
@@ -310,7 +314,7 @@ class MapGroup:
         if len(verts) < 3:
             return
 
-        molecule = model_complex.molecules[model_complex.current_frame]
+        molecule = model_complex._molecules[model_complex.current_frame]
         n_chain = len(list(molecule.chains))
 
         rdcolor = randomcolor.RandomColor(seed=1234)
@@ -408,6 +412,7 @@ class MapGroup:
 
     def has_map(self):
         return self.map_mesh.complex is not None
+
 
 class ViewportEditor:
 

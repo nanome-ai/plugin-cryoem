@@ -329,7 +329,7 @@ class EditMeshMenu:
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         self.map_group.radius = self.radius
-        if self.map_group.mesh:
+        if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
     @property
@@ -341,11 +341,17 @@ class EditMeshMenu:
 
         # Populate file list
         self.lst_files.items.clear()
-        for filepath in map_group.files:
+
+        group_objs = []
+        if map_group.map_gz_file:
+            group_objs.append(os.path.basename(map_group.map_gz_file))
+        if map_group.model_complex:
+            group_objs.append(map_group.model_complex.name)
+        for obj_name in group_objs:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
-            filename = os.path.basename(filepath)
-            btn.text.value.set_all(filename)
+            btn.text.value.set_all(obj_name)
+            btn.toggle_on_press = True
             self.lst_files.items.append(ln)
 
         # Populate color scheme dropdown
