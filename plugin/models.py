@@ -213,6 +213,10 @@ class MapGroup:
     def map_gz_file(self):
         return self.map_mesh.map_gz_file
 
+    @property
+    def map_complex(self):
+        return self.map_mesh.complex
+
     def add_pdb(self, pdb_file):
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
@@ -412,6 +416,16 @@ class MapGroup:
 
     def has_map(self):
         return self.map_mesh.complex is not None
+
+    def remove_group_objects(self, comp_list):
+        comps_to_delete = []
+        if self.model_complex in comp_list:
+            comps_to_delete.append(self.model_complex)
+            self.__model_complex = None
+        if self.map_complex in comp_list:
+            comps_to_delete.append(self.map_complex)
+            self.map_mesh = MapMesh(self._plugin)
+        self._plugin.remove_from_workspace(comps_to_delete)
 
 
 class ViewportEditor:

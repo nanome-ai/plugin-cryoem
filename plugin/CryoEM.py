@@ -124,7 +124,10 @@ class CryoEM(nanome.AsyncPluginInstance):
         if comps_to_delete:
             await self.remove_from_workspace(comps_to_delete)
         self.groups.remove(map_group)
-        self.menu.render()
+
+        selected_mapgroup_name = self.menu.get_selected_mapgroup()
+        mapgroup = self.get_group(selected_mapgroup_name)
+        self.menu.render(selected_mapgroup=mapgroup)
 
 
 def main():

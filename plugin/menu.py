@@ -271,6 +271,9 @@ class EditMeshMenu:
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
         self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
 
+        self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
+        self.btn_delete.register_pressed_callback(self.delete_group_objects)
+
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
         self.update_isovalue_lbl(self.sld_isovalue)
@@ -413,6 +416,20 @@ class EditMeshMenu:
                 if item_comp:
                     strucs.append(item_comp)
         self._plugin.zoom_on_structures(strucs)
+
+    def delete_group_objects(self, btn: ui.Button):
+        Logs.message("Delete group objects button clicked.")
+        strucs = []
+        for item in self.lst_files.items:
+            item_btn = item.get_content()
+            if item_btn.selected:
+                item_comp = getattr(item_btn, 'comp', None)
+                if item_comp:
+                    strucs.append(item_comp)
+        if strucs:
+            Logs.message(f"Deleting {len(strucs)} group objects.")
+            self.map_group.remove_group_objects(strucs)
+            self.render(self.map_group)
 
     # def set_wireframe_mode(self, btn):
     #     toggle = btn.selected
