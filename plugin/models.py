@@ -31,7 +31,7 @@ class MapMesh:
     """
 
     def __init__(self, plugin, map_gz_file=None):
-        self.map_gz_file: str = map_gz_file
+        self.__map_gz_file: str = map_gz_file
         self._plugin = plugin
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
@@ -41,13 +41,23 @@ class MapMesh:
         if map_gz_file:
             self._load_map_file()
 
+    @property
+    def map_gz_file(self):
+        return self.__map_gz_file
+
+    def add_map_gz_file(self, filepath):
+        self.__map_gz_file = filepath
+        self._load_map_file()
+
     def _load_map_file(self):
         dm = DataManager()
+        self.complex = create_hidden_complex(self.map_gz_file)
         with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
             mrc_filepath = mrc_file.name
             with gzip.open(self.map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
                 self.map_manager = dm.get_real_map(mrc_filepath)
+                self.complex.name = os.path.basename(self.map_gz_file)
 
     @property
     def color(self):
@@ -73,9 +83,8 @@ class MapMesh:
         if map_data is None:
             map_data = self.map_manager.map_data().as_numpy_array()
         self._generate_mesh(map_data, isovalue, opacity, radius, position)
-        if not self.complex:
+        if self.complex.index == -1:
             # Create complex to attach mesh to.
-            self.complex = create_hidden_complex(os.path.basename(self.map_gz_file))
             self.complex.boxed = True
             self.complex.locked = True
             [self.complex] = await self._plugin.add_to_workspace([self.complex])
@@ -206,12 +215,14 @@ class MapGroup:
 
     async def add_map_gz(self, map_gz_file):
         # Unpack map.gz
-        self.map_mesh = MapMesh(self._plugin, map_gz_file)
-        await self.generate_mesh()
-        self.map_mesh.upload()
+        self.map_mesh.add_map_gz_file(map_gz_file)
 
     def add_model_complex(self, comp):
         self.__model_complex = comp
+        if self.map_mesh.complex:
+            self.map_mesh.complex.locked = True
+            self.map_mesh.complex.position = comp.position
+            self.map_mesh.complex.rotation = comp.rotation
         if self.map_mesh.mesh:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
@@ -257,6 +268,7 @@ class MapGroup:
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.upload()
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -394,6 +406,8 @@ class MapGroup:
         if self.model_complex:
             self.model_complex.visible = value
 
+    def has_map(self):
+        return self.map_mesh.complex is not None
 
 class ViewportEditor:
 

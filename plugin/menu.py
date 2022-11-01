@@ -88,6 +88,14 @@ class MainMenu:
             btn.selected = btn._content_id == selected_btn._content_id
         self._plugin.update_content(self.lst_groups)
 
+    def get_selected_mapgroup(self):
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            if btn.selected:
+                label = item.find_node('Label').get_content()
+                return label.text_value
+        raise Exception('No map group selected')
+
     def open_group_details(self, map_group, btn=None):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
@@ -156,7 +164,7 @@ class SearchMenu:
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
         isovalue = self.get_preferred_isovalue(embid_id)
-        await self._plugin.create_mapgroup_for_file(map_file, isovalue)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -349,8 +357,9 @@ class EditMeshMenu:
                 item.selected = False
 
         # Generate histogram
-        img_filepath = map_group.generate_histogram(self.temp_dir)
-        self.img_histogram.file_path = img_filepath
+        if map_group.has_map():
+            img_filepath = map_group.generate_histogram(self.temp_dir)
+            self.img_histogram.file_path = img_filepath
 
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max

@@ -17,6 +17,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.menu = MainMenu(self)
         self.search_menu = SearchMenu(self)
         self.groups = {}
+        self.add_mapgroup()
 
     def on_stop(self):
         self.temp_dir.cleanup()
@@ -42,45 +43,36 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
-        group = next(iter(self.groups.values()), None)
+        selected_mapgroup_name = self.menu.get_selected_mapgroup()
+        mapgroup = self.groups[selected_mapgroup_name]
         comp = structure.Complex.io.from_pdb(path=filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
-        if group:
-            group.add_pdb(filepath)
+        comp.locked = True
+        if mapgroup and mapgroup.map_mesh.complex:
+            mapgroup.add_pdb(filepath)
             # align complex to mapmesh
-            mesh_complex = group.map_mesh.complex
+            mesh_complex = mapgroup.map_mesh.complex
             comp.position = mesh_complex.position
             comp.rotation = mesh_complex.rotation
             comp.locked = True
             comp.boxed = False
         [created_comp] = await self.add_to_workspace([comp])
-        if group:
-            group.add_model_complex(created_comp)
+        if mapgroup:
+            mapgroup.add_model_complex(created_comp)
 
-    async def create_mapgroup_for_file(self, map_gz_filepath, isovalue=None):
-        path, ext = os.path.splitext(map_gz_filepath)
-        mapgroup = next(iter(self.groups.values()), None)
-        group_name = os.path.basename(path)
-        mapgroup = MapGroup(self, group_name=group_name)
+    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None):
+        selected_mapgroup_name = self.menu.get_selected_mapgroup()
+        mapgroup = self.groups[selected_mapgroup_name]
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
         await mapgroup.add_map_gz(map_gz_filepath)
-        self.groups[group_name] = mapgroup
-
         # Check if theres a complex we can align to
-        # Probably not the end behavior we want, but
-        # it works at this stage of prototyping
-        complexes = await self.request_complex_list()
-        if complexes and complexes[0].index != mapgroup.map_mesh.complex.index:
-            comp = complexes[0]
-            deep_comp = (await self.request_complexes([comp.index]))[0]
+        if mapgroup.model_complex:
+            [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
             mapgroup.add_model_complex(deep_comp)
-            mapgroup.map_mesh.complex.position = deep_comp.position
-            mapgroup.map_mesh.complex.rotation = deep_comp.rotation
-            self.update_structures_deep([mapgroup.map_mesh.complex])
         await mapgroup.generate_mesh()
         self.menu.render()
 
