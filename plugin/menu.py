@@ -36,24 +36,35 @@ class MainMenu:
         self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
         self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+        self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
+        self.btn_add_group.register_pressed_callback(self.add_mapgroup)
 
-    def render(self, force_enable=False):
+    def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
             self._menu.enabled = True
 
         groups = self._plugin.groups
-        self.render_map_groups(groups)
+        self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
+
+    def add_mapgroup(self, btn):
+        Logs.message('Adding new map group')
+        self._plugin.add_mapgroup()
 
     def on_btn_search_menu_pressed(self, btn):
         Logs.message('Loading Search menu')
         self._plugin.enable_search_menu()
 
-    def render_map_groups(self, groups):
+    def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
-        for map_group in groups.values():
+        for map_group in mapgroups:
             ln: ui.LayoutNode = self.pfb_group_item.clone()
             lbl: ui.Label = ln.find_node('Label').get_content()
+
+            btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
+            btn_add_to_map.toggle_on_press = True
+            btn_add_to_map.register_pressed_callback(self.select_mapgroup)
+            btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
             btn: ui.Button = ln.get_content()
@@ -69,6 +80,20 @@ class MainMenu:
 
             self.lst_groups.items.append(ln)
         self._plugin.update_content(self.lst_groups)
+
+    def select_mapgroup(self, selected_btn: ui.Button):
+        Logs.message('Selecting map group')
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            btn.selected = btn._content_id == selected_btn._content_id
+        self._plugin.update_content(self.lst_groups)
+
+    def get_selected_mapgroup(self):
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            if btn.selected:
+                label = item.find_node('Label').get_content()
+                return label.text_value
 
     def open_group_details(self, map_group, btn=None):
         Logs.message('Loading group details menu')
@@ -99,6 +124,9 @@ class SearchMenu:
         root: ui.LayoutNode = self._menu.root
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
+        self.btn_rcsb_submit.disable_on_press = True
+        self.btn_embl_submit.disable_on_press = True
+
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
 
@@ -109,10 +137,10 @@ class SearchMenu:
         # For development only
         # self.ti_rcsb_query.input_text = '7q1u'
         # self.ti_embl_query.input_text = '13764'
-        # self.ti_rcsb_query.input_text = '5k7n'
-        # self.ti_embl_query.input_text = '8216'
-        self.ti_rcsb_query.input_text = '7c4u'
-        self.ti_embl_query.input_text = '30288'
+        self.ti_rcsb_query.input_text = '5k7n'
+        self.ti_embl_query.input_text = '8216'
+        # self.ti_rcsb_query.input_text = '7c4u'
+        # self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):
@@ -131,14 +159,17 @@ class SearchMenu:
         if not pdb_path:
             return
         await self._plugin.add_pdb_to_group(pdb_path)
+        self._plugin.update_content(btn)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
+
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
         isovalue = self.get_preferred_isovalue(embid_id)
-        await self._plugin.create_mapgroup_for_file(map_file, isovalue)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue)
+        self._plugin.update_content(btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -242,6 +273,11 @@ class EditMeshMenu:
         self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
+        self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
+        self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
+
+        self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
+        self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
@@ -303,7 +339,7 @@ class EditMeshMenu:
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         self.map_group.radius = self.radius
-        if self.map_group.mesh:
+        if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
     @property
@@ -315,11 +351,20 @@ class EditMeshMenu:
 
         # Populate file list
         self.lst_files.items.clear()
-        for filepath in map_group.files:
+
+        group_objs = []
+        if map_group.map_gz_file:
+            map_comp = map_group.map_mesh.complex
+            group_objs.append(map_comp)
+        if map_group.model_complex:
+            group_objs.append(map_group.model_complex)
+
+        for comp in group_objs:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
-            filename = os.path.basename(filepath)
-            btn.text.value.set_all(filename)
+            btn.text.value.set_all(comp.full_name)
+            btn.comp = comp
+            btn.toggle_on_press = True
             self.lst_files.items.append(ln)
 
         # Populate color scheme dropdown
@@ -331,8 +376,9 @@ class EditMeshMenu:
                 item.selected = False
 
         # Generate histogram
-        img_filepath = map_group.generate_histogram(self.temp_dir)
-        self.img_histogram.file_path = img_filepath
+        if map_group.has_map():
+            img_filepath = map_group.generate_histogram(self.temp_dir)
+            self.img_histogram.file_path = img_filepath
 
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
@@ -365,6 +411,30 @@ class EditMeshMenu:
         elif item.name == "Chain":
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
+
+    def zoom_to_struct(self, btn: ui.Button):
+        strucs = []
+        for item in self.lst_files.items:
+            item_btn = item.get_content()
+            if item_btn.selected:
+                item_comp = getattr(item_btn, 'comp', None)
+                if item_comp:
+                    strucs.append(item_comp)
+        self._plugin.zoom_on_structures(strucs)
+
+    def delete_group_objects(self, btn: ui.Button):
+        Logs.message("Delete group objects button clicked.")
+        strucs = []
+        for item in self.lst_files.items:
+            item_btn = item.get_content()
+            if item_btn.selected:
+                item_comp = getattr(item_btn, 'comp', None)
+                if item_comp:
+                    strucs.append(item_comp)
+        if strucs:
+            Logs.message(f"Deleting {len(strucs)} group objects.")
+            self.map_group.remove_group_objects(strucs)
+            self.render(self.map_group)
 
     # def set_wireframe_mode(self, btn):
     #     toggle = btn.selected
