@@ -43,7 +43,10 @@ class CryoEM(nanome.AsyncPluginInstance):
         self.menu.render(selected_mapgroup=map_group)
 
     def get_group(self, group_name):
-        return next(group for group in self.groups if group.group_name == group_name)
+        return next((
+            group for group in self.groups
+            if group.group_name == group_name
+        ), None)
 
     async def add_pdb_to_group(self, filepath):
         # Look for a MapGroup to add the model to
@@ -58,12 +61,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
         comp.locked = True
-        if mapgroup and mapgroup.map_mesh.complex:
+        if mapgroup and mapgroup.map_complex:
             mapgroup.add_pdb(filepath)
             # align complex to mapmesh
-            mesh_complex = mapgroup.map_mesh.complex
-            comp.position = mesh_complex.position
-            comp.rotation = mesh_complex.rotation
+            map_complex = mapgroup.map_complex
+            comp.position = map_complex.position
+            comp.rotation = map_complex.rotation
             comp.locked = True
             comp.boxed = False
         [created_comp] = await self.add_to_workspace([comp])
@@ -77,11 +80,13 @@ class CryoEM(nanome.AsyncPluginInstance):
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
         await mapgroup.add_map_gz(map_gz_filepath)
-        # Check if theres a complex we can align to
         if mapgroup.model_complex:
+            # Get latest position of model complex
             [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
             mapgroup.add_model_complex(deep_comp)
         await mapgroup.generate_mesh()
+        # Rename Mapgroup after the new map
+        mapgroup.group_name = Path(map_gz_filepath).stem
         self.menu.render(selected_mapgroup=mapgroup)
 
     async def load_map_and_model(self):
@@ -123,7 +128,10 @@ class CryoEM(nanome.AsyncPluginInstance):
             comps_to_delete.append(model_comp)
         if comps_to_delete:
             await self.remove_from_workspace(comps_to_delete)
-        self.groups.remove(map_group)
+        try:
+            self.groups.remove(map_group)
+        except ValueError:
+            Logs.warning("Tried to delete a map group that doesn't exist.")
 
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)

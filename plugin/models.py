@@ -227,10 +227,10 @@ class MapGroup:
 
     def add_model_complex(self, comp):
         self.__model_complex = comp
-        if self.map_mesh.complex:
-            self.map_mesh.complex.locked = True
-            self.map_mesh.complex.position = comp.position
-            self.map_mesh.complex.rotation = comp.rotation
+        if self.map_complex:
+            self.map_complex.locked = True
+            self.map_complex.position = comp.position
+            self.map_complex.rotation = comp.rotation
         if self.map_mesh.mesh:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
@@ -409,7 +409,7 @@ class MapGroup:
     @visible.setter
     def visible(self, value):
         self.__visible = value
-        if self.map_mesh.complex:
+        if self.map_complex:
             self.map_mesh.complex.visible = value
         if self.model_complex:
             self.model_complex.visible = value

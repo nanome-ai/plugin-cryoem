@@ -94,7 +94,6 @@ class MainMenu:
             if btn.selected:
                 label = item.find_node('Label').get_content()
                 return label.text_value
-        raise Exception('No map group selected')
 
     def open_group_details(self, map_group, btn=None):
         Logs.message('Loading group details menu')
@@ -153,18 +152,36 @@ class SearchMenu:
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
-        pdb_path = self.download_pdb_from_rcsb(pdb_id)
-        if not pdb_path:
-            return
-        await self._plugin.add_pdb_to_group(pdb_path)
+        btn.unusable = True
+        self._plugin.update_content(btn)
+        try:
+            pdb_path = self.download_pdb_from_rcsb(pdb_id)
+            if not pdb_path:
+                return
+            await self._plugin.add_pdb_to_group(pdb_path)
+        except Exception:
+            btn.unusable = False
+            self._plugin.update_content(btn)
+            raise
+        btn.unusable = False
+        self._plugin.update_content(btn)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
-        map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        isovalue = self.get_preferred_isovalue(embid_id)
-        await self._plugin.add_mapgz_to_group(map_file, isovalue)
+        btn.unusable = True
+        self._plugin.update_content(btn)
+        try:
+            map_file = self.download_cryoem_map_from_emdbid(embid_id)
+            isovalue = self.get_preferred_isovalue(embid_id)
+            await self._plugin.add_mapgz_to_group(map_file, isovalue)
+        except Exception as e:
+            btn.unusable = False
+            self._plugin.update_content(btn)
+            raise e
+        btn.unusable = False
+        self._plugin.update_content(btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
