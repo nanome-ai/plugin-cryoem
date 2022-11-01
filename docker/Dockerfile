@@ -5,10 +5,8 @@ WORKDIR /app
 
 ARG CACHEBUST
 
-RUN conda install -c conda-forge cctbx-base
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY environment.yml .
+RUN conda env update
 
 COPY . .
 

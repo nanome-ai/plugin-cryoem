@@ -1,12 +1,13 @@
 import os
 import nanome
 import requests
+import xml.etree.ElementTree as ET
 from functools import partial
 from os import path
-from nanome.api import shapes, structure, ui
-from nanome.util import async_callback, enums, Color, Logs, Vector3
-
+from nanome.api import ui
+from nanome.util import async_callback, enums, Logs
 from .models import MapGroup, ViewportEditor
+
 
 ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
@@ -74,9 +75,10 @@ class MainMenu:
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
-    def delete_group(self, map_group, btn):
-        Logs.message('Deleting group')
-        # TODO
+    @async_callback
+    async def delete_group(self, map_group, btn):
+        Logs.message(f'Deleting group {map_group.group_name}')
+        await self._plugin.delete_mapgroup(map_group)
 
     def toggle_group(self, map_group, btn: ui.Button):
         Logs.message('Toggling group')
@@ -84,7 +86,7 @@ class MainMenu:
         btn.icon.value.set_all(
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
         self._plugin.update_content(btn)
-        # TODO
+        self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
 
 class SearchMenu:
@@ -107,10 +109,10 @@ class SearchMenu:
         # For development only
         # self.ti_rcsb_query.input_text = '7q1u'
         # self.ti_embl_query.input_text = '13764'
-        self.ti_rcsb_query.input_text = '5k7n'
-        self.ti_embl_query.input_text = '8216'
-        # self.ti_rcsb_query.input_text = '7c4u'
-        # self.ti_embl_query.input_text = '30288'
+        # self.ti_rcsb_query.input_text = '5k7n'
+        # self.ti_embl_query.input_text = '8216'
+        self.ti_rcsb_query.input_text = '7c4u'
+        self.ti_embl_query.input_text = '30288'
 
     @property
     def temp_dir(self):
@@ -135,7 +137,8 @@ class SearchMenu:
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        await self._plugin.create_mapgroup_for_file(map_file)
+        isovalue = self.get_preferred_isovalue(embid_id)
+        await self._plugin.create_mapgroup_for_file(map_file, isovalue)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -151,8 +154,30 @@ class SearchMenu:
             f.write(response.content)
         return file_path
 
+    def get_preferred_isovalue(self, emdbid):
+        # Get the isovalue that is closest to the mean of the map data
+        # This is a hack to get a good isovalue for the map
+        Logs.message("Downloading EM metadata for EMDBID:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
+        response = requests.get(url)
+        # Parse xml and get resolution value
+        xml_root = ET.fromstring(response.content)
+        contour_list_ele = next(xml_root.iter("contour_list"))
+        for child in contour_list_ele:
+            if child.tag == "contour" and child.attrib["primary"].lower() == 'true':
+                level_ele = next(child.iter("level"))
+                isovalue = level_ele.text
+                break
+        try:
+            isovalue = float(isovalue)
+        except ValueError:
+            Logs.warning("Could not parse resolution value from XML")
+            isovalue = None
+        return isovalue
+
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
+        # return 'tests/fixtures/emd_30288.map.gz'  # Use this when emdb starts timing out.
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
@@ -268,8 +293,6 @@ class EditMeshMenu:
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
-        if self.map_group.mesh:
-            self.map_group.mesh.upload()
 
     @async_callback
     async def redraw_map(self, content=None):
@@ -281,7 +304,7 @@ class EditMeshMenu:
         self.map_group.color_scheme = self.color_scheme
         self.map_group.radius = self.radius
         if self.map_group.mesh:
-            await self._plugin.render_mesh(self.map_group)
+            await self.map_group.generate_mesh()
 
     @property
     def temp_dir(self):
@@ -308,7 +331,6 @@ class EditMeshMenu:
                 item.selected = False
 
         # Generate histogram
-        # if len(map_group.files) > 1:
         img_filepath = map_group.generate_histogram(self.temp_dir)
         self.img_histogram.file_path = img_filepath
 
