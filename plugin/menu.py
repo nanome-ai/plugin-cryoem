@@ -124,6 +124,9 @@ class SearchMenu:
         root: ui.LayoutNode = self._menu.root
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
+        self.btn_rcsb_submit.disable_on_press = True
+        self.btn_embl_submit.disable_on_press = True
+
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
 
@@ -152,35 +155,20 @@ class SearchMenu:
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
-        btn.unusable = True
-        self._plugin.update_content(btn)
-        try:
-            pdb_path = self.download_pdb_from_rcsb(pdb_id)
-            if not pdb_path:
-                return
-            await self._plugin.add_pdb_to_group(pdb_path)
-        except Exception:
-            btn.unusable = False
-            self._plugin.update_content(btn)
-            raise
-        btn.unusable = False
+        pdb_path = self.download_pdb_from_rcsb(pdb_id)
+        if not pdb_path:
+            return
+        await self._plugin.add_pdb_to_group(pdb_path)
         self._plugin.update_content(btn)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
-        btn.unusable = True
-        self._plugin.update_content(btn)
-        try:
-            map_file = self.download_cryoem_map_from_emdbid(embid_id)
-            isovalue = self.get_preferred_isovalue(embid_id)
-            await self._plugin.add_mapgz_to_group(map_file, isovalue)
-        except Exception as e:
-            btn.unusable = False
-            self._plugin.update_content(btn)
-            raise e
-        btn.unusable = False
+
+        map_file = self.download_cryoem_map_from_emdbid(embid_id)
+        isovalue = self.get_preferred_isovalue(embid_id)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue)
         self._plugin.update_content(btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
