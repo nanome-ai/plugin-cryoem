@@ -257,6 +257,7 @@ class MapGroup:
         if self.map_mesh.mesh is not None:
             self.map_mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
+            self.map_mesh.upload()
 
     async def generate_mesh(self):
         # Compute iso-surface with marching cubes algorithm
@@ -290,7 +291,7 @@ class MapGroup:
             self.color_by_bfactor(map_mesh, comp)
         elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain(map_mesh, comp)
-        map_mesh.mesh.upload()
+        map_mesh.upload()
         Logs.message("Mesh colored")
 
     def color_by_element(self, map_mesh, model_complex):
