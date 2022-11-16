@@ -130,7 +130,6 @@ class MapMesh:
         self.mesh.triangles = triangles.flatten()
 
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-        self.mesh.upload()
         Logs.message("Mesh generated")
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
