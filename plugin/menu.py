@@ -4,9 +4,9 @@ import time
 import xml.etree.ElementTree as ET
 from functools import partial
 from nanome.api import ui
-
-from os import path
 from nanome.util import async_callback, enums, Logs
+from os import path
+
 from .models import MapGroup, ViewportEditor
 
 
