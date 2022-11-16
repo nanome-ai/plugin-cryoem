@@ -1,10 +1,11 @@
-import os
 import nanome
 import requests
+import time
 import xml.etree.ElementTree as ET
 from functools import partial
-from os import path
 from nanome.api import ui
+
+from os import path
 from nanome.util import async_callback, enums, Logs
 from .models import MapGroup, ViewportEditor
 
@@ -208,7 +209,6 @@ class SearchMenu:
 
     def download_cryoem_map_from_emdbid(self, emdbid):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
-        # return 'tests/fixtures/emd_30288.map.gz'  # Use this when emdb starts timing out.
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
