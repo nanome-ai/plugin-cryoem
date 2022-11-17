@@ -31,21 +31,18 @@ class MapGroupTestCase(unittest.TestCase):
         self.map_group.add_pdb(self.pdb_file)
         self.assertTrue(isinstance(self.map_group._model, manager))
 
-    # @patch('nanome._internal._shapes._shape._Shape')
-    @patch('nanome._internal._network.PluginNetwork._instance')
-    @patch('plugin.models.MapGroup._plugin')
-    @patch('nanome.api.plugin_instance.PluginInstance._instance')
-    @unittest.skip("Need to figure out mocking. =(")
-    def test_add_map_gz(self, _instance_mock, plugin_mock, *mocks):
+    def test_add_map_gz(self):
         async def validate_add_map_gz(self):
+            # Set future result for request_complexes mock
+            fut = asyncio.Future()
+            fut.set_result([structure.Complex()])
+            self.plugin.add_to_workspace.return_value = fut
+
+            breakpoint()
+            self.assertTrue(isinstance(self.map_group.map_mesh, MapMesh))
             await self.map_group.add_map_gz(self.map_file)
             self.assertTrue(isinstance(self.map_group.map_mesh, MapMesh))
 
-        # Set future result for request_complexes mock
-        fut = asyncio.Future()
-        fut.set_result([])
-        breakpoint()
-        plugin_mock.add_to_workspace.return_value = fut
         run_awaitable(validate_add_map_gz, self)
 
     @patch('nanome._internal._network.PluginNetwork._instance')
@@ -84,14 +81,22 @@ class MapMeshTestCase(unittest.TestCase):
 
     def test_add_map_gz_file(self):
         self.assertTrue(self.map_mesh.complex is None)
+        mesh = self.map_mesh.mesh
+        expected_vertices = 4437
+        expected_normals = 4437
+        expected_triangles = 7986
+        self.assertEqual(len(mesh.vertices), 0)
+        self.assertEqual(len(mesh.normals), 0)
+        self.assertEqual(len(mesh.triangles), 0)
         self.map_mesh.add_map_gz_file(self.map_file)
+        self.assertEqual(len(mesh.vertices), expected_vertices)
+        self.assertEqual(len(mesh.normals), expected_normals)
+        self.assertEqual(len(mesh.triangles), expected_triangles)
         # Make sure complex is added.
         self.assertTrue(isinstance(self.map_mesh.complex, structure.Complex))
         self.assertTrue(len(list(self.map_mesh.complex.atoms)) > 0)
 
-    # @patch('nanome._internal._network.PluginNetwork._instance')
     def test_load(self):
-
         async def validate_load(self):
             """Validate that running load() generates the NanomeMesh."""
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
