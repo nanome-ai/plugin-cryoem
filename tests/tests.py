@@ -3,6 +3,7 @@ import os
 import unittest
 from nanome.api import structure
 from unittest.mock import MagicMock, patch
+from iotbx.map_manager import map_manager
 
 from mmtbx.model.model import manager
 from plugin.models import MapGroup, MapMesh
@@ -37,12 +38,10 @@ class MapGroupTestCase(unittest.TestCase):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
             self.plugin.add_to_workspace.return_value = fut
-
-            breakpoint()
-            self.assertTrue(isinstance(self.map_group.map_mesh, MapMesh))
+            # run add_map_gz, and make sure map_manager is created on internal map_manager
+            self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, type(None)))
             await self.map_group.add_map_gz(self.map_file)
-            self.assertTrue(isinstance(self.map_group.map_mesh, MapMesh))
-
+            self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, map_manager))
         run_awaitable(validate_add_map_gz, self)
 
     @patch('nanome._internal._network.PluginNetwork._instance')
@@ -80,21 +79,14 @@ class MapMeshTestCase(unittest.TestCase):
         self.map_mesh = MapMesh(self.plugin)
 
     def test_add_map_gz_file(self):
-        self.assertTrue(self.map_mesh.complex is None)
-        mesh = self.map_mesh.mesh
-        expected_vertices = 4437
-        expected_normals = 4437
-        expected_triangles = 7986
-        self.assertEqual(len(mesh.vertices), 0)
-        self.assertEqual(len(mesh.normals), 0)
-        self.assertEqual(len(mesh.triangles), 0)
+        # Set future result for request_complexes mock
+        fut = asyncio.Future()
+        fut.set_result([structure.Complex()])
+        self.plugin.add_to_workspace.return_value = fut
+        # run add_map_gz, and make sure map_manager is created on internal map_manager
+        self.assertTrue(isinstance(self.map_mesh.map_manager, type(None)))
         self.map_mesh.add_map_gz_file(self.map_file)
-        self.assertEqual(len(mesh.vertices), expected_vertices)
-        self.assertEqual(len(mesh.normals), expected_normals)
-        self.assertEqual(len(mesh.triangles), expected_triangles)
-        # Make sure complex is added.
-        self.assertTrue(isinstance(self.map_mesh.complex, structure.Complex))
-        self.assertTrue(len(list(self.map_mesh.complex.atoms)) > 0)
+        self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
 
     def test_load(self):
         async def validate_load(self):
