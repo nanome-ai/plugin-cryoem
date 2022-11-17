@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from nanome.api import structure
 from unittest.mock import MagicMock, patch
 
 from mmtbx.model.model import manager
@@ -58,8 +59,8 @@ class MapGroupTestCase(unittest.TestCase):
             await self.map_group.generate_mesh()
             self.assertTrue(len(self.map_group.map_mesh.computed_vertices) > 0)
         plugin_mock.add_to_workspace.return_value = asyncio.Future()
-        with patch('plugin.models.MapGroup._plugin', plugin_mock) as m1:
-            with patch('nanome.api.plugin_instance.PluginInstance._instance') as m2:
+        with patch('plugin.models.MapGroup._plugin', plugin_mock):
+            with patch('nanome.api.plugin_instance.PluginInstance._instance'):
                 run_awaitable(validate_generate_mesh, self)
         # run_awaitable(validate_generate_mesh, self)
 
@@ -70,3 +71,48 @@ class MapGroupTestCase(unittest.TestCase):
     #     self.assertEqual(self.map_group.wireframe_mode, True)
     #     self.map_group.toggle_wireframe_mode(False)
     #     self.assertEqual(self.map_group.wireframe_mode, False)
+
+
+class MapMeshTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.plugin = MagicMock()
+        self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.map_mesh = MapMesh(self.plugin)
+
+    def test_add_map_gz_file(self):
+        self.assertTrue(self.map_mesh.complex is None)
+        self.map_mesh.add_map_gz_file(self.map_file)
+        # Make sure complex is added.
+        self.assertTrue(isinstance(self.map_mesh.complex, structure.Complex))
+        self.assertTrue(len(list(self.map_mesh.complex.atoms)) > 0)
+
+    # @patch('nanome._internal._network.PluginNetwork._instance')
+    def test_load(self):
+
+        async def validate_load(self):
+            """Validate that running load() generates the NanomeMesh."""
+            map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+            expected_vertices = 4437
+            expected_normals = 4437
+            expected_triangles = 7986
+            self.map_mesh.add_map_gz_file(map_file)
+            isovalue = 0.2
+            opacity = 0.65
+            radius = 5
+            position = 0.1
+
+            fut = asyncio.Future()
+            fut.set_result([structure.Complex()])
+            self.plugin.add_to_workspace.return_value = fut
+            mesh = self.map_mesh.mesh
+            self.assertEqual(len(mesh.vertices), 0)
+            self.assertEqual(len(mesh.normals), 0)
+            self.assertEqual(len(mesh.triangles), 0)
+            await self.map_mesh.load(isovalue, opacity, radius, position)
+            self.assertEqual(len(mesh.vertices), expected_vertices)
+            self.assertEqual(len(mesh.normals), expected_normals)
+            self.assertEqual(len(mesh.triangles), expected_triangles)
+        run_awaitable(validate_load, self)

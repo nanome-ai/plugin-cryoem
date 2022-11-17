@@ -49,16 +49,6 @@ class MapMesh:
         self.__map_gz_file = filepath
         self._load_map_file()
 
-    def _load_map_file(self):
-        dm = DataManager()
-        self.complex = create_hidden_complex(self.map_gz_file)
-        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
-            mrc_filepath = mrc_file.name
-            with gzip.open(self.map_gz_file, 'rb') as f:
-                mrc_file.write(f.read())
-                self.map_manager = dm.get_real_map(mrc_filepath)
-                self.complex.name = os.path.basename(self.map_gz_file)
-
     @property
     def color(self):
         return self.mesh.color
@@ -91,6 +81,16 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
+
+    def _load_map_file(self):
+        dm = DataManager()
+        self.complex = create_hidden_complex(self.map_gz_file)
+        with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
+            mrc_filepath = mrc_file.name
+            with gzip.open(self.map_gz_file, 'rb') as f:
+                mrc_file.write(f.read())
+                self.map_manager = dm.get_real_map(mrc_filepath)
+                self.complex.name = os.path.basename(self.map_gz_file)
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")
