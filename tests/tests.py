@@ -1,4 +1,5 @@
 import asyncio
+import nanome
 import os
 import unittest
 from nanome.api import structure
@@ -44,20 +45,23 @@ class MapGroupTestCase(unittest.TestCase):
             self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, map_manager))
         run_awaitable(validate_add_map_gz, self)
 
-    @patch('nanome._internal._network.PluginNetwork._instance')
-    @patch('nanome.api.plugin_instance.PluginInstance', return_value=asyncio.Future())
-    @unittest.skip("Need to figure out mocking. =(")
-    def test_generate_mesh(self, instance_mock, plugin_mock, *mocks):
+    @patch('nanome._internal._network.PluginNetwork._instance', return_value=asyncio.Future())
+    def test_generate_mesh(self, instance_mock):
         # Assert that attributes are set after load_map called.
         async def validate_generate_mesh(self):
-            await self.map_group.add_map_gz(self.map_file)
-            self.assertEqual(len(self.map_group.map_mesh.vertices), 0)
+            fut = asyncio.Future()
+            fut.set_result([structure.Complex()])
+            self.plugin.add_to_workspace.return_value = fut
+            nanome.PluginInstance._instance = self.plugin
+
+            map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+            expected_vertices = 4364
+            # Make sure vertices are added to mesh
+            self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
+            await self.map_group.add_map_gz(map_file)
             await self.map_group.generate_mesh()
-            self.assertTrue(len(self.map_group.map_mesh.computed_vertices) > 0)
-        plugin_mock.add_to_workspace.return_value = asyncio.Future()
-        with patch('plugin.models.MapGroup._plugin', plugin_mock):
-            with patch('nanome.api.plugin_instance.PluginInstance._instance'):
-                run_awaitable(validate_generate_mesh, self)
+            self.assertEqual(len(self.map_group.map_mesh.computed_vertices), expected_vertices)
+        run_awaitable(validate_generate_mesh, self)
         # run_awaitable(validate_generate_mesh, self)
 
     # def test_toggle_wireframe_mode(self):
