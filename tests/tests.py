@@ -1,8 +1,7 @@
 import asyncio
-import nanome
 import os
 import unittest
-from nanome.api import structure
+from nanome.api import structure, PluginInstance
 from unittest.mock import MagicMock, patch
 from iotbx.map_manager import map_manager
 
@@ -25,6 +24,7 @@ class MapGroupTestCase(unittest.TestCase):
 
     def setUp(self):
         self.plugin = MagicMock()
+        PluginInstance._instance = self.plugin
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
@@ -52,7 +52,6 @@ class MapGroupTestCase(unittest.TestCase):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
             self.plugin.add_to_workspace.return_value = fut
-            nanome.PluginInstance._instance = self.plugin
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 4364
