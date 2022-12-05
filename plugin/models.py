@@ -84,13 +84,14 @@ class MapMesh:
 
     def _load_map_file(self):
         dm = DataManager()
-        self.complex = create_hidden_complex(self.map_gz_file)
         with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
             mrc_filepath = mrc_file.name
             with gzip.open(self.map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
                 self.map_manager = dm.get_real_map(mrc_filepath)
-                self.complex.name = os.path.basename(self.map_gz_file)
+        unit_cell_coords = self.map_manager.unit_cell_parameters[:3]
+        self.complex = create_hidden_complex(self.map_gz_file, unit_cell_coords)
+        self.complex.name = os.path.basename(self.map_gz_file)
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")

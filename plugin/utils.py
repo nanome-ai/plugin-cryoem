@@ -1,4 +1,5 @@
 from nanome.api import structure
+from nanome.util import Color
 
 
 def cpk_colors(a):
@@ -129,9 +130,10 @@ def cpk_colors(a):
     return list(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + [1.0]
 
 
-def create_hidden_complex(comp_name=None):
+def create_hidden_complex(comp_name=None, unit_cell_coords=None):
     # Create a nanome complex to attach the mesh to
     # create viewport sphere and position at current map position
+    unit_cell_coords = unit_cell_coords or []
     comp = structure.Complex()
     molecule = structure.Molecule()
     chain = structure.Chain()
@@ -144,9 +146,31 @@ def create_hidden_complex(comp_name=None):
     chain.add_residue(residue)
 
     # create invisible atoms to create bounding box
-    for i in [-10, 10]:
-        atom = structure.Atom()
-        atom.set_visible(False)
-        atom.position.set(i, i, i)
-        residue.add_atom(atom)
+    if unit_cell_coords:
+        atom_origin = structure.Atom()
+        atom_origin.position.set(0, 0, 0)
+        atom_origin.atom_color = Color.Red()
+        # atom_origin.set_visible(True)
+
+        atom_x = structure.Atom()
+        atom_x.position.set(unit_cell_coords[0], 0, 0)
+        # atom_x.atom_color = [1, 1, 1, 1]
+
+        atom_y = structure.Atom()
+        atom_y.position.set(0, unit_cell_coords[1], 0)
+        # atom_y.atom_color = [1, 1, 1, 1]
+
+        atom_z = structure.Atom()
+        atom_z.position.set(0, 0, unit_cell_coords[2])
+        # atom_z.atom_color = [1, 1, 1, 1]
+        residue.add_atom(atom_origin)
+        residue.add_atom(atom_x)
+        residue.add_atom(atom_y)
+        residue.add_atom(atom_z)
+    else:
+        for i in [-10, 10]:
+            atom = structure.Atom()
+            atom.set_visible(False)
+            atom.position.set(i, i, i)
+            residue.add_atom(atom)
     return comp
