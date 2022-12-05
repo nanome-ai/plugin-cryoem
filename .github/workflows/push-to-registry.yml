@@ -23,19 +23,19 @@ jobs:
       id: default_tag
       run: |
         default_tag=latest
-        echo "::set-output name=default_tag::$default_tag"
+        echo "default_tag=$default_tag" >> $GITHUB_OUTPUT
     - name: Get short SHA
       id: sha
-      run: echo "::set-output name=sha7::$(echo ${GITHUB_SHA} | cut -c1-7)"
+      run: echo "sha7=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
     - name: Get tag
       id: tag
       run: |
         input_tag=${{ github.event.inputs.tag }}
         default_tag=${{ steps.default_tag.outputs.default_tag }}
         if [ -z "$input_tag" ]; then
-          echo "::set-output name=tag::$default_tag"
+          echo "tag=$default_tag" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=tag::$input_tag"
+          echo "tag=$input_tag" >> $GITHUB_OUTPUT
         fi
     - uses: docker://ghcr.io/kciter/aws-ecr-action:latest
       with:
