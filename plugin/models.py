@@ -118,12 +118,12 @@ class MapMesh:
             voxel_size = np.array(voxel_sizes)
             vertices *= voxel_size
 
-        computed_vertices = np.array(vertices)
-        computed_normals = np.array(normals)
-        computed_triangles = np.array(triangles)
-        Logs.debug("Limiting view...")
-        vertices, normals, triangles = self.limit_view(
-            computed_vertices, computed_normals, computed_triangles, radius, position)
+        vertices = np.array(vertices)
+        normals = np.array(normals)
+        triangles = np.array(triangles)
+        # Logs.debug("Limiting view...")
+        # vertices, normals, triangles = self.limit_view(
+        #     computed_vertices, computed_normals, computed_triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -265,13 +265,20 @@ class MapGroup:
         kwargs = {
             'ignore_symmetry_conflicts': True
         }
-        if hasattr(self, '_model'):
-            kwargs['model'] = self._model
+        model = None
+        if hasattr(self, '_model') and self._model:
+            model = self._model
+            kwargs['model'] = model
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
-        mmm.generate_map()
+        if model:
+            mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
+        else:
+            mmm.generate_map()
+
+        # mmm.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
@@ -304,7 +311,7 @@ class MapGroup:
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
-        result, indices = kdtree.query(verts, distance_upper_bound=2)
+        _, indices = kdtree.query(verts, distance_upper_bound=2)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -354,7 +361,7 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
-        result, indices = kdtree.query(
+        _, indices = kdtree.query(
             verts, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -382,7 +389,7 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
-        result, indices = kdtree.query(
+        _, indices = kdtree.query(
             verts, distance_upper_bound=20)
 
         colors = []

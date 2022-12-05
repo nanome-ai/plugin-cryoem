@@ -60,14 +60,15 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
         comp.locked = True
-        if mapgroup and mapgroup.map_complex:
+        if mapgroup:
             mapgroup.add_pdb(filepath)
             # align complex to mapmesh
-            map_complex = mapgroup.map_complex
-            comp.position = map_complex.position
-            comp.rotation = map_complex.rotation
             comp.locked = True
             comp.boxed = False
+            map_complex = mapgroup.map_complex
+            if map_complex:
+                comp.position = map_complex.position
+                comp.rotation = map_complex.rotation
         [created_comp] = await self.add_to_workspace([comp])
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
