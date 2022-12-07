@@ -89,8 +89,16 @@ class MapMesh:
             with gzip.open(self.map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
                 self.map_manager = dm.get_real_map(mrc_filepath)
-        unit_cell_coords = self.map_manager.unit_cell_parameters[:3]
-        self.complex = create_hidden_complex(self.map_gz_file, unit_cell_coords)
+
+        grid_min = self.map_manager.origin
+        grid_max = self.map_manager.map_data().last()
+        grid_step = self.map_manager.pixel_sizes()
+
+        angstrom_min = [x * y for x, y in zip(grid_min, grid_step)]
+        angstrom_max = [x * y for x, y in zip(grid_max, grid_step)]
+        bounds = [angstrom_min, angstrom_max]
+
+        self.complex = create_hidden_complex(self.map_gz_file, bounds)
         self.complex.name = os.path.basename(self.map_gz_file)
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
