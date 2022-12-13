@@ -108,18 +108,16 @@ class MapMesh:
         # this makes sure the mesh is in the same coordinates as the molecule
         map_origin = self.map_manager.origin
         vertices += np.asarray(map_origin)
-        np_vertices = np.asarray(vertices)
-        np_triangles = np.asarray(triangles)
 
         # convert vertices from grid units to cartesian angstroms
-        for i in range(np_vertices.shape[0]):
-            np_vertices[i] = self.map_manager.grid_units_to_cart(np_vertices[i])
+        for i in range(vertices.shape[0]):
+            vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
 
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
-        target = max(1000, len(np_triangles) / decimation_factor)
+        target = max(1000, len(triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
-        mesh_simplifier.setMesh(np_vertices, np_triangles)
+        mesh_simplifier.setMesh(vertices, triangles)
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
         Logs.debug("Mesh Simplified")
@@ -128,9 +126,10 @@ class MapMesh:
         vertices = np.array(vertices)
         normals = np.array(normals)
         triangles = np.array(triangles)
-        # Logs.debug("Limiting view...")
-        # vertices, normals, triangles = self.limit_view(
-        #     computed_vertices, computed_normals, computed_triangles, radius, position)
+
+        Logs.debug("Limiting view...")
+        vertices, normals, triangles = self.limit_view(
+            vertices, normals, triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -280,10 +279,10 @@ class MapGroup:
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
-        if model:
-            mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
-        else:
-            mmm.generate_map()
+        # if model:
+        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
+        # else:
+        mmm.generate_map()
 
         # mmm.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         Logs.debug("Map Generated")
