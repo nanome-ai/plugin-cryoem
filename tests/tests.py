@@ -54,7 +54,7 @@ class MapGroupTestCase(unittest.TestCase):
             self.plugin.add_to_workspace.return_value = fut
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 4364
+            expected_vertices = 4419
             # Make sure vertices are added to mesh
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
             await self.map_group.add_map_gz(map_file)
@@ -95,8 +95,8 @@ class MapMeshTestCase(unittest.TestCase):
         async def validate_load(self):
             """Validate that running load() generates the NanomeMesh."""
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 4437
-            expected_normals = 4437
+            expected_vertices = 4395
+            expected_normals = 4395
             expected_triangles = 7986
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
