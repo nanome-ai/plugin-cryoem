@@ -137,7 +137,7 @@ class SearchMenu:
         self.current_group = "Group 1"
         # For development only
         # rcsb, embl = ['4znn', '3001'] # 94.33º
-        rcsb, embl = ['5k7n', '8216'] # 111.55º broken
+        rcsb, embl = ['5k7n', '8216']  # 111.55º broken
         # rcsb, embl = ['5vos', '8720'] # 100.02º
         # rcsb, embl = ['7c4u', '30288'] # small molecule
         # rcsb, embl = ['7q1u', '13764'] # large protein
