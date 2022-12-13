@@ -91,11 +91,9 @@ class MapMesh:
                 self.map_manager = dm.get_real_map(mrc_filepath)
 
         grid_min = self.map_manager.origin
-        grid_max = self.map_manager.map_data().last()
-        grid_step = self.map_manager.pixel_sizes()
-
-        angstrom_min = [x * y for x, y in zip(grid_min, grid_step)]
-        angstrom_max = [x * y for x, y in zip(grid_max, grid_step)]
+        grid_max = self.map_manager.data.last()
+        angstrom_min = self.map_manager.grid_units_to_cart(grid_min)
+        angstrom_max = self.map_manager.grid_units_to_cart(grid_max)
         bounds = [angstrom_min, angstrom_max]
 
         self.complex = create_hidden_complex(self.map_gz_file, bounds)
@@ -112,6 +110,11 @@ class MapMesh:
         vertices += np.asarray(map_origin)
         np_vertices = np.asarray(vertices)
         np_triangles = np.asarray(triangles)
+
+        # convert vertices from grid units to cartesian angstroms
+        for i in range(np_vertices.shape[0]):
+            np_vertices[i] = self.map_manager.grid_units_to_cart(np_vertices[i])
+
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
         target = max(1000, len(np_triangles) / decimation_factor)
@@ -121,11 +124,6 @@ class MapMesh:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        voxel_sizes = self.map_manager.pixel_sizes()
-        if voxel_sizes[0] > 0.0001:
-            Logs.debug("Setting voxels")
-            voxel_size = np.array(voxel_sizes)
-            vertices *= voxel_size
 
         vertices = np.array(vertices)
         normals = np.array(normals)
