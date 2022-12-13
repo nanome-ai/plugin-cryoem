@@ -97,7 +97,7 @@ class MapMeshTestCase(unittest.TestCase):
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 4395
             expected_normals = 4395
-            expected_triangles = 7986
+            expected_triangles = 7956
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
