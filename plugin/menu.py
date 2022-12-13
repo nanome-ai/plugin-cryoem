@@ -136,12 +136,13 @@ class SearchMenu:
 
         self.current_group = "Group 1"
         # For development only
-        # self.ti_rcsb_query.input_text = '7q1u'
-        # self.ti_embl_query.input_text = '13764'
-        self.ti_rcsb_query.input_text = '5k7n'
-        self.ti_embl_query.input_text = '8216'
-        # self.ti_rcsb_query.input_text = '7c4u'
-        # self.ti_embl_query.input_text = '30288'
+        # rcsb, embl = ['4znn', '3001']  # 94.33º
+        rcsb, embl = ['5k7n', '8216']  # 111.55º
+        # rcsb, embl = ['5vos', '8720']  # 100.02º
+        # rcsb, embl = ['7c4u', '30288']  # small molecule
+        # rcsb, embl = ['7q1u', '13764']  # large protein
+        self.ti_rcsb_query.input_text = rcsb
+        self.ti_embl_query.input_text = embl
 
     @property
     def temp_dir(self):
@@ -168,7 +169,8 @@ class SearchMenu:
         Logs.debug(f"EMBL query: {embid_id}")
 
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
-        isovalue = self.get_preferred_isovalue(embid_id)
+        metadata = self.download_metadata_from_emdbid(embid_id)
+        isovalue = self.get_isovalue_from_metadata(metadata)
         await self._plugin.add_mapgz_to_group(map_file, isovalue)
         self._plugin.update_content(btn)
 
@@ -186,14 +188,14 @@ class SearchMenu:
             f.write(response.content)
         return file_path
 
-    def get_preferred_isovalue(self, emdbid):
-        # Get the isovalue that is closest to the mean of the map data
-        # This is a hack to get a good isovalue for the map
+    def download_metadata_from_emdbid(self, emdbid):
         Logs.message("Downloading EM metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
-        # Parse xml and get resolution value
-        xml_root = ET.fromstring(response.content)
+        return ET.fromstring(response.content)
+
+    def get_isovalue_from_metadata(self, xml_root):
+        # Parse xml and get isovalue
         contour_list_ele = next(xml_root.iter("contour_list"))
         for child in contour_list_ele:
             if child.tag == "contour" and child.attrib["primary"].lower() == 'true':
@@ -203,7 +205,7 @@ class SearchMenu:
         try:
             isovalue = float(isovalue)
         except ValueError:
-            Logs.warning("Could not parse resolution value from XML")
+            Logs.warning("Could not parse isovalue from XML")
             isovalue = None
         return isovalue
 

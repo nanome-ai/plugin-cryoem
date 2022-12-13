@@ -1,4 +1,5 @@
 from nanome.api import structure
+from nanome.util import Color
 
 
 def cpk_colors(a):
@@ -129,9 +130,10 @@ def cpk_colors(a):
     return list(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + [1.0]
 
 
-def create_hidden_complex(comp_name=None):
+def create_hidden_complex(comp_name=None, bounds=None):
     # Create a nanome complex to attach the mesh to
     # create viewport sphere and position at current map position
+    bounds = bounds or [[-10, -10, -10], [10, 10, 10]]
     comp = structure.Complex()
     molecule = structure.Molecule()
     chain = structure.Chain()
@@ -144,9 +146,9 @@ def create_hidden_complex(comp_name=None):
     chain.add_residue(residue)
 
     # create invisible atoms to create bounding box
-    for i in [-10, 10]:
+    for x, y, z in bounds:
         atom = structure.Atom()
         atom.set_visible(False)
-        atom.position.set(i, i, i)
+        atom.position.set(x, y, z)
         residue.add_atom(atom)
     return comp

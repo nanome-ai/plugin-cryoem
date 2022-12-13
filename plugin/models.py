@@ -84,13 +84,20 @@ class MapMesh:
 
     def _load_map_file(self):
         dm = DataManager()
-        self.complex = create_hidden_complex(self.map_gz_file)
         with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
             mrc_filepath = mrc_file.name
             with gzip.open(self.map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
                 self.map_manager = dm.get_real_map(mrc_filepath)
-                self.complex.name = os.path.basename(self.map_gz_file)
+
+        grid_min = self.map_manager.origin
+        grid_max = self.map_manager.data.last()
+        angstrom_min = self.map_manager.grid_units_to_cart(grid_min)
+        angstrom_max = self.map_manager.grid_units_to_cart(grid_max)
+        bounds = [angstrom_min, angstrom_max]
+
+        self.complex = create_hidden_complex(self.map_gz_file, bounds)
+        self.complex.name = os.path.basename(self.map_gz_file)
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")
@@ -101,29 +108,28 @@ class MapMesh:
         # this makes sure the mesh is in the same coordinates as the molecule
         map_origin = self.map_manager.origin
         vertices += np.asarray(map_origin)
-        np_vertices = np.asarray(vertices)
-        np_triangles = np.asarray(triangles)
+
+        # convert vertices from grid units to cartesian angstroms
+        for i in range(vertices.shape[0]):
+            vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
+
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
-        target = max(1000, len(np_triangles) / decimation_factor)
+        target = max(1000, len(triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
-        mesh_simplifier.setMesh(np_vertices, np_triangles)
+        mesh_simplifier.setMesh(vertices, triangles)
         mesh_simplifier.simplify_mesh(
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
-        voxel_sizes = self.map_manager.pixel_sizes()
-        if voxel_sizes[0] > 0.0001:
-            Logs.debug("Setting voxels")
-            voxel_size = np.array(voxel_sizes)
-            vertices *= voxel_size
 
-        computed_vertices = np.array(vertices)
-        computed_normals = np.array(normals)
-        computed_triangles = np.array(triangles)
+        vertices = np.array(vertices)
+        normals = np.array(normals)
+        triangles = np.array(triangles)
+
         Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
-            computed_vertices, computed_normals, computed_triangles, radius, position)
+            vertices, normals, triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -265,13 +271,20 @@ class MapGroup:
         kwargs = {
             'ignore_symmetry_conflicts': True
         }
-        if hasattr(self, '_model'):
-            kwargs['model'] = self._model
+        model = None
+        if hasattr(self, '_model') and self._model:
+            model = self._model
+            kwargs['model'] = model
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
+        # if model:
+        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
+        # else:
         mmm.generate_map()
+
+        # mmm.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
@@ -304,7 +317,7 @@ class MapGroup:
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
-        result, indices = kdtree.query(verts, distance_upper_bound=2)
+        _, indices = kdtree.query(verts, distance_upper_bound=2)
         colors = []
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -354,7 +367,7 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
-        result, indices = kdtree.query(
+        _, indices = kdtree.query(
             verts, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
@@ -382,7 +395,7 @@ class MapGroup:
         # Create a KDTree for fast neighbor search
         # Look for the closest atom near each vertex
         kdtree = KDTree(np.array(atom_positions))
-        result, indices = kdtree.query(
+        _, indices = kdtree.query(
             verts, distance_upper_bound=20)
 
         colors = []
