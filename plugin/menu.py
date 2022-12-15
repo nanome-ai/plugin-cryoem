@@ -173,8 +173,8 @@ class SearchMenu:
         await self._plugin.add_pdb_to_group(pdb_path)
 
         # Reenable embl search button
-        self.btn_rcsb_submit.unusable = False
-        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        self.btn_embl_submit.unusable = False
+        self.btn_embl_submit.text.value.unusable = "Downloading..."
         self._plugin.update_content(self.btn_embl_submit, btn)
 
     @async_callback
