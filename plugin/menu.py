@@ -161,22 +161,40 @@ class SearchMenu:
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
+
+        # Disable RCSB button
+        self.btn_embl_submit.unusable = True
+        self.btn_embl_submit.text.value.unusable = "Search"
+        self._plugin.update_content(self.btn_embl_submit)
+
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
         await self._plugin.add_pdb_to_group(pdb_path)
-        self._plugin.update_content(btn)
+
+        # Reenable embl search button
+        self.btn_rcsb_submit.unusable = False
+        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        self._plugin.update_content(self.btn_embl_submit, btn)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
 
+        # Disable RCSB button
+        self.btn_rcsb_submit.unusable = True
+        self.btn_rcsb_submit.text.value.unusable = "Search"
+        self._plugin.update_content(self.btn_rcsb_submit)
+
         metadata = self.download_metadata_from_emdbid(embid_id)
         map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata)
         isovalue = self.get_isovalue_from_metadata(metadata)
         await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
-        self._plugin.update_content(btn)
+        # Reenable rcsb search button
+        self.btn_rcsb_submit.unusable = False
+        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        self._plugin.update_content(self.btn_rcsb_submit, btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -297,11 +315,6 @@ class EditMeshMenu:
 
         self.ln_isovalue_line: ui.LayoutNode = root.find_node('ln_isovalue_line')
 
-        # self.btn_show_hide_map: ui.Button = root.find_node('btn_show_hide_map').get_content()
-        # self.btn_show_hide_map.switch.active = True
-        # self.btn_show_hide_map.toggle_on_press = True
-        # self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
-
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
@@ -363,7 +376,7 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self, _):
+    async def redraw_map(self, btn=None):
         if self.viewport_editor.is_editing:
             self.viewport_editor.update_radius(self.radius)
             return
