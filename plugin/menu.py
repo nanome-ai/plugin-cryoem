@@ -172,7 +172,7 @@ class SearchMenu:
         map_file = self.download_cryoem_map_from_emdbid(embid_id)
         metadata = self.download_metadata_from_emdbid(embid_id)
         isovalue = self.get_isovalue_from_metadata(metadata)
-        await self._plugin.add_mapgz_to_group(map_file, isovalue)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
         self._plugin.update_content(btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
@@ -387,6 +387,8 @@ class EditMeshMenu:
             else:
                 item.selected = False
 
+        resolution = self.get_resolution_from_metadata(map_group.metadata)
+        self.lbl_resolution.text_value = f'{resolution} A'
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
         self.set_radius_ui(self.map_group.radius)
@@ -449,6 +451,21 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
+
+    def get_resolution_from_metadata(self, metadata: ET.ElementTree):
+        # Parse xml and get isovalue
+        final_reconstruction_ele = next(metadata.iter("final_reconstruction"))
+        for child in final_reconstruction_ele:
+            if child.tag == "resolution":
+                res_ele = next(child.iter("resolution"))
+                resolution_text = res_ele.text
+                break
+        try:
+            resolution = float(resolution_text)
+        except ValueError:
+            Logs.warning("Could not parse resolution from XML")
+            resolution = None
+        return resolution
 
     # def set_wireframe_mode(self, btn):
     #     toggle = btn.selected

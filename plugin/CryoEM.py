@@ -40,7 +40,6 @@ class CryoEM(nanome.AsyncPluginInstance):
                 break
             group_num += 1
         self.groups.append(map_group)
-        self.menu.render(selected_mapgroup=map_group)
 
     def get_group(self, group_name):
         return next((
@@ -73,7 +72,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
 
-    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None):
+    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None, metadata=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:
@@ -82,6 +81,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
+        mapgroup.metadata = metadata
         await mapgroup.add_map_gz(map_gz_filepath)
         if mapgroup.model_complex:
             # Get latest position of model complex
