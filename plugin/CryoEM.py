@@ -1,4 +1,3 @@
-import os
 import tempfile
 from pathlib import Path
 
@@ -90,7 +89,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
         self.menu.render(selected_mapgroup=mapgroup)
-
 
     async def delete_mapgroup(self, map_group: MapGroup):
         map_comp = map_group.map_mesh.complex
