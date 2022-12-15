@@ -1,3 +1,4 @@
+import asyncio
 import nanome
 import requests
 import time
@@ -55,6 +56,7 @@ class MainMenu:
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
+        self.render()
 
     def on_btn_search_menu_pressed(self, btn):
         Logs.message('Loading Search menu')
@@ -368,7 +370,7 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self):
+    async def redraw_map(self, _):
         if self.viewport_editor.is_editing:
             self.viewport_editor.update_radius(self.radius)
             return
@@ -413,22 +415,24 @@ class EditMeshMenu:
                 item.selected = False
 
         resolution = self.get_resolution_from_metadata(map_group.metadata)
-        self.lbl_resolution.text_value = f'{resolution} A'
+        self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
         self.set_radius_ui(self.map_group.radius)
 
         self._plugin.update_menu(self._menu)
-        if map_group.has_map():
-            # Generate histogram in background
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                Logs.debug("Generating histogram...")
-                fut = executor.submit(map_group.generate_histogram, self.temp_dir)
-                img_filepath = fut.result()
-                self.img_histogram.file_path = img_filepath
-                self.sld_isovalue.min_value = map_group.hist_x_min
-                self.sld_isovalue.max_value = map_group.hist_x_max
-                self._plugin.update_content(self.img_histogram, self.sld_isovalue)
+        if map_group.has_map() and not map_group.has_histogram():
+            loop = asyncio.get_event_loop()
+            loop.create_task(self._setup_histogram(map_group))
+
+    async def _setup_histogram(self, map_group: MapGroup):
+        # Generate histogram in background
+        Logs.debug("Generating histogram...")
+        img_filepath = map_group.generate_histogram(self.temp_dir)
+        self.img_histogram.file_path = img_filepath
+        self.sld_isovalue.min_value = map_group.hist_x_min
+        self.sld_isovalue.max_value = map_group.hist_x_max
+        self._plugin.update_content(self.img_histogram, self.sld_isovalue)
 
     @property
     def isovalue(self):
@@ -480,6 +484,7 @@ class EditMeshMenu:
     def get_resolution_from_metadata(self, metadata: ET.ElementTree):
         # Parse xml and get isovalue
         final_reconstruction_ele = next(metadata.iter("final_reconstruction"))
+        resolution_text = ""
         for child in final_reconstruction_ele:
             if child.tag == "resolution":
                 res_ele = next(child.iter("resolution"))

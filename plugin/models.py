@@ -196,8 +196,8 @@ class MapGroup:
         self.files: List[str] = kwargs.get("files", [])
         self.map_mesh = MapMesh(plugin)
 
-        self.hist_x_min = 0.0
-        self.hist_x_max = 1.0
+        self.hist_x_min = float('-inf')
+        self.hist_x_max = float('inf')
 
         self.__visible = True
         self.position = [0.0, 0.0, 0.0]
@@ -424,6 +424,9 @@ class MapGroup:
 
     def has_map(self):
         return self.map_mesh.complex is not None
+
+    def has_histogram(self):
+        return self.hist_x_min != float('-inf')
 
     def remove_group_objects(self, comp_list):
         comps_to_delete = []
