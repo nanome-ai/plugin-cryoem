@@ -193,9 +193,11 @@ class MapGroup:
         self.group_name: str = kwargs.get("group_name", "")
         self.files: List[str] = kwargs.get("files", [])
         self.map_mesh = MapMesh(plugin)
+        self.metadata = None
 
         self.hist_x_min = float('-inf')
         self.hist_x_max = float('inf')
+        self.png_tempfile = None
 
         self.__visible = True
         self.position = [0.0, 0.0, 0.0]

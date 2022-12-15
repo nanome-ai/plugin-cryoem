@@ -73,7 +73,7 @@ class MainMenu:
             lbl.text_value = map_group.group_name
 
             btn: ui.Button = ln.get_content()
-            btn.register_pressed_callback(partial(self.open_group_details, map_group))
+            btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
             btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
@@ -100,7 +100,7 @@ class MainMenu:
                 label = item.find_node('Label').get_content()
                 return label.text_value
 
-    def open_group_details(self, map_group, btn=None):
+    def open_edit_mesh_menu(self, map_group, btn=None):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
@@ -406,23 +406,26 @@ class EditMeshMenu:
                 item.selected = True
             else:
                 item.selected = False
-
-        resolution = self.get_resolution_from_metadata(map_group.metadata)
-        self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
+        if map_group.metadata:
+            resolution = self.get_resolution_from_metadata(map_group.metadata)
+            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
         self.set_radius_ui(self.map_group.radius)
 
         self._plugin.update_menu(self._menu)
-        if map_group.has_map() and not map_group.has_histogram():
+        if map_group.has_map() and not map_group.png_tempfile:
             Logs.debug("Generating histogram...")
-            img_filepath = map_group.generate_histogram(self.temp_dir)
-            Logs.debug("Histogram generated")
-            self.ln_img_histogram.add_new_image(img_filepath)
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
+            self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            self._plugin.update_content(self.sld_isovalue)
+            map_group.generate_histogram(self.temp_dir)
+            Logs.debug("Histogram generated")
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self.sld_isovalue.min_value = map_group.hist_x_min
+        self.sld_isovalue.max_value = map_group.hist_x_max
+        self._plugin.update_node(self.ln_img_histogram)
+        self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
