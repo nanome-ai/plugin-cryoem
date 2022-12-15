@@ -1,4 +1,3 @@
-import os
 import tempfile
 from pathlib import Path
 
@@ -24,7 +23,6 @@ class CryoEM(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_run(self):
-        # await self.load_map_and_model()
         self.menu.render(force_enable=True)
 
     def enable_search_menu(self):
@@ -40,7 +38,6 @@ class CryoEM(nanome.AsyncPluginInstance):
                 break
             group_num += 1
         self.groups.append(map_group)
-        self.menu.render(selected_mapgroup=map_group)
 
     def get_group(self, group_name):
         return next((
@@ -73,7 +70,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
 
-    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None):
+    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None, metadata=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:
@@ -82,6 +79,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
+        mapgroup.metadata = metadata
         await mapgroup.add_map_gz(map_gz_filepath)
         if mapgroup.model_complex:
             # Get latest position of model complex
@@ -91,35 +89,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
         self.menu.render(selected_mapgroup=mapgroup)
-
-    async def load_map_and_model(self):
-        """Function for development that loads a map and model from the fixtures folder.
-
-        This is useful for validating that a map and model can still aligned correctly in the worspace
-        Having every step in one function can be useful for perspective
-        """
-        Logs.message("Loading Map and PDB file")
-        fixtures_path = os.path.join(os.getcwd(), 'tests', 'fixtures')
-        map_gz_file = os.path.join(fixtures_path, 'emd_30288.map.gz')
-        pdb_file = os.path.join(fixtures_path, "7c4u.pdb")
-
-        map_group = MapGroup()
-        map_group.add_pdb(pdb_file)
-        map_group.add_map_gz(map_gz_file)
-        map_group.isovalue = 2.5
-        map_group.opacity = 0.65
-
-        # Load pdb and associate resulting complex with MapGroup
-        await self.send_files_to_load([pdb_file])
-        shallow_comp = (await self.request_complex_list())[0]
-        comp = (await self.request_complexes([shallow_comp.index]))[0]
-        map_group.add_model_complex(comp)
-        mesh = map_group.generate_mesh()
-        anchor = mesh.anchors[0]
-        anchor.anchor_type = enums.ShapeAnchorType.Complex
-        anchor.target = comp.index
-        await mesh.upload()
-        return map_group
 
     async def delete_mapgroup(self, map_group: MapGroup):
         map_comp = map_group.map_mesh.complex

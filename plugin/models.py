@@ -36,8 +36,6 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.map_manager: map_manager = None
-        self.wireframe_mode: bool = False
-        self.wireframe_vertices: List[float] = []
         if map_gz_file:
             self._load_map_file()
 
@@ -195,17 +193,18 @@ class MapGroup:
         self.group_name: str = kwargs.get("group_name", "")
         self.files: List[str] = kwargs.get("files", [])
         self.map_mesh = MapMesh(plugin)
+        self.metadata = None
 
-        self.hist_x_min = 0.0
-        self.hist_x_max = 1.0
+        self.hist_x_min = float('-inf')
+        self.hist_x_max = float('inf')
+        self.png_tempfile = None
 
         self.__visible = True
         self.position = [0.0, 0.0, 0.0]
         self.isovalue = 2.5
         self.opacity = 0.65
-        self.radius = 15
+        self.radius = -1
         self.color_scheme = enums.ColorScheme.Element
-        self.wireframe_mode: bool = False
 
         self._model: manager = None
         self.__model_complex: structure.Complex = None
@@ -279,12 +278,7 @@ class MapGroup:
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
-        # if model:
-        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
-        # else:
         mmm.generate_map()
-
-        # mmm.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
@@ -307,7 +301,7 @@ class MapGroup:
         Logs.message("Mesh colored")
 
     def color_by_element(self, map_mesh, model_complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
         atom_positions = []
@@ -327,7 +321,7 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
 
@@ -345,7 +339,7 @@ class MapGroup:
                 ")", "").replace(",", "").split()
             chain_color = [int(i) / 255.0 for i in col] + [1.0]
             id_chain += 1
-            for atom in c.atoms:
+            for _ in c.atoms:
                 color_per_atom.append(chain_color)
 
         colors = []
@@ -377,7 +371,7 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
 
@@ -430,6 +424,9 @@ class MapGroup:
     def has_map(self):
         return self.map_mesh.complex is not None
 
+    def has_histogram(self):
+        return self.hist_x_min != float('-inf')
+
     def remove_group_objects(self, comp_list):
         comps_to_delete = []
         if self.model_complex in comp_list:
@@ -450,6 +447,7 @@ class ViewportEditor:
         self.is_editing = False
         self.complex = None
         self.sphere = None
+        self.default_radius = 15
 
     async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
@@ -483,7 +481,8 @@ class ViewportEditor:
             # create viewport sphere
             sphere = shapes.Sphere()
             self.sphere = sphere
-            sphere.radius = self.map_group.radius
+            preset_radius = self.map_group.radius
+            sphere.radius = preset_radius if preset_radius >= 0 else self.default_radius
             sphere.color = Color(100, 100, 100, 127)
 
             anchor = sphere.anchors[0]

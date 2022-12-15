@@ -1,5 +1,4 @@
 from nanome.api import structure
-from nanome.util import Color
 
 
 def cpk_colors(a):

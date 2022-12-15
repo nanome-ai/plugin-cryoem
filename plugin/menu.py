@@ -45,12 +45,16 @@ class MainMenu:
             self._menu.enabled = True
 
         groups = self._plugin.groups
+        # By default, select the first group
+        if groups and not selected_mapgroup:
+            selected_mapgroup = groups[0]
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
+        self.render()
 
     def on_btn_search_menu_pressed(self, btn):
         Logs.message('Loading Search menu')
@@ -69,7 +73,7 @@ class MainMenu:
             lbl.text_value = map_group.group_name
 
             btn: ui.Button = ln.get_content()
-            btn.register_pressed_callback(partial(self.open_group_details, map_group))
+            btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
             btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
@@ -96,7 +100,7 @@ class MainMenu:
                 label = item.find_node('Label').get_content()
                 return label.text_value
 
-    def open_group_details(self, map_group, btn=None):
+    def open_edit_mesh_menu(self, map_group, btn=None):
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
@@ -133,7 +137,7 @@ class SearchMenu:
 
         self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
         self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
-
+        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         self.current_group = "Group 1"
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
@@ -157,22 +161,40 @@ class SearchMenu:
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
+
+        # Disable RCSB button
+        self.btn_embl_submit.unusable = True
+        self.btn_embl_submit.text.value.unusable = "Search"
+        self._plugin.update_content(self.btn_embl_submit)
+
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
         await self._plugin.add_pdb_to_group(pdb_path)
-        self._plugin.update_content(btn)
+
+        # Reenable embl search button
+        self.btn_embl_submit.unusable = False
+        self.btn_embl_submit.text.value.unusable = "Downloading..."
+        self._plugin.update_content(self.btn_embl_submit, btn)
 
     @async_callback
     async def on_embl_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
 
-        map_file = self.download_cryoem_map_from_emdbid(embid_id)
+        # Disable RCSB button
+        self.btn_rcsb_submit.unusable = True
+        self.btn_rcsb_submit.text.value.unusable = "Search"
+        self._plugin.update_content(self.btn_rcsb_submit)
+
         metadata = self.download_metadata_from_emdbid(embid_id)
+        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata)
         isovalue = self.get_isovalue_from_metadata(metadata)
-        await self._plugin.add_mapgz_to_group(map_file, isovalue)
-        self._plugin.update_content(btn)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
+        # Reenable rcsb search button
+        self.btn_rcsb_submit.unusable = False
+        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        self._plugin.update_content(self.btn_rcsb_submit, btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -209,11 +231,28 @@ class SearchMenu:
             isovalue = None
         return isovalue
 
-    def download_cryoem_map_from_emdbid(self, emdbid):
-        Logs.message("Downloading EM data for EMDBID:", emdbid)
+    def get_filesize_from_metadata(self, xml_root):
+        # Parse xml and get isovalue
+        map_tag = next(xml_root.iter("map"))
+        size_kbytes = map_tag.attrib.get("size_kbytes", None)
+        try:
+            filesize = int(size_kbytes)
+        except ValueError:
+            Logs.warning("Could not parse isovalue from XML")
+            filesize = None
+        return filesize
+
+    def download_cryoem_map_from_emdbid(self, emdbid, metadata=None):
+        Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
+        # Set up loading bar
+        self.lb_embl_download.enabled = True
+        self._plugin.update_node(self.lb_embl_download)
+        loading_bar = self.lb_embl_download.get_content()
+
+        file_size = self.get_filesize_from_metadata(metadata)
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             chunk_size = 8192
@@ -226,8 +265,13 @@ class SearchMenu:
                     f.write(chunk)
                     now = time.time()
                     if now - data_check > 5:
-                        Logs.debug(f"{round(now - start_time, 0)} seconds: bytes downloaded: {downloaded_chunks}")
+                        kb_downloaded = downloaded_chunks / 1000
+                        Logs.debug(f"{int(now - start_time)} seconds: kbs downloaded: {kb_downloaded}")
+                        loading_bar.percentage = kb_downloaded / file_size
+                        self._plugin.update_content(loading_bar)
                         data_check = now
+        self.lb_embl_download.enabled = False
+        self._plugin.update_node(self.lb_embl_download)
         return file_path
 
 
@@ -271,17 +315,7 @@ class EditMeshMenu:
 
         self.ln_isovalue_line: ui.LayoutNode = root.find_node('ln_isovalue_line')
 
-        # self.btn_show_hide_map: ui.Button = root.find_node('btn_show_hide_map').get_content()
-        # self.btn_show_hide_map.switch.active = True
-        # self.btn_show_hide_map.toggle_on_press = True
-        # self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
-
-        # self.btn_wireframe: ui.Button = root.find_node('btn_wireframe').get_content()
-        # self.btn_wireframe.switch.active = True
-        # self.btn_wireframe.toggle_on_press = True
-        # self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
-
-        self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
+        self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
@@ -342,7 +376,7 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self, content=None):
+    async def redraw_map(self, btn=None):
         if self.viewport_editor.is_editing:
             self.viewport_editor.update_radius(self.radius)
             return
@@ -385,20 +419,28 @@ class EditMeshMenu:
                 item.selected = True
             else:
                 item.selected = False
-
-        # Generate histogram
-        if map_group.has_map():
-            img_filepath = map_group.generate_histogram(self.temp_dir)
-            self.img_histogram.file_path = img_filepath
-
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
-
+        if map_group.metadata:
+            resolution = self.get_resolution_from_metadata(map_group.metadata)
+            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
-        self.set_radius_ui(self.map_group.radius)
+
+        radius = self.map_group.radius if self.map_group.radius >= 0 else 15
+        self.set_radius_ui(radius)
 
         self._plugin.update_menu(self._menu)
+        if map_group.has_map() and not map_group.png_tempfile:
+            Logs.debug("Generating histogram...")
+            self.ln_img_histogram.add_new_label('Loading Histogram...')
+            self._plugin.update_node(self.ln_img_histogram)
+            map_group.generate_histogram(self.temp_dir)
+            Logs.debug("Histogram generated")
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self.sld_isovalue.min_value = map_group.hist_x_min
+        self.sld_isovalue.max_value = map_group.hist_x_max
+        self._plugin.update_node(self.ln_img_histogram)
+        self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
@@ -447,17 +489,18 @@ class EditMeshMenu:
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
 
-    # def set_wireframe_mode(self, btn):
-    #     toggle = btn.selected
-    #     Logs.message(f"Wireframe mode set to {toggle}")
-    #     self.map_group.toggle_wireframe_mode(toggle)
-    #     self.map_group.mesh.upload()
-
-    # @async_callback
-    # async def toggle_map_visibility(self, btn):
-    #     toggle = btn.selected
-    #     Logs.message(f"Map visibility set to {toggle}")
-    #     opacity = self.opacity if toggle else 0
-    #     color = self.map_group.color_scheme
-    #     await self.map_group.update_color(color, opacity)
-    #     self.map_group.mesh.upload()
+    def get_resolution_from_metadata(self, metadata: ET.ElementTree):
+        # Parse xml and get isovalue
+        final_reconstruction_ele = next(metadata.iter("final_reconstruction"))
+        resolution_text = ""
+        for child in final_reconstruction_ele:
+            if child.tag == "resolution":
+                res_ele = next(child.iter("resolution"))
+                resolution_text = res_ele.text
+                break
+        try:
+            resolution = float(resolution_text)
+        except ValueError:
+            Logs.warning("Could not parse resolution from XML")
+            resolution = None
+        return resolution
