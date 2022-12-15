@@ -302,11 +302,6 @@ class EditMeshMenu:
         # self.btn_show_hide_map.toggle_on_press = True
         # self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
 
-        # self.btn_wireframe: ui.Button = root.find_node('btn_wireframe').get_content()
-        # self.btn_wireframe.switch.active = True
-        # self.btn_wireframe.toggle_on_press = True
-        # self.btn_wireframe.register_pressed_callback(self.set_wireframe_mode)
-
         self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
@@ -490,18 +485,3 @@ class EditMeshMenu:
             Logs.warning("Could not parse resolution from XML")
             resolution = None
         return resolution
-
-    # def set_wireframe_mode(self, btn):
-    #     toggle = btn.selected
-    #     Logs.message(f"Wireframe mode set to {toggle}")
-    #     self.map_group.toggle_wireframe_mode(toggle)
-    #     self.map_group.mesh.upload()
-
-    # @async_callback
-    # async def toggle_map_visibility(self, btn):
-    #     toggle = btn.selected
-    #     Logs.message(f"Map visibility set to {toggle}")
-    #     opacity = self.opacity if toggle else 0
-    #     color = self.map_group.color_scheme
-    #     await self.map_group.update_color(color, opacity)
-    #     self.map_group.mesh.upload()

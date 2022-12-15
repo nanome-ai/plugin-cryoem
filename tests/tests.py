@@ -63,14 +63,6 @@ class MapGroupTestCase(unittest.TestCase):
         run_awaitable(validate_generate_mesh, self)
         # run_awaitable(validate_generate_mesh, self)
 
-    # def test_toggle_wireframe_mode(self):
-    #     # wireframe_mode = self.map_group.wireframe_mode
-    #     self.assertEqual(self.map_group.wireframe_mode, False)
-    #     self.map_group.toggle_wireframe_mode(True)
-    #     self.assertEqual(self.map_group.wireframe_mode, True)
-    #     self.map_group.toggle_wireframe_mode(False)
-    #     self.assertEqual(self.map_group.wireframe_mode, False)
-
 
 class MapMeshTestCase(unittest.TestCase):
 

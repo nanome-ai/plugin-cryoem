@@ -36,8 +36,6 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.map_manager: map_manager = None
-        self.wireframe_mode: bool = False
-        self.wireframe_vertices: List[float] = []
         if map_gz_file:
             self._load_map_file()
 
@@ -127,7 +125,7 @@ class MapMesh:
         normals = np.array(normals)
         triangles = np.array(triangles)
 
-        Logs.debug("Limiting view...")
+        # Logs.debug("Limiting view...")
         # vertices, normals, triangles = self.limit_view(
         #     vertices, normals, triangles, radius, position)
 
@@ -205,7 +203,6 @@ class MapGroup:
         self.opacity = 0.65
         self.radius = 15
         self.color_scheme = enums.ColorScheme.Element
-        self.wireframe_mode: bool = False
 
         self._model: manager = None
         self.__model_complex: structure.Complex = None
@@ -302,7 +299,7 @@ class MapGroup:
         Logs.message("Mesh colored")
 
     def color_by_element(self, map_mesh, model_complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
         atom_positions = []
@@ -322,7 +319,7 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
 
@@ -340,7 +337,7 @@ class MapGroup:
                 ")", "").replace(",", "").split()
             chain_color = [int(i) / 255.0 for i in col] + [1.0]
             id_chain += 1
-            for atom in c.atoms:
+            for _ in c.atoms:
                 color_per_atom.append(chain_color)
 
         colors = []
@@ -372,7 +369,7 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
-        verts = map_mesh.computed_vertices if not map_mesh.wireframe_mode else map_mesh.wire_vertices
+        verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
 
