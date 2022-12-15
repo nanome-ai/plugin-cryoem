@@ -83,9 +83,12 @@ class MapMeshTestCase(unittest.TestCase):
         self.map_mesh.add_map_gz_file(self.map_file)
         self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
 
-    def test_load(self):
+    def test_load_no_limit_view(self):
+        """Validate that running load() generates the NanomeMesh.
+
+        when radius is set to -1, the mesh should be generated for the entire map.
+        """
         async def validate_load(self):
-            """Validate that running load() generates the NanomeMesh."""
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 285798
             expected_normals = 537129
@@ -93,7 +96,7 @@ class MapMeshTestCase(unittest.TestCase):
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
-            radius = -1
+            radius = -1  # Indicates no limit view
             position = 0.1
 
             fut = asyncio.Future()
@@ -108,3 +111,32 @@ class MapMeshTestCase(unittest.TestCase):
             self.assertEqual(len(mesh.normals), expected_normals)
             self.assertEqual(len(mesh.triangles), expected_triangles)
         run_awaitable(validate_load, self)
+
+    def test_load_limit_view(self):
+        """Validate that running load() generates the NanomeMesh.
+        
+        when radius is set >= 0, only partial mesh should be generated.
+        """
+        async def validate_load_limit_view(self):
+            map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+            expected_vertices = 4440
+            expected_normals = 4440
+            expected_triangles = 8034
+            self.map_mesh.add_map_gz_file(map_file)
+            isovalue = 0.2
+            opacity = 0.65
+            radius = 5  # Indicates limit view to 15 angstroms around position
+            position = [0, 0, 0]
+
+            fut = asyncio.Future()
+            fut.set_result([structure.Complex()])
+            self.plugin.add_to_workspace.return_value = fut
+            mesh = self.map_mesh.mesh
+            self.assertEqual(len(mesh.vertices), 0)
+            self.assertEqual(len(mesh.normals), 0)
+            self.assertEqual(len(mesh.triangles), 0)
+            await self.map_mesh.load(isovalue, opacity, radius, position)
+            self.assertEqual(len(mesh.vertices), expected_vertices)
+            self.assertEqual(len(mesh.normals), expected_normals)
+            self.assertEqual(len(mesh.triangles), expected_triangles)
+        run_awaitable(validate_load_limit_view, self)
