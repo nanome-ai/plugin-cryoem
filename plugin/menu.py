@@ -141,9 +141,9 @@ class SearchMenu:
         self.current_group = "Group 1"
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
+        # rcsb, embl = ['5k7n', '8216']  # 111.55º
         # rcsb, embl = ['5vos', '8720']  # 100.02º
-        # rcsb, embl = ['7c4u', '30288']  # small molecule
+        rcsb, embl = ['7c4u', '30288']  # small molecule
         # rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
@@ -225,7 +225,7 @@ class SearchMenu:
         return filesize
 
     def download_cryoem_map_from_emdbid(self, emdbid, metadata=None):
-        Logs.message("Downloading EM data for EMDBID:", emdbid)
+        Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
