@@ -93,7 +93,7 @@ class MapMeshTestCase(unittest.TestCase):
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
-            radius = 5
+            radius = -1
             position = 0.1
 
             fut = asyncio.Future()
