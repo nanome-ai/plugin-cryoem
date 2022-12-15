@@ -46,6 +46,9 @@ class MainMenu:
             self._menu.enabled = True
 
         groups = self._plugin.groups
+        # By default, select the first group
+        if groups and not selected_mapgroup:
+            selected_mapgroup = groups[0]
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
