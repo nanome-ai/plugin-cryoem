@@ -343,7 +343,7 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self, content=None):
+    async def redraw_map(self):
         if self.viewport_editor.is_editing:
             self.viewport_editor.update_radius(self.radius)
             return
