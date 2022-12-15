@@ -302,7 +302,7 @@ class EditMeshMenu:
         # self.btn_show_hide_map.toggle_on_press = True
         # self.btn_show_hide_map.register_pressed_callback(self.toggle_map_visibility)
 
-        self.img_histogram: ui.Image = root.find_node('img_histogram').get_content()
+        self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
@@ -418,10 +418,11 @@ class EditMeshMenu:
             Logs.debug("Generating histogram...")
             img_filepath = map_group.generate_histogram(self.temp_dir)
             Logs.debug("Histogram generated")
-            self.img_histogram.file_path = img_filepath
+            self.ln_img_histogram.add_new_image(img_filepath)
             self.sld_isovalue.min_value = map_group.hist_x_min
             self.sld_isovalue.max_value = map_group.hist_x_max
-            self._plugin.update_content(self.img_histogram, self.sld_isovalue)
+            self._plugin.update_node(self.ln_img_histogram)
+            self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
