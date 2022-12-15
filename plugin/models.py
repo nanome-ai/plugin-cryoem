@@ -128,8 +128,8 @@ class MapMesh:
         triangles = np.array(triangles)
 
         Logs.debug("Limiting view...")
-        vertices, normals, triangles = self.limit_view(
-            vertices, normals, triangles, radius, position)
+        # vertices, normals, triangles = self.limit_view(
+        #     vertices, normals, triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()

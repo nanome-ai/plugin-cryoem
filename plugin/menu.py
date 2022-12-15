@@ -2,6 +2,7 @@ import nanome
 import requests
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
@@ -386,19 +387,21 @@ class EditMeshMenu:
             else:
                 item.selected = False
 
-        # Generate histogram
-        if map_group.has_map():
-            img_filepath = map_group.generate_histogram(self.temp_dir)
-            self.img_histogram.file_path = img_filepath
-
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
-
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
         self.set_radius_ui(self.map_group.radius)
 
         self._plugin.update_menu(self._menu)
+        if map_group.has_map():
+            # Generate histogram in background
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                Logs.debug("Generating histogram...")
+                fut = executor.submit(map_group.generate_histogram, self.temp_dir)
+                img_filepath = fut.result()
+                self.img_histogram.file_path = img_filepath
+                self.sld_isovalue.min_value = map_group.hist_x_min
+                self.sld_isovalue.max_value = map_group.hist_x_max
+                self._plugin.update_content(self.img_histogram, self.sld_isovalue)
 
     @property
     def isovalue(self):
