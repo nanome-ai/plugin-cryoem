@@ -1,9 +1,7 @@
-import asyncio
 import nanome
 import requests
 import time
 import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
@@ -422,17 +420,13 @@ class EditMeshMenu:
 
         self._plugin.update_menu(self._menu)
         if map_group.has_map() and not map_group.has_histogram():
-            loop = asyncio.get_event_loop()
-            loop.create_task(self._setup_histogram(map_group))
-
-    async def _setup_histogram(self, map_group: MapGroup):
-        # Generate histogram in background
-        Logs.debug("Generating histogram...")
-        img_filepath = map_group.generate_histogram(self.temp_dir)
-        self.img_histogram.file_path = img_filepath
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
-        self._plugin.update_content(self.img_histogram, self.sld_isovalue)
+            Logs.debug("Generating histogram...")
+            img_filepath = map_group.generate_histogram(self.temp_dir)
+            Logs.debug("Histogram generated")
+            self.img_histogram.file_path = img_filepath
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
+            self._plugin.update_content(self.img_histogram, self.sld_isovalue)
 
     @property
     def isovalue(self):
