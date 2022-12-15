@@ -125,9 +125,9 @@ class MapMesh:
         normals = np.array(normals)
         triangles = np.array(triangles)
 
-        # Logs.debug("Limiting view...")
-        # vertices, normals, triangles = self.limit_view(
-        #     vertices, normals, triangles, radius, position)
+        Logs.debug("Limiting view...")
+        vertices, normals, triangles = self.limit_view(
+            vertices, normals, triangles, radius, position)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -203,7 +203,7 @@ class MapGroup:
         self.position = [0.0, 0.0, 0.0]
         self.isovalue = 2.5
         self.opacity = 0.65
-        self.radius = 15
+        self.radius = -1
         self.color_scheme = enums.ColorScheme.Element
 
         self._model: manager = None
@@ -447,6 +447,7 @@ class ViewportEditor:
         self.is_editing = False
         self.complex = None
         self.sphere = None
+        self.default_radius = 15
 
     async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
@@ -480,7 +481,8 @@ class ViewportEditor:
             # create viewport sphere
             sphere = shapes.Sphere()
             self.sphere = sphere
-            sphere.radius = self.map_group.radius
+            preset_radius = self.map_group.radius
+            sphere.radius = preset_radius if preset_radius >= 0 else self.default_radius
             sphere.color = Color(100, 100, 100, 127)
 
             anchor = sphere.anchors[0]

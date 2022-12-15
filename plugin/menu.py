@@ -424,7 +424,9 @@ class EditMeshMenu:
             self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
-        self.set_radius_ui(self.map_group.radius)
+
+        radius = self.map_group.radius if self.map_group.radius >= 0 else 15
+        self.set_radius_ui(radius)
 
         self._plugin.update_menu(self._menu)
         if map_group.has_map() and not map_group.png_tempfile:
