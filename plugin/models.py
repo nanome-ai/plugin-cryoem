@@ -279,12 +279,7 @@ class MapGroup:
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
-        # if model:
-        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=2)
-        # else:
         mmm.generate_map()
-
-        # mmm.box_all_maps_around_model_and_shift_origin(box_cushion=3)
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
