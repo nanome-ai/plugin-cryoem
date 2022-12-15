@@ -137,7 +137,7 @@ class SearchMenu:
 
         self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
         self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
-
+        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         self.current_group = "Group 1"
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
@@ -172,8 +172,8 @@ class SearchMenu:
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMBL query: {embid_id}")
 
-        map_file = self.download_cryoem_map_from_emdbid(embid_id)
         metadata = self.download_metadata_from_emdbid(embid_id)
+        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata)
         isovalue = self.get_isovalue_from_metadata(metadata)
         await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
         self._plugin.update_content(btn)
@@ -213,11 +213,28 @@ class SearchMenu:
             isovalue = None
         return isovalue
 
-    def download_cryoem_map_from_emdbid(self, emdbid):
+    def get_filesize_from_metadata(self, xml_root):
+        # Parse xml and get isovalue
+        map_tag = next(xml_root.iter("map"))
+        size_kbytes = map_tag.attrib.get("size_kbytes", None)
+        try:
+            filesize = int(size_kbytes)
+        except ValueError:
+            Logs.warning("Could not parse isovalue from XML")
+            filesize = None
+        return filesize
+
+    def download_cryoem_map_from_emdbid(self, emdbid, metadata=None):
         Logs.message("Downloading EM data for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
+        # Set up loading bar
+        self.lb_embl_download.enabled = True
+        self._plugin.update_node(self.lb_embl_download)
+        loading_bar = self.lb_embl_download.get_content()
+
+        file_size = self.get_filesize_from_metadata(metadata)
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             chunk_size = 8192
@@ -230,8 +247,13 @@ class SearchMenu:
                     f.write(chunk)
                     now = time.time()
                     if now - data_check > 5:
-                        Logs.debug(f"{round(now - start_time, 0)} seconds: bytes downloaded: {downloaded_chunks}")
+                        kb_downloaded = downloaded_chunks / 1000
+                        Logs.debug(f"{round(now - start_time, 0)} seconds: bytes downloaded: {kb_downloaded}")
+                        loading_bar.percentage = kb_downloaded / file_size
+                        self._plugin.update_content(loading_bar)
                         data_check = now
+        self.lb_embl_download.enabled = False
+        self._plugin.update_node(self.lb_embl_download)
         return file_path
 
 
