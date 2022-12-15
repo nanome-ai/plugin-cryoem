@@ -114,7 +114,7 @@ class MapMeshTestCase(unittest.TestCase):
 
     def test_load_limit_view(self):
         """Validate that running load() generates the NanomeMesh.
-        
+
         when radius is set >= 0, only partial mesh should be generated.
         """
         async def validate_load_limit_view(self):
