@@ -255,7 +255,7 @@ class SearchMenu:
                     now = time.time()
                     if now - data_check > 5:
                         kb_downloaded = downloaded_chunks / 1000
-                        Logs.debug(f"{int(now - start_time)} seconds: kbs downloaded: {kb_downloaded}")
+                        Logs.debug(f"{int(now - start_time)} seconds: kbs downloaded: {kb_downloaded} / {file_size} kbs")
                         loading_bar.percentage = kb_downloaded / file_size
                         self._plugin.update_content(loading_bar)
                         data_check = now
