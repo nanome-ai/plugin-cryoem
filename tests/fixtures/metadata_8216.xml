@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<emd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://github.com/emdb-empiar/emdb-schemas/blob/master/v3/v3_0_1_7/emdb.xsd" emdb_id="EMD-8216" version="3.0.1.7">
+    <admin>
+        <current_status>
+            <date>2019-12-18</date>
+            <code>REL</code>
+            <processing_site>RCSB</processing_site>
+        </current_status>
+        <sites>
+            <deposition>RCSB</deposition>
+            <last_processing>RCSB</last_processing>
+        </sites>
+        <key_dates>
+            <deposition>2016-05-26</deposition>
+            <header_release>2016-06-22</header_release>
+            <map_release>2016-06-22</map_release>
+            <update>2019-12-18</update>
+        </key_dates>
+        <grant_support>
+            <grant_reference>
+                <funding_body>National Institutes of Health/National Institute on Aging (NIH/NIA)</funding_body>
+                <code>1R01-AG029430</code>
+                <country>United States</country>
+            </grant_reference>
+        </grant_support>
+        <title>MicroED structure of tau VQIVYK peptide at 1.1 A resolution</title>
+        <authors_list>
+            <author>de la Cruz MJ</author>
+            <author>Hattne J</author>
+            <author>Shi D</author>
+            <author>Seidler P</author>
+            <author>Rodriguez J</author>
+            <author>Reyes FE</author>
+            <author>Sawaya MR</author>
+            <author>Cascio D</author>
+            <author>Eisenberg D</author>
+            <author>Gonen T</author>
+        </authors_list>
+    </admin>
+    <crossreferences>
+        <citation_list>
+            <primary_citation>
+                <journal_citation published="true">
+                    <author order="1">de la Cruz MJ</author>
+                    <author order="2">Hattne J</author>
+                    <author order="3">Shi D</author>
+                    <author order="4">Seidler P</author>
+                    <author order="5">Rodriguez J</author>
+                    <author order="6">Reyes FE</author>
+                    <author order="7">Sawaya MR</author>
+                    <author order="8">Cascio D</author>
+                    <author order="9">Weiss SC</author>
+                    <author order="10">Kim SK</author>
+                    <author order="11">Hinck CS</author>
+                    <author order="12">Hinck AP</author>
+                    <author order="13">Calero G</author>
+                    <author order="14">Eisenberg D</author>
+                    <author order="15">Gonen T</author>
+                    <title>Atomic-resolution structures from fragmented protein crystals with the cryoEM method MicroED.</title>
+                    <journal_abbreviation>Nat. Methods</journal_abbreviation>
+                    <country>US</country>
+                    <volume>14</volume>
+                    <first_page>399</first_page>
+                    <last_page>402</last_page>
+                    <year>2017</year>
+                    <external_references type="PUBMED">28192420</external_references>
+                    <external_references type="DOI">doi:10.1038/nmeth.4178</external_references>
+                    <external_references type="ISSN">1548-7105</external_references>
+                </journal_citation>
+            </primary_citation>
+        </citation_list>
+        <emdb_list>
+            <emdb_reference>
+                <emdb_id>EMD-8216</emdb_id>
+                <relationship>
+                    <other>associated EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8217</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8218</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8219</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8220</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8221</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+            <emdb_reference>
+                <emdb_id>EMD-8222</emdb_id>
+                <relationship>
+                    <other>other EM volume</other>
+                </relationship>
+            </emdb_reference>
+        </emdb_list>
+        <pdb_list>
+            <pdb_reference>
+                <pdb_id>5k7n</pdb_id>
+                <relationship>
+                    <in_frame>FULLOVERLAP</in_frame>
+                </relationship>
+            </pdb_reference>
+        </pdb_list>
+    </crossreferences>
+    <sample>
+        <name>VQIVYK</name>
+        <supramolecule_list>
+            <organelle_or_cellular_component_supramolecule supramolecule_id="1">
+                <name>VQIVYK</name>
+                <parent>0</parent>
+                <macromolecule_list>
+                    <macromolecule>
+                        <macromolecule_id>1</macromolecule_id>
+                    </macromolecule>
+                </macromolecule_list>
+                <natural_source database="NCBI">
+                    <organism ncbi="9606">Homo sapiens</organism>
+                </natural_source>
+                <molecular_weight>
+                    <theoretical units="MDa">0.000747</theoretical>
+                </molecular_weight>
+            </organelle_or_cellular_component_supramolecule>
+        </supramolecule_list>
+        <macromolecule_list>
+            <protein_or_peptide macromolecule_id="1">
+                <name>VQIVYK</name>
+                <natural_source database="NCBI">
+                    <organism ncbi="9606">Homo sapiens</organism>
+                </natural_source>
+                <molecular_weight>
+                    <theoretical units="MDa">0.000749917</theoretical>
+                </molecular_weight>
+                <number_of_copies>1</number_of_copies>
+                <enantiomer>LEVO</enantiomer>
+                <sequence>
+                    <string>VQIVYK</string>
+                </sequence>
+            </protein_or_peptide>
+            <ligand macromolecule_id="2">
+                <name>water</name>
+                <molecular_weight>
+                    <theoretical units="MDa">1.8015e-05</theoretical>
+                </molecular_weight>
+                <number_of_copies>2</number_of_copies>
+                <formula>HOH</formula>
+            </ligand>
+        </macromolecule_list>
+    </sample>
+    <structure_determination_list>
+        <structure_determination structure_determination_id="1">
+            <method>electronCrystallography</method>
+            <aggregation_state>threeDArray</aggregation_state>
+            <specimen_preparation_list>
+                <crystallography_preparation preparation_id="1">
+                    <buffer>
+                        <ph>8.5</ph>
+                        <component>
+                            <concentration units="%">22.5</concentration>
+                            <name>ethylene glycol</name>
+                        </component>
+                        <component>
+                            <name>Tris</name>
+                        </component>
+                    </buffer>
+                    <vitrification>
+                        <cryogen_name>ETHANE</cryogen_name>
+                        <details></details>
+                    </vitrification>
+                </crystallography_preparation>
+            </specimen_preparation_list>
+            <microscopy_list>
+                <crystallography_microscopy microscopy_id="1">
+                    <microscope>FEI TECNAI F20</microscope>
+                    <illumination_mode>FLOOD BEAM</illumination_mode>
+                    <imaging_mode>DIFFRACTION</imaging_mode>
+                    <electron_source>FIELD EMISSION GUN</electron_source>
+                    <acceleration_voltage units="kV">200</acceleration_voltage>
+                    <cooling_holder_cryogen>NITROGEN</cooling_holder_cryogen>
+                    <image_recording_list>
+                        <image_recording image_recording_id="1">
+                            <film_or_detector_model>TVIPS TEMCAM-F416 (4k x 4k)</film_or_detector_model>
+                            <digitization_details>
+                                <dimensions>
+                                    <width units="pixel">2048</width>
+                                    <height units="pixel">2048</height>
+                                </dimensions>
+                                <sampling_interval units="µm">0.0311999992</sampling_interval>
+                            </digitization_details>
+                            <number_grids_imaged>1</number_grids_imaged>
+                            <number_real_images>299</number_real_images>
+                            <number_diffraction_images>299</number_diffraction_images>
+                            <average_exposure_time units="s">2.1</average_exposure_time>
+                            <average_electron_dose_per_image units="e/Å^2">0.002</average_electron_dose_per_image>
+                        </image_recording>
+                    </image_recording_list>
+                    <camera_length units="mm">730</camera_length>
+                </crystallography_microscopy>
+            </microscopy_list>
+            <crystallography_processing image_processing_id="1">
+                <image_recording_id>1</image_recording_id>
+                <final_reconstruction>
+                    <resolution units="Å" res_type="BY AUTHOR">1.1</resolution>
+                    <resolution_method>DIFFRACTION PATTERN/LAYERLINES</resolution_method>
+                </final_reconstruction>
+                <crystal_parameters>
+                    <unit_cell>
+                        <a units="Å">29.42</a>
+                        <b units="Å">4.99</b>
+                        <c units="Å">37.17</c>
+                        <gamma units="deg">90</gamma>
+                        <alpha units="deg">90</alpha>
+                        <beta units="deg">111.55</beta>
+                    </unit_cell>
+                    <space_group>C 1 2 1</space_group>
+                </crystal_parameters>
+                <merging_software_list>
+                    <software>
+                        <name>XDS</name>
+                        <version>May 1, 2016</version>
+                    </software>
+                </merging_software_list>
+                <crystallography_statistics>
+                    <number_intensities_measured>6185</number_intensities_measured>
+                    <number_structure_factors>3319</number_structure_factors>
+                    <fourier_space_coverage>83</fourier_space_coverage>
+                    <r_sym>12.9</r_sym>
+                    <r_merge>12.9</r_merge>
+                    <overall_phase_error>0</overall_phase_error>
+                    <overall_phase_residual>39.4</overall_phase_residual>
+                    <phase_error_rejection_criteria>0</phase_error_rejection_criteria>
+                    <high_resolution units="Å">1.1</high_resolution>
+                    <shell_list>
+                        <shell shell_id="1">
+                            <high_resolution units="Å">1.1</high_resolution>
+                            <low_resolution units="Å">1.23</low_resolution>
+                            <number_structure_factors>255</number_structure_factors>
+                            <phase_residual>47.6</phase_residual>
+                            <fourier_space_coverage>79.4</fourier_space_coverage>
+                            <multiplicity>1.8</multiplicity>
+                        </shell>
+                    </shell_list>
+                </crystallography_statistics>
+            </crystallography_processing>
+        </structure_determination>
+    </structure_determination_list>
+    <map format="CCP4" size_kbytes="1661">
+        <file>emd_8216.map.gz</file>
+        <symmetry>
+            <space_group>5</space_group>
+        </symmetry>
+        <data_type>IMAGE STORED AS FLOATING POINT NUMBER (4 BYTES)</data_type>
+        <dimensions>
+            <col>83</col>
+            <row>100</row>
+            <sec>50</sec>
+        </dimensions>
+        <origin>
+            <col>-15</col>
+            <row>-6</row>
+            <sec>-19</sec>
+        </origin>
+        <spacing>
+            <x>80</x>
+            <y>16</y>
+            <z>104</z>
+        </spacing>
+        <cell>
+            <a units="Å">29.419998</a>
+            <b units="Å">4.99</b>
+            <c units="Å">37.17</c>
+            <alpha units="deg">90.0</alpha>
+            <beta units="deg">111.55</beta>
+            <gamma units="deg">90.0</gamma>
+        </cell>
+        <axis_order>
+            <fast>Z</fast>
+            <medium>X</medium>
+            <slow>Y</slow>
+        </axis_order>
+        <statistics>
+            <minimum>-0.47962725</minimum>
+            <maximum>1.1435935</maximum>
+            <average>-0.0008480896</average>
+            <std>0.15727948</std>
+        </statistics>
+        <pixel_spacing>
+            <x units="Å">0.36775</x>
+            <y units="Å">0.311875</y>
+            <z units="Å">0.3574038</z>
+        </pixel_spacing>
+        <contour_list>
+            <contour primary="true">
+                <level>0.2</level>
+                <source>EMDB</source>
+            </contour>
+        </contour_list>
+        <label>::::EMDATABANK.org::::EMD-8216::::</label>
+        <annotation_details>tau VQIVYK peptide</annotation_details>
+    </map>
+    <interpretation>
+        <modelling_list>
+            <modelling>
+                <refinement_protocol>AB INITIO MODEL</refinement_protocol>
+                <refinement_space>RECIPROCAL</refinement_space>
+            </modelling>
+        </modelling_list>
+    </interpretation>
+</emd>
