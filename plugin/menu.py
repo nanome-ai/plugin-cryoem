@@ -1,11 +1,11 @@
 import nanome
 import requests
 import time
-import xml.etree.ElementTree as ET
 from functools import partial
 from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
 from os import path
+from threading import Thread
 
 from .models import MapGroup, ViewportEditor
 from .utils import EMDBMetadataParser
@@ -255,7 +255,7 @@ class SearchMenu:
                     now = time.time()
                     if now - data_check > 5:
                         kb_downloaded = downloaded_chunks / 1000
-                        Logs.debug(f"{int(now - start_time)} seconds: kbs downloaded: {kb_downloaded} / {file_size} kbs")
+                        Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
                         loading_bar.percentage = kb_downloaded / file_size
                         self._plugin.update_content(loading_bar)
                         data_check = now
@@ -386,7 +386,6 @@ class EditMeshMenu:
 
         # Populate file list
         self.lst_files.items.clear()
-
         group_objs = []
         if map_group.map_gz_file:
             map_comp = map_group.map_mesh.complex
@@ -419,12 +418,25 @@ class EditMeshMenu:
         self.set_radius_ui(radius)
 
         self._plugin.update_menu(self._menu)
+        if map_group.has_map():
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            map_group.generate_histogram(self.temp_dir)
+            thread = Thread(
+                target=self.generate_histogram_thread,
+                args=[map_group])
+            thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+
+        self._plugin.update_node(self.ln_img_histogram)
+        self._plugin.update_content(self.sld_isovalue)
+
+    def generate_histogram_thread(self, map_group):
+        map_group.generate_histogram(self.temp_dir)
+        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
         self._plugin.update_node(self.ln_img_histogram)

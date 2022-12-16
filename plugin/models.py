@@ -292,6 +292,8 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
+        # Set hist_x_min and hist_x_max
+        self._set_hist_x_min_max()
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -445,6 +447,10 @@ class MapGroup:
             self.map_mesh = MapMesh(self._plugin)
         self._plugin.remove_from_workspace(comps_to_delete)
 
+    def _set_hist_x_min_max(self):
+        flat = list(self.map_mesh.map_manager.map_data().as_1d())
+        self.hist_x_min = np.min(flat)
+        self.hist_x_max = np.max(flat)
 
 class ViewportEditor:
 
