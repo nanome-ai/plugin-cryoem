@@ -55,6 +55,16 @@ class EMDBMetadataParser:
             filesize = None
         return filesize
 
+    @property
+    def pdb_list(self):
+        # Parse xml and get isovalue
+        pdb_list = []
+        pdb_list_ele = next(self.xml_root.iter("pdb_list"))
+        for pdb_ref in pdb_list_ele:
+            for child in pdb_ref:
+                if child.tag == "pdb_id":
+                    pdb_list.append(child.text)
+        return pdb_list
 
 def cpk_colors(a):
     colors = {}

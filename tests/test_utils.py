@@ -25,3 +25,8 @@ class EMDBMetadataParserTestCase(unittest.TestCase):
     def test_map_filesize(self):
         expected_value = 1661
         self.assertEqual(self.parser.map_filesize, expected_value)
+
+    def test_pdb_list(self):
+        expected_value = ['5k7n']
+        pdb_list = self.parser.pdb_list
+        self.assertEqual(pdb_list, expected_value)
