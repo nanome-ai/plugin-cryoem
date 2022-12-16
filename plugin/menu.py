@@ -8,7 +8,7 @@ from nanome.util import async_callback, enums, Logs
 from os import path
 
 from .models import MapGroup, ViewportEditor
-
+from .utils import EMDBMetadataParser
 
 ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
@@ -187,9 +187,9 @@ class SearchMenu:
         self.btn_rcsb_submit.text.value.unusable = "Search"
         self._plugin.update_content(self.btn_rcsb_submit)
 
-        metadata = self.download_metadata_from_emdbid(embid_id)
-        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata)
-        isovalue = self.get_isovalue_from_metadata(metadata)
+        metadata_parser = self.download_metadata_from_emdbid(embid_id)
+        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
+        isovalue = metadata_parser.isovalue
 
         # Update message to say generating mesh
         self._plugin.update_content(btn)
@@ -197,7 +197,13 @@ class SearchMenu:
         btn.unusable = True
         self._plugin.update_content(btn)
 
-        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
+        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+
+        # Populate rcsb text input with pdb from metadata
+        if metadata_parser.pdb_list:
+            pdb_id = metadata_parser.pdb_list[0]
+            self.ti_rcsb_query.input_text = pdb_id
+            self._plugin.update_content(self.ti_rcsb_query)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
@@ -223,35 +229,9 @@ class SearchMenu:
         Logs.message("Downloading EM metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
-        return ET.fromstring(response.content)
+        return EMDBMetadataParser(response.content)
 
-    def get_isovalue_from_metadata(self, xml_root):
-        # Parse xml and get isovalue
-        contour_list_ele = next(xml_root.iter("contour_list"))
-        for child in contour_list_ele:
-            if child.tag == "contour" and child.attrib["primary"].lower() == 'true':
-                level_ele = next(child.iter("level"))
-                isovalue = level_ele.text
-                break
-        try:
-            isovalue = float(isovalue)
-        except ValueError:
-            Logs.warning("Could not parse isovalue from XML")
-            isovalue = None
-        return isovalue
-
-    def get_filesize_from_metadata(self, xml_root):
-        # Parse xml and get isovalue
-        map_tag = next(xml_root.iter("map"))
-        size_kbytes = map_tag.attrib.get("size_kbytes", None)
-        try:
-            filesize = int(size_kbytes)
-        except ValueError:
-            Logs.warning("Could not parse isovalue from XML")
-            filesize = None
-        return filesize
-
-    def download_cryoem_map_from_emdbid(self, emdbid, metadata=None):
+    def download_cryoem_map_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
@@ -261,7 +241,7 @@ class SearchMenu:
         self._plugin.update_node(self.lb_embl_download)
         loading_bar = self.lb_embl_download.get_content()
 
-        file_size = self.get_filesize_from_metadata(metadata)
+        file_size = metadata_parser.map_filesize
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             chunk_size = 8192

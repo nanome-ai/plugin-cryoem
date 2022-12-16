@@ -1,4 +1,70 @@
 from nanome.api import structure
+import xml.etree.ElementTree as ET
+from nanome.util import Logs
+
+__all__ = ["cpk_colors", "create_hidden_complex", "EMDBMetadataParser"]
+
+
+class EMDBMetadataParser:
+
+    def __init__(self, metadata_content: str):
+        self.xml_root = ET.fromstring(metadata_content)
+
+    @property
+    def isovalue(self):
+        # Parse xml and get isovalue
+        contour_list_ele = next(self.xml_root.iter("contour_list"))
+        for child in contour_list_ele:
+            if child.tag == "contour" and child.attrib["primary"].lower() == 'true':
+                level_ele = next(child.iter("level"))
+                isovalue = level_ele.text
+                break
+        try:
+            isovalue = float(isovalue)
+        except ValueError:
+            Logs.warning("Could not parse isovalue from XML")
+            isovalue = None
+        return isovalue
+
+    @property
+    def resolution(self):
+        # Parse xml and get isovalue
+        final_reconstruction_ele = next(self.xml_root.iter("final_reconstruction"))
+        resolution_text = ""
+        for child in final_reconstruction_ele:
+            if child.tag == "resolution":
+                res_ele = next(child.iter("resolution"))
+                resolution_text = res_ele.text
+                break
+        try:
+            resolution = float(resolution_text)
+        except ValueError:
+            Logs.warning("Could not parse resolution from XML")
+            resolution = None
+        return resolution
+
+    @property
+    def map_filesize(self):
+        # Parse xml and get isovalue
+        map_tag = next(self.xml_root.iter("map"))
+        size_kbytes = map_tag.attrib.get("size_kbytes", None)
+        try:
+            filesize = int(size_kbytes)
+        except ValueError:
+            Logs.warning("Could not parse isovalue from XML")
+            filesize = None
+        return filesize
+
+    @property
+    def pdb_list(self):
+        # Parse xml and get isovalue
+        pdb_list = []
+        pdb_list_ele = next(self.xml_root.iter("pdb_list"))
+        for pdb_ref in pdb_list_ele:
+            for child in pdb_ref:
+                if child.tag == "pdb_id":
+                    pdb_list.append(child.text)
+        return pdb_list
 
 
 def cpk_colors(a):
