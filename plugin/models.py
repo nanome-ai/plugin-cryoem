@@ -452,6 +452,7 @@ class MapGroup:
         self.hist_x_min = np.min(flat)
         self.hist_x_max = np.max(flat)
 
+
 class ViewportEditor:
 
     def __init__(self, map_group: MapGroup, plugin_instance: nanome.PluginInstance):
