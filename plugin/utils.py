@@ -26,7 +26,7 @@ class EMDBMetadataParser:
             isovalue = None
         return isovalue
 
-    @property  
+    @property
     def resolution(self):
         # Parse xml and get isovalue
         final_reconstruction_ele = next(self.xml_root.iter("final_reconstruction"))
@@ -65,6 +65,7 @@ class EMDBMetadataParser:
                 if child.tag == "pdb_id":
                     pdb_list.append(child.text)
         return pdb_list
+
 
 def cpk_colors(a):
     colors = {}
