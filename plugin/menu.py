@@ -420,11 +420,9 @@ class EditMeshMenu:
 
         self._plugin.update_menu(self._menu)
         if map_group.has_map() and not map_group.png_tempfile:
-            Logs.debug("Generating histogram...")
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
             map_group.generate_histogram(self.temp_dir)
-            Logs.debug("Histogram generated")
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min

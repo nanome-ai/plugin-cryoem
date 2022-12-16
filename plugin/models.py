@@ -1,6 +1,7 @@
 import gzip
 import os
 import tempfile
+import time
 
 import matplotlib.pyplot as plt
 import mcubes
@@ -239,6 +240,8 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        Logs.debug("Generating histogram...")
+        start_time = time.time()
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
@@ -253,6 +256,11 @@ class MapGroup:
         self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png", dir=temp_dir)
         plt.savefig(self.png_tempfile.name)
+        end_time = time.time()
+        elapsed_time = round(end_time - start_time, 1)
+        Logs.debug(
+            f"Histogram Generated in {elapsed_time} seconds",
+            extra={"elapsed_time": elapsed_time})
         return self.png_tempfile.name
 
     async def update_color(self, color_scheme, opacity):
