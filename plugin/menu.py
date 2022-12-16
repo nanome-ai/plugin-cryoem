@@ -190,10 +190,19 @@ class SearchMenu:
         metadata = self.download_metadata_from_emdbid(embid_id)
         map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata)
         isovalue = self.get_isovalue_from_metadata(metadata)
+
+        # Update message to say generating mesh
+        self._plugin.update_content(btn)
+        btn.text.value.unusable = "Generating..."
+        btn.unusable = True
+        self._plugin.update_content(btn)
+
         await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        btn.text.value.unusable = "Downloading..."
+        btn.unusable = False
         self._plugin.update_content(self.btn_rcsb_submit, btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
@@ -270,6 +279,7 @@ class SearchMenu:
                         loading_bar.percentage = kb_downloaded / file_size
                         self._plugin.update_content(loading_bar)
                         data_check = now
+        loading_bar.percentage = 0
         self.lb_embl_download.enabled = False
         self._plugin.update_node(self.lb_embl_download)
         return file_path
