@@ -1,12 +1,15 @@
 import asyncio
 import os
+import nanome
 import tempfile
 import unittest
-from nanome.api import structure, PluginInstance
+
+from nanome.api import structure, PluginInstance, shapes
 from unittest.mock import MagicMock, patch
 from iotbx.map_manager import map_manager
 
 from mmtbx.model.model import manager
+from plugin import models
 from plugin.models import MapGroup, MapMesh
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -82,6 +85,7 @@ class MapGroupTestCase(unittest.TestCase):
                 print(f'generate_histogram took {end_time - start_time} seconds')
                 self.assertTrue(os.path.exists(png_file))
         run_awaitable(validate_generate_histogram, self)
+
 
 class MapMeshTestCase(unittest.TestCase):
 
@@ -160,3 +164,38 @@ class MapMeshTestCase(unittest.TestCase):
             self.assertEqual(len(mesh.triangles), expected_triangles)
         run_awaitable(validate_load_limit_view, self)
 
+
+class ViewportEditorTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.plugin = MagicMock()
+        nanome.PluginInstance._instance = MagicMock()
+        nanome._internal._network.PluginNetwork._instance = MagicMock()
+        self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.map_group = models.MapGroup(self.plugin)
+        self.viewport_editor = models.ViewportEditor(self.map_group, self.plugin)
+
+    def test_enable(self):
+        async def validate_enable(self):
+            await self.map_group.add_map_gz(self.map_file)
+            self.assertTrue(self.viewport_editor.complex is None)
+            self.assertTrue(self.viewport_editor.sphere is None)
+            self.assertFalse(self.map_group.map_complex.locked)
+            self.viewport_editor.enable()
+            self.assertTrue(isinstance(self.viewport_editor.complex, structure.Complex))
+            self.assertTrue(isinstance(self.viewport_editor.sphere, shapes.Sphere))
+            self.assertTrue(self.map_group.map_complex.locked)
+        run_awaitable(validate_enable, self)
+
+    def test_disable(self):
+        async def validate_disable(self):
+            await self.map_group.add_map_gz(self.map_file)
+            self.viewport_editor.enable()
+            self.assertTrue(isinstance(self.viewport_editor.complex, structure.Complex))
+            self.assertTrue(isinstance(self.viewport_editor.sphere, shapes.Sphere))
+            self.viewport_editor.disable()
+            self.assertTrue(self.viewport_editor.complex is None)
+            self.assertTrue(self.viewport_editor.sphere is None)
+        run_awaitable(validate_disable, self)

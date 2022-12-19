@@ -464,6 +464,36 @@ class ViewportEditor:
         self.complex = None
         self.sphere = None
 
+    def enable(self):
+        if not self.complex:
+            self.complex = create_hidden_complex(self.map_group.map_complex.full_name)
+        if not self.sphere:
+            # create viewport sphere
+            sphere = shapes.Sphere()
+            self.sphere = sphere
+            preset_radius = self.map_group.radius
+            sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
+            sphere.color = Color(100, 100, 100, 127)
+
+            anchor = sphere.anchors[0]
+            anchor.anchor_type = enums.ShapeAnchorType.Complex
+            anchor.target = self.complex.index
+        # lock mesh position
+        self.map_group.map_complex.locked = True
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+        self.sphere.upload()
+
+    def disable(self):
+        if self.complex:
+            self.plugin.remove_from_workspace([self.complex])
+            self.complex = None
+        if self.sphere:
+            shapes.Shape.destroy(self.sphere)
+            self.sphere = None
+        # unlock mesh position
+        self.map_group.map_complex.locked = False
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+
     async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
             Logs.warning("No model complex found")
@@ -492,18 +522,6 @@ class ViewportEditor:
 
             res = await self.plugin.add_to_workspace([self.complex])
             self.complex.index = res[0].index
-
-            # create viewport sphere
-            sphere = shapes.Sphere()
-            self.sphere = sphere
-            preset_radius = self.map_group.radius
-            sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
-            sphere.color = Color(100, 100, 100, 127)
-
-            anchor = sphere.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = self.complex.index
-            sphere.upload()
             Logs.debug("Viewport created")
 
         else:
