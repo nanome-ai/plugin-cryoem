@@ -2,7 +2,7 @@ import nanome
 import requests
 import time
 from functools import partial
-from nanome.api import ui
+from nanome.api import ui, shapes
 from nanome.util import async_callback, enums, Logs
 from os import path
 from threading import Thread
@@ -282,7 +282,7 @@ class EditMeshMenu:
         self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
         self.btn_edit_viewport.register_pressed_callback(partial(self.open_edit_viewport, True))
         self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-        self.btn_save_viewport.register_pressed_callback(partial(self.apply_viewport, False))
+        self.btn_save_viewport.register_pressed_callback(self.apply_viewport)
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
@@ -295,7 +295,7 @@ class EditMeshMenu:
         self.sld_opacity.register_released_callback(self.update_color)
 
         self.sld_radius: ui.Slider = root.find_node('sld_radius').get_content()
-        self.sld_radius.register_changed_callback(self.update_radius_lbl)
+        self.sld_radius.register_changed_callback(self.sld_radius_update)
         self.sld_radius.register_released_callback(self.redraw_map)
 
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
@@ -324,7 +324,7 @@ class EditMeshMenu:
 
     def set_radius_ui(self, radius: float):
         self.sld_radius.current_value = radius
-        self.update_radius_lbl(self.sld_radius)
+        self.sld_radius_update(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
         self.lbl_isovalue.text_value = f'{round(sld.current_value, 2)} A'
@@ -344,8 +344,12 @@ class EditMeshMenu:
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
         self._plugin.update_content(self.lbl_opacity, sld)
 
-    def update_radius_lbl(self, sld):
-        self.lbl_radius.text_value = f'{round(sld.current_value, 2)} A'
+    def sld_radius_update(self, sld):
+        sld_current_val = sld.current_value
+        self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
+        if self.viewport_editor.sphere:
+            self.viewport_editor.sphere.radius = sld_current_val
+            shapes.Shape.upload(self.viewport_editor.sphere)
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
@@ -354,14 +358,18 @@ class EditMeshMenu:
         self.ln_edit_viewport.enabled = edit_viewport
         if edit_viewport and self.sld_radius.current_value <= 0:
             self.sld_radius.current_value = ViewportEditor.DEFAULT_RADIUS
-            self.update_radius_lbl(self.sld_radius)
+            self.sld_radius_update(self.sld_radius)
             self._plugin.update_content(self.sld_radius)
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
         await self.viewport_editor.enable()
 
     @async_callback
-    def apply_viewport(self, btn):
-        pass
+    async def apply_viewport(self, btn):
+        await self.viewport_editor.apply()
+        self.viewport_editor.disable()
+        self.ln_edit_map.enabled = True
+        self.ln_edit_viewport.enabled = False
+        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
 
     @async_callback
     async def update_color(self, *args):
