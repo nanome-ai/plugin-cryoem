@@ -1,6 +1,7 @@
 import gzip
 import os
 import tempfile
+import time
 
 import matplotlib.pyplot as plt
 import mcubes
@@ -125,7 +126,6 @@ class MapMesh:
         normals = np.array(normals)
         triangles = np.array(triangles)
 
-        Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
             vertices, normals, triangles, radius, position)
 
@@ -140,7 +140,8 @@ class MapMesh:
     def limit_view(self, vertices, normals, triangles, radius, position):
         if radius <= 0:
             return (vertices, normals, triangles)
-
+        Logs.debug(f"Radius: {radius}")
+        Logs.debug("Limiting view...")
         pos = np.asarray(position)
         idv = 0
         to_keep = []
@@ -239,6 +240,8 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        Logs.debug("Generating histogram...")
+        start_time = time.time()
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
@@ -253,6 +256,11 @@ class MapGroup:
         self.png_tempfile = tempfile.NamedTemporaryFile(
             delete=False, suffix=".png", dir=temp_dir)
         plt.savefig(self.png_tempfile.name)
+        end_time = time.time()
+        elapsed_time = round(end_time - start_time, 1)
+        Logs.debug(
+            f"Histogram Generated in {elapsed_time} seconds",
+            extra={"elapsed_time": elapsed_time})
         return self.png_tempfile.name
 
     async def update_color(self, color_scheme, opacity):
@@ -284,6 +292,7 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
+        self._set_hist_x_min_max()
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -437,77 +446,76 @@ class MapGroup:
             self.map_mesh = MapMesh(self._plugin)
         self._plugin.remove_from_workspace(comps_to_delete)
 
+    def _set_hist_x_min_max(self):
+        flat = list(self.map_mesh.map_manager.map_data().as_1d())
+        self.hist_x_min = np.min(flat)
+        self.hist_x_max = np.max(flat)
+
 
 class ViewportEditor:
 
-    def __init__(self, map_group: MapGroup, plugin_instance: nanome.PluginInstance):
+    DEFAULT_RADIUS = 15
+
+    def __init__(self, plugin_instance: nanome.PluginInstance, map_group: MapGroup):
         self.map_group = map_group
         self.plugin = plugin_instance
 
         self.is_editing = False
         self.complex = None
         self.sphere = None
-        self.default_radius = 15
 
-    async def toggle_edit(self, edit: bool):
-        if not self.map_group.model_complex:
-            Logs.warning("No model complex found")
-            return
-        self.is_editing = edit
-        # Get latest position for map_mesh complex
-        map_mesh_comp = self.map_group.map_mesh.complex
-        complexes = await self.plugin.request_complex_list()
-        mesh_complex = next(
-            c for c in complexes
-            if c.index == map_mesh_comp.index)
-
-        if edit:
-            Logs.debug("Creating Viewport...")
-            # create viewport sphere and position at current map position
-            comp_name = self.map_group.model_complex.name + ' (viewport)'
-            self.complex = create_hidden_complex(comp_name)
-
-            # calculate viewport position
-            c_to_w = mesh_complex.get_complex_to_workspace_matrix()
-            self.complex.position = c_to_w * Vector3(*self.map_group.position)
-
-            # lock mesh position
-            mesh_complex.locked = True
-            self.plugin.update_structures_shallow([mesh_complex])
-
-            res = await self.plugin.add_to_workspace([self.complex])
-            self.complex.index = res[0].index
-
+    async def enable(self):
+        Logs.message("Enabling viewport editor")
+        if not self.complex:
+            [self.complex] = await self.plugin.add_to_workspace([
+                create_hidden_complex(self.map_group.map_complex.full_name)
+            ])
+        if not self.sphere:
             # create viewport sphere
             sphere = shapes.Sphere()
             self.sphere = sphere
             preset_radius = self.map_group.radius
-            sphere.radius = preset_radius if preset_radius >= 0 else self.default_radius
+            sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
             sphere.color = Color(100, 100, 100, 127)
 
             anchor = sphere.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
-            sphere.upload()
-            Logs.debug("Viewport created")
+        # lock mesh position
+        self.map_group.map_complex.locked = True
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+        shapes.Shape.upload(self.sphere)
 
-        else:
-            # get viewport position, transform into map space and set map position
-            vp_complex = next(c for c in complexes if c.index == self.complex.index)
-
-            # calculate viewport position
-            w_to_c = mesh_complex.get_workspace_to_complex_matrix()
-            vp_position = w_to_c * vp_complex.position
-            self.map_group.position = [*vp_position]
-
-            mesh_complex.boxed = False
-            self.plugin.update_structures_shallow([mesh_complex])
-
-            # remove viewport sphere
-            self.sphere.destroy()
+    def disable(self):
+        Logs.message("Hiding viewport editor")
+        if self.complex:
             self.plugin.remove_from_workspace([self.complex])
             self.complex = None
+        if self.sphere:
+            shapes.Shape.destroy(self.sphere)
             self.sphere = None
+        # unlock mesh position
+        self.map_group.map_complex.locked = False
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+
+    async def apply(self):
+        Logs.message("Applying Viewport")
+        """Apply viewport position and radius to MapGroup."""
+        # Get latest states of viewport complex and mapgroup
+        viewport_comp_index = self.complex.index
+        [viewport_comp] = await self.plugin.request_complexes([viewport_comp_index])
+        # get viewport complex position
+        c_to_w = viewport_comp.get_complex_to_workspace_matrix()
+        pos = c_to_w * Vector3(*self.map_group.position)
+
+        # set mapgroup radius and position
+        self.map_group.position = [*pos]
+        self.map_group.radius = self.sphere.radius
+
+        # update mapgroup complex
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+        # redraw map
+        await self.map_group.generate_mesh()
 
     def update_radius(self, radius):
         self.sphere.radius = radius

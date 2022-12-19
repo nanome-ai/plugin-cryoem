@@ -1,11 +1,11 @@
 import nanome
 import requests
 import time
-import xml.etree.ElementTree as ET
 from functools import partial
-from nanome.api import ui
+from nanome.api import ui, shapes
 from nanome.util import async_callback, enums, Logs
 from os import path
+from threading import Thread
 
 from .models import MapGroup, ViewportEditor
 from .utils import EMDBMetadataParser
@@ -255,7 +255,7 @@ class SearchMenu:
                     now = time.time()
                     if now - data_check > 5:
                         kb_downloaded = downloaded_chunks / 1000
-                        Logs.debug(f"{int(now - start_time)} seconds: kbs downloaded: {kb_downloaded}")
+                        Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
                         loading_bar.percentage = kb_downloaded / file_size
                         self._plugin.update_content(loading_bar)
                         data_check = now
@@ -269,7 +269,7 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self.viewport_editor = ViewportEditor(map_group, plugin_instance)
+        self.viewport_editor = None
 
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
@@ -280,9 +280,9 @@ class EditMeshMenu:
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
 
         self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, True))
+        self.btn_edit_viewport.register_pressed_callback(self.open_edit_viewport)
         self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-        self.btn_save_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, False))
+        self.btn_save_viewport.register_pressed_callback(self.apply_viewport)
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
@@ -295,7 +295,7 @@ class EditMeshMenu:
         self.sld_opacity.register_released_callback(self.update_color)
 
         self.sld_radius: ui.Slider = root.find_node('sld_radius').get_content()
-        self.sld_radius.register_changed_callback(self.update_radius_lbl)
+        self.sld_radius.register_changed_callback(self.sld_radius_update)
         self.sld_radius.register_released_callback(self.redraw_map)
 
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
@@ -324,7 +324,7 @@ class EditMeshMenu:
 
     def set_radius_ui(self, radius: float):
         self.sld_radius.current_value = radius
-        self.update_radius_lbl(self.sld_radius)
+        self.sld_radius_update(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
         self.lbl_isovalue.text_value = f'{round(sld.current_value, 2)} A'
@@ -344,20 +344,33 @@ class EditMeshMenu:
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
         self._plugin.update_content(self.lbl_opacity, sld)
 
-    def update_radius_lbl(self, sld):
-        self.lbl_radius.text_value = f'{round(sld.current_value, 2)} A'
+    def sld_radius_update(self, sld):
+        sld_current_val = sld.current_value
+        self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
+        if self.viewport_editor.sphere:
+            self.viewport_editor.sphere.radius = sld_current_val
+            shapes.Shape.upload(self.viewport_editor.sphere)
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def toggle_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
-        self.ln_edit_map.enabled = not edit_viewport
-        self.ln_edit_viewport.enabled = edit_viewport
+    async def open_edit_viewport(self, btn: ui.Button):
+        self.ln_edit_map.enabled = False
+        self.ln_edit_viewport.enabled = True
+
+        self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
+        radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
+        self.set_radius_ui(radius)
+        self._plugin.update_content(self.sld_radius)
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        await self.viewport_editor.enable()
 
-        await self.viewport_editor.toggle_edit(edit_viewport)
-
-        if not edit_viewport:
-            self.redraw_map()
+    @async_callback
+    async def apply_viewport(self, btn):
+        await self.viewport_editor.apply()
+        self.ln_edit_map.enabled = True
+        self.ln_edit_viewport.enabled = False
+        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        self.viewport_editor.disable()
 
     @async_callback
     async def update_color(self, *args):
@@ -367,13 +380,9 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_map(self, btn=None):
-        if self.viewport_editor.is_editing:
-            self.viewport_editor.update_radius(self.radius)
-            return
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
-        self.map_group.radius = self.radius
         if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
@@ -386,7 +395,6 @@ class EditMeshMenu:
 
         # Populate file list
         self.lst_files.items.clear()
-
         group_objs = []
         if map_group.map_gz_file:
             map_comp = map_group.map_mesh.complex
@@ -410,27 +418,36 @@ class EditMeshMenu:
             else:
                 item.selected = False
         if map_group.metadata:
-            resolution = self.get_resolution_from_metadata(map_group.metadata)
+            resolution = map_group.metadata.resolution
             self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
 
-        radius = self.map_group.radius if self.map_group.radius >= 0 else 15
-        self.set_radius_ui(radius)
-
         self._plugin.update_menu(self._menu)
+        if map_group.has_map():
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
         if map_group.has_map() and not map_group.png_tempfile:
-            Logs.debug("Generating histogram...")
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            map_group.generate_histogram(self.temp_dir)
-            Logs.debug("Histogram generated")
+            self.generate_histogram_thread(map_group)
+            # thread = Thread(
+            #     target=self.generate_histogram_thread,
+            #     args=[map_group])
+            # thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
+
         self._plugin.update_node(self.ln_img_histogram)
         self._plugin.update_content(self.sld_isovalue)
+
+    def generate_histogram_thread(self, map_group):
+        map_group.generate_histogram(self.temp_dir)
+        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self.sld_isovalue.min_value = map_group.hist_x_min
+        self.sld_isovalue.max_value = map_group.hist_x_max
+        # self._plugin.update_node(self.ln_img_histogram)
+        # self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
@@ -478,19 +495,3 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
-
-    def get_resolution_from_metadata(self, metadata: ET.ElementTree):
-        # Parse xml and get isovalue
-        final_reconstruction_ele = next(metadata.iter("final_reconstruction"))
-        resolution_text = ""
-        for child in final_reconstruction_ele:
-            if child.tag == "resolution":
-                res_ele = next(child.iter("resolution"))
-                resolution_text = res_ele.text
-                break
-        try:
-            resolution = float(resolution_text)
-        except ValueError:
-            Logs.warning("Could not parse resolution from XML")
-            resolution = None
-        return resolution
