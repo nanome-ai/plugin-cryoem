@@ -199,3 +199,22 @@ class ViewportEditorTestCase(unittest.TestCase):
             self.assertTrue(self.viewport_editor.complex is None)
             self.assertTrue(self.viewport_editor.sphere is None)
         run_awaitable(validate_disable, self)
+
+    def test_apply(self):
+        async def validate_apply(self):
+            fut = asyncio.Future()
+            fut.set_result([structure.Complex()])
+            self.plugin.add_to_workspace.return_value = fut
+            await self.map_group.add_map_gz(self.map_file)
+            await self.map_group.generate_mesh()
+            initial_vertices = self.map_group.map_mesh.computed_vertices
+            self.assertTrue(len(initial_vertices) > 0)
+            self.viewport_editor.enable()
+            # Set up request_complexes mock
+            request_complexes_fut = asyncio.Future()
+            request_complexes_fut.set_result([self.viewport_editor.complex])
+            self.plugin.request_complexes.return_value = request_complexes_fut
+            await self.viewport_editor.apply()
+            new_vertices = self.map_group.map_mesh.computed_vertices
+            self.assertTrue(len(new_vertices) < len(initial_vertices))
+        run_awaitable(validate_apply, self)

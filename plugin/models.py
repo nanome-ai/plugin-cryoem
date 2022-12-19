@@ -494,6 +494,24 @@ class ViewportEditor:
         self.map_group.map_complex.locked = False
         self.plugin.update_structures_shallow([self.map_group.map_complex])
 
+    async def apply(self):
+        """Apply viewport position and radius to MapGroup."""
+        # Get latest states of viewport complex and mapgroup
+        viewport_comp_index = self.complex.index
+        [viewport_comp] = await self.plugin.request_complexes([viewport_comp_index])
+        # get viewport complex position
+        c_to_w = viewport_comp.get_complex_to_workspace_matrix()
+        pos = c_to_w * Vector3(*self.map_group.position)
+
+        # set mapgroup radius and position
+        self.map_group.position = [*pos]
+        self.map_group.radius = self.sphere.radius
+
+        # update mapgroup complex
+        self.plugin.update_structures_shallow([self.map_group.map_complex])
+        # redraw map
+        await self.map_group.generate_mesh()
+
     async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
             Logs.warning("No model complex found")
