@@ -456,7 +456,7 @@ class ViewportEditor:
 
     DEFAULT_RADIUS = 15
 
-    def __init__(self, map_group: MapGroup, plugin_instance: nanome.PluginInstance):
+    def __init__(self, plugin_instance: nanome.PluginInstance, map_group: MapGroup):
         self.map_group = map_group
         self.plugin = plugin_instance
 

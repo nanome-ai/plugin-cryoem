@@ -269,7 +269,7 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self.viewport_editor = ViewportEditor(map_group, plugin_instance)
+        self.viewport_editor = None
 
         self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
         self._plugin = plugin_instance
@@ -280,7 +280,7 @@ class EditMeshMenu:
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
 
         self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(partial(self.open_edit_viewport, True))
+        self.btn_edit_viewport.register_pressed_callback(self.open_edit_viewport)
         self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
         self.btn_save_viewport.register_pressed_callback(self.apply_viewport)
 
@@ -353,23 +353,24 @@ class EditMeshMenu:
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def open_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
-        self.ln_edit_map.enabled = not edit_viewport
-        self.ln_edit_viewport.enabled = edit_viewport
-        if edit_viewport and self.sld_radius.current_value <= 0:
-            self.sld_radius.current_value = ViewportEditor.DEFAULT_RADIUS
-            self.sld_radius_update(self.sld_radius)
-            self._plugin.update_content(self.sld_radius)
+    async def open_edit_viewport(self, btn: ui.Button):
+        self.ln_edit_map.enabled = False
+        self.ln_edit_viewport.enabled = True
+
+        self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
+        radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
+        self.set_radius_ui(radius)
+        self._plugin.update_content(self.sld_radius)
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
         await self.viewport_editor.enable()
 
     @async_callback
     async def apply_viewport(self, btn):
         await self.viewport_editor.apply()
-        self.viewport_editor.disable()
         self.ln_edit_map.enabled = True
         self.ln_edit_viewport.enabled = False
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        self.viewport_editor.disable()
 
     @async_callback
     async def update_color(self, *args):
@@ -425,9 +426,6 @@ class EditMeshMenu:
             self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
-
-        radius = self.map_group.radius
-        self.set_radius_ui(radius)
 
         self._plugin.update_menu(self._menu)
         if map_group.has_map():
