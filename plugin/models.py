@@ -464,9 +464,12 @@ class ViewportEditor:
         self.complex = None
         self.sphere = None
 
-    def enable(self):
+    async def enable(self):
+        Logs.message("Enabling viewport editor")
         if not self.complex:
-            self.complex = create_hidden_complex(self.map_group.map_complex.full_name)
+            [self.complex] = await self.plugin.add_to_workspace([
+                create_hidden_complex(self.map_group.map_complex.full_name)
+            ])
         if not self.sphere:
             # create viewport sphere
             sphere = shapes.Sphere()
@@ -481,9 +484,10 @@ class ViewportEditor:
         # lock mesh position
         self.map_group.map_complex.locked = True
         self.plugin.update_structures_shallow([self.map_group.map_complex])
-        self.sphere.upload()
+        shapes.Shape.upload(self.sphere)
 
     def disable(self):
+        Logs.message("Hiding viewport editor")
         if self.complex:
             self.plugin.remove_from_workspace([self.complex])
             self.complex = None
@@ -495,6 +499,7 @@ class ViewportEditor:
         self.plugin.update_structures_shallow([self.map_group.map_complex])
 
     async def apply(self):
+        Logs.message("Applying Viewport")
         """Apply viewport position and radius to MapGroup."""
         # Get latest states of viewport complex and mapgroup
         viewport_comp_index = self.complex.index

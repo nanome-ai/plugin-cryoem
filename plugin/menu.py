@@ -280,9 +280,9 @@ class EditMeshMenu:
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
 
         self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, True))
+        self.btn_edit_viewport.register_pressed_callback(partial(self.open_edit_viewport, True))
         self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-        self.btn_save_viewport.register_pressed_callback(partial(self.toggle_edit_viewport, False))
+        self.btn_save_viewport.register_pressed_callback(partial(self.apply_viewport, False))
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
@@ -349,19 +349,19 @@ class EditMeshMenu:
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def toggle_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
+    async def open_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
         self.ln_edit_map.enabled = not edit_viewport
         self.ln_edit_viewport.enabled = edit_viewport
-        if edit_viewport and self.sld_radius <= 0:
+        if edit_viewport and self.sld_radius.current_value <= 0:
             self.sld_radius.current_value = ViewportEditor.DEFAULT_RADIUS
             self.update_radius_lbl(self.sld_radius)
-            self.update_content(self.sld_radius)
+            self._plugin.update_content(self.sld_radius)
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        await self.viewport_editor.enable()
 
-        await self.viewport_editor.toggle_edit(edit_viewport)
-
-        if not edit_viewport:
-            self.redraw_map()
+    @async_callback
+    def apply_viewport(self, btn):
+        pass
 
     @async_callback
     async def update_color(self, *args):
@@ -428,10 +428,10 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
+            # thread = Thread(
+            #     target=self.generate_histogram_thread,
+            #     args=[map_group])
+            # thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
 
@@ -443,8 +443,8 @@ class EditMeshMenu:
         self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
-        self._plugin.update_node(self.ln_img_histogram)
-        self._plugin.update_content(self.sld_isovalue)
+        # self._plugin.update_node(self.ln_img_histogram)
+        # self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
