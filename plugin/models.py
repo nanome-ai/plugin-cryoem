@@ -517,54 +517,6 @@ class ViewportEditor:
         # redraw map
         await self.map_group.generate_mesh()
 
-    async def toggle_edit(self, edit: bool):
-        if not self.map_group.model_complex:
-            Logs.warning("No model complex found")
-            return
-        self.is_editing = edit
-        # Get latest position for map_mesh complex
-        map_mesh_comp = self.map_group.map_mesh.complex
-        complexes = await self.plugin.request_complex_list()
-        mesh_complex = next(
-            c for c in complexes
-            if c.index == map_mesh_comp.index)
-
-        if edit:
-            Logs.debug("Creating Viewport...")
-            # create viewport sphere and position at current map position
-            comp_name = self.map_group.model_complex.name + ' (viewport)'
-            self.complex = create_hidden_complex(comp_name)
-
-            # calculate viewport position
-            c_to_w = mesh_complex.get_complex_to_workspace_matrix()
-            self.complex.position = c_to_w * Vector3(*self.map_group.position)
-
-            # lock mesh position
-            mesh_complex.locked = True
-            self.plugin.update_structures_shallow([mesh_complex])
-
-            res = await self.plugin.add_to_workspace([self.complex])
-            self.complex.index = res[0].index
-            Logs.debug("Viewport created")
-
-        else:
-            # get viewport position, transform into map space and set map position
-            vp_complex = next(c for c in complexes if c.index == self.complex.index)
-
-            # calculate viewport position
-            w_to_c = mesh_complex.get_workspace_to_complex_matrix()
-            vp_position = w_to_c * vp_complex.position
-            self.map_group.position = [*vp_position]
-
-            mesh_complex.boxed = False
-            self.plugin.update_structures_shallow([mesh_complex])
-
-            # remove viewport sphere
-            self.sphere.destroy()
-            self.plugin.remove_from_workspace([self.complex])
-            self.complex = None
-            self.sphere = None
-
     def update_radius(self, radius):
         self.sphere.radius = radius
         self.sphere.upload()

@@ -29,6 +29,7 @@ class MapGroupTestCase(unittest.TestCase):
     def setUp(self):
         self.plugin = MagicMock()
         PluginInstance._instance = self.plugin
+        nanome._internal._network.PluginNetwork._instance = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
@@ -66,8 +67,7 @@ class MapGroupTestCase(unittest.TestCase):
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), expected_vertices)
         run_awaitable(validate_generate_mesh, self)
 
-    @patch('nanome._internal._network.PluginNetwork._instance', return_value=asyncio.Future())
-    def test_generate_histogram(self, instance_mock):
+    def test_generate_histogram(self):
         # Assert that attributes are set after load_map called.
         async def validate_generate_histogram(self):
             fut = asyncio.Future()
@@ -95,6 +95,10 @@ class MapMeshTestCase(unittest.TestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_mesh = MapMesh(self.plugin)
+
+        fut = asyncio.Future()
+        fut.set_result([structure.Complex()])
+        self.plugin.add_to_workspace.return_value = fut
 
     def test_add_map_gz_file(self):
         # Set future result for request_complexes mock
@@ -151,9 +155,6 @@ class MapMeshTestCase(unittest.TestCase):
             radius = 5  # Indicates limit view to 15 angstroms around position
             position = [0, 0, 0]
 
-            fut = asyncio.Future()
-            fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
             mesh = self.map_mesh.mesh
             self.assertEqual(len(mesh.vertices), 0)
             self.assertEqual(len(mesh.normals), 0)
@@ -175,7 +176,12 @@ class ViewportEditorTestCase(unittest.TestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_group = models.MapGroup(self.plugin)
-        self.viewport_editor = models.ViewportEditor(self.map_group, self.plugin)
+        self.viewport_editor = models.ViewportEditor(self.plugin, self.map_group)
+
+        # Mock add_to_workspace call
+        fut = asyncio.Future()
+        fut.set_result([structure.Complex()])
+        self.plugin.add_to_workspace.return_value = fut
 
     def test_enable(self):
         async def validate_enable(self):
@@ -183,7 +189,7 @@ class ViewportEditorTestCase(unittest.TestCase):
             self.assertTrue(self.viewport_editor.complex is None)
             self.assertTrue(self.viewport_editor.sphere is None)
             self.assertFalse(self.map_group.map_complex.locked)
-            self.viewport_editor.enable()
+            await self.viewport_editor.enable()
             self.assertTrue(isinstance(self.viewport_editor.complex, structure.Complex))
             self.assertTrue(isinstance(self.viewport_editor.sphere, shapes.Sphere))
             self.assertTrue(self.map_group.map_complex.locked)
@@ -192,7 +198,7 @@ class ViewportEditorTestCase(unittest.TestCase):
     def test_disable(self):
         async def validate_disable(self):
             await self.map_group.add_map_gz(self.map_file)
-            self.viewport_editor.enable()
+            await self.viewport_editor.enable()
             self.assertTrue(isinstance(self.viewport_editor.complex, structure.Complex))
             self.assertTrue(isinstance(self.viewport_editor.sphere, shapes.Sphere))
             self.viewport_editor.disable()
@@ -202,14 +208,11 @@ class ViewportEditorTestCase(unittest.TestCase):
 
     def test_apply(self):
         async def validate_apply(self):
-            fut = asyncio.Future()
-            fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
             await self.map_group.add_map_gz(self.map_file)
             await self.map_group.generate_mesh()
             initial_vertices = self.map_group.map_mesh.computed_vertices
             self.assertTrue(len(initial_vertices) > 0)
-            self.viewport_editor.enable()
+            await self.viewport_editor.enable()
             # Set up request_complexes mock
             request_complexes_fut = asyncio.Future()
             request_complexes_fut.set_result([self.viewport_editor.complex])

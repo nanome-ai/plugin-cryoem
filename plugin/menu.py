@@ -380,10 +380,6 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_map(self, btn=None):
-        if self.viewport_editor.is_editing:
-            self.viewport_editor.update_radius(self.radius)
-            self.map_group.radius = self.radius
-            return
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
@@ -434,6 +430,7 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
+            self.generate_histogram_thread(map_group)
             # thread = Thread(
             #     target=self.generate_histogram_thread,
             #     args=[map_group])
