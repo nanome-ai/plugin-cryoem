@@ -159,3 +159,4 @@ class MapMeshTestCase(unittest.TestCase):
             self.assertEqual(len(mesh.normals), expected_normals)
             self.assertEqual(len(mesh.triangles), expected_triangles)
         run_awaitable(validate_load_limit_view, self)
+
