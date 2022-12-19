@@ -78,11 +78,7 @@ class MapGroupTestCase(unittest.TestCase):
             await self.map_group.add_map_gz(map_file)
             await self.map_group.generate_mesh()
             with tempfile.TemporaryDirectory() as tmpdir:
-                import time
-                start_time = time.time()
                 png_file = self.map_group.generate_histogram(tmpdir)
-                end_time = time.time()
-                print(f'generate_histogram took {end_time - start_time} seconds')
                 self.assertTrue(os.path.exists(png_file))
         run_awaitable(validate_generate_histogram, self)
 
