@@ -184,11 +184,9 @@ class ViewportEditorTestCase(unittest.TestCase):
             await self.map_group.add_map_gz(self.map_file)
             self.assertTrue(self.viewport_editor.complex is None)
             self.assertTrue(self.viewport_editor.sphere is None)
-            self.assertFalse(self.map_group.map_complex.locked)
             await self.viewport_editor.enable()
             self.assertTrue(isinstance(self.viewport_editor.complex, structure.Complex))
             self.assertTrue(isinstance(self.viewport_editor.sphere, shapes.Sphere))
-            self.assertTrue(self.map_group.map_complex.locked)
         run_awaitable(validate_enable, self)
 
     def test_disable(self):

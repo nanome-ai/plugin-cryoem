@@ -481,9 +481,6 @@ class ViewportEditor:
             anchor = sphere.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
-        # lock mesh position
-        self.map_group.map_complex.locked = True
-        self.plugin.update_structures_shallow([self.map_group.map_complex])
         shapes.Shape.upload(self.sphere)
 
     def disable(self):
@@ -494,8 +491,6 @@ class ViewportEditor:
         if self.sphere:
             shapes.Shape.destroy(self.sphere)
             self.sphere = None
-        # unlock mesh position
-        self.map_group.map_complex.locked = False
         self.plugin.update_structures_shallow([self.map_group.map_complex])
 
     async def apply(self):
