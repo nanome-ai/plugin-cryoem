@@ -292,7 +292,6 @@ class MapGroup:
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
-        # Set hist_x_min and hist_x_max
         self._set_hist_x_min_max()
 
     def color_by_scheme(self, map_mesh, scheme):
