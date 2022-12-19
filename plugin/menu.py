@@ -352,6 +352,10 @@ class EditMeshMenu:
     async def toggle_edit_viewport(self, edit_viewport: bool, btn: ui.Button):
         self.ln_edit_map.enabled = not edit_viewport
         self.ln_edit_viewport.enabled = edit_viewport
+        if edit_viewport and self.sld_radius <= 0:
+            self.sld_radius.current_value = ViewportEditor.DEFAULT_RADIUS
+            self.update_radius_lbl(self.sld_radius)
+            self.update_content(self.sld_radius)
         self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
 
         await self.viewport_editor.toggle_edit(edit_viewport)
@@ -369,11 +373,11 @@ class EditMeshMenu:
     async def redraw_map(self, btn=None):
         if self.viewport_editor.is_editing:
             self.viewport_editor.update_radius(self.radius)
+            self.map_group.radius = self.radius
             return
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
-        self.map_group.radius = self.radius
         if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
@@ -414,7 +418,7 @@ class EditMeshMenu:
         self.set_isovalue_ui(self.map_group.isovalue)
         self.set_opacity_ui(self.map_group.opacity)
 
-        radius = self.map_group.radius if self.map_group.radius >= 0 else 15
+        radius = self.map_group.radius
         self.set_radius_ui(radius)
 
         self._plugin.update_menu(self._menu)

@@ -126,7 +126,6 @@ class MapMesh:
         normals = np.array(normals)
         triangles = np.array(triangles)
 
-        Logs.debug("Limiting view...")
         vertices, normals, triangles = self.limit_view(
             vertices, normals, triangles, radius, position)
 
@@ -141,7 +140,8 @@ class MapMesh:
     def limit_view(self, vertices, normals, triangles, radius, position):
         if radius <= 0:
             return (vertices, normals, triangles)
-
+        Logs.debug(f"Radius: {radius}")
+        Logs.debug("Limiting view...")
         pos = np.asarray(position)
         idv = 0
         to_keep = []
@@ -455,6 +455,8 @@ class MapGroup:
 
 class ViewportEditor:
 
+    DEFAULT_RADIUS = 15
+
     def __init__(self, map_group: MapGroup, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
         self.plugin = plugin_instance
@@ -462,7 +464,6 @@ class ViewportEditor:
         self.is_editing = False
         self.complex = None
         self.sphere = None
-        self.default_radius = 15
 
     async def toggle_edit(self, edit: bool):
         if not self.map_group.model_complex:
@@ -497,7 +498,7 @@ class ViewportEditor:
             sphere = shapes.Sphere()
             self.sphere = sphere
             preset_radius = self.map_group.radius
-            sphere.radius = preset_radius if preset_radius >= 0 else self.default_radius
+            sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
             sphere.color = Color(100, 100, 100, 127)
 
             anchor = sphere.anchors[0]
