@@ -10,8 +10,7 @@ from .models import MapGroup
 
 class CryoEM(nanome.AsyncPluginInstance):
 
-    @async_callback
-    async def start(self):
+    def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.search_menu = SearchMenu(self)
@@ -50,8 +49,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:
-            self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
-            return
+            if not self.groups:
+                self.add_mapgroup()
+                mapgroup = self.groups[0]
+            else:
+                self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+                return
         comp = structure.Complex.io.from_pdb(path=filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
@@ -74,8 +77,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:
-            self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
-            return
+            if not self.groups:
+                self.add_mapgroup()
+                mapgroup = self.groups[0]
+            else:
+                self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+                return
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue

@@ -310,7 +310,8 @@ class EditMeshMenu:
         self.dd_color_scheme.register_item_clicked_callback(self.update_color)
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
         self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
-
+        self.ligand_zoom: ui.Button = root.find_node('btn_ligand_zoom').get_content()
+        self.ligand_zoom.register_pressed_callback(self.zoom_to_ligand)
         self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
@@ -481,6 +482,17 @@ class EditMeshMenu:
                 if item_comp:
                     strucs.append(item_comp)
         self._plugin.zoom_on_structures(strucs)
+
+    @async_callback
+    async def zoom_to_ligand(self, btn: ui.Button):
+        self._current_ligand = getattr(self, '_current_ligand', 0)
+        model_comp = self.map_group.model_complex
+        model_mol = list(model_comp.molecules)[model_comp.current_frame]
+        ligands = await model_mol.get_ligands()
+        ligand_to_zoom = ligands[self._current_ligand]
+        residues = ligand_to_zoom.residues
+        self._plugin.zoom_on_structures(residues)
+        self._current_ligand = (self._current_ligand + 1) % len(ligands)
 
     def delete_group_objects(self, btn: ui.Button):
         Logs.message("Delete group objects button clicked.")
