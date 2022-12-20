@@ -430,11 +430,11 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            self.generate_histogram_thread(map_group)
-            # thread = Thread(
-            #     target=self.generate_histogram_thread,
-            #     args=[map_group])
-            # thread.start()
+            # self.generate_histogram_thread(map_group)
+            thread = Thread(
+                target=self.generate_histogram_thread,
+                args=[map_group])
+            thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
 
@@ -446,8 +446,8 @@ class EditMeshMenu:
         self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
-        # self._plugin.update_node(self.ln_img_histogram)
-        # self._plugin.update_content(self.sld_isovalue)
+        self._plugin.update_node(self.ln_img_histogram)
+        self._plugin.update_content(self.sld_isovalue)
 
     @property
     def isovalue(self):
