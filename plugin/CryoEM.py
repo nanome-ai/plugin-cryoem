@@ -10,8 +10,7 @@ from .models import MapGroup
 
 class CryoEM(nanome.AsyncPluginInstance):
 
-    @async_callback
-    async def start(self):
+    def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.search_menu = SearchMenu(self)
