@@ -1,16 +1,13 @@
 import asyncio
 import os
 import nanome
-import tempfile
 import unittest
 
 from nanome.api import structure, PluginInstance
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from mmtbx.model.model import manager
-from plugin import models
 from plugin.CryoEM import CryoEM
-from plugin.models import MapGroup, MapMesh
+from plugin.models import MapGroup
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
