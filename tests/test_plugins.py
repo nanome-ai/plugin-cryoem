@@ -79,6 +79,12 @@ class CryoEMPluginTestCase(unittest.TestCase):
             self.assertTrue(selected_mapgroup is not None)
             await self.plugin.add_pdb_to_group(self.pdb_file)
             self.assertTrue(isinstance(selected_mapgroup.model_complex, structure.Complex))
+
+            # Make sure if no groups exist when this is called, a new one is created.
+            self.plugin.groups = []
+            self.assertEqual(len(self.plugin.groups), 0)
+            await self.plugin.add_pdb_to_group(self.pdb_file)
+            self.assertEqual(len(self.plugin.groups), 1)
         run_awaitable(validate_add_pdb_to_group)
 
     def test_add_mapgz_to_group(self):
