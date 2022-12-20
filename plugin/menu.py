@@ -492,7 +492,7 @@ class EditMeshMenu:
         ligand_to_zoom = ligands[self._current_ligand]
         residues = ligand_to_zoom.residues
         self._plugin.zoom_on_structures(residues)
-        self._current_ligand = (self._current_ligand + 1) % len(ligands) 
+        self._current_ligand = (self._current_ligand + 1) % len(ligands)
 
     def delete_group_objects(self, btn: ui.Button):
         Logs.message("Delete group objects button clicked.")
