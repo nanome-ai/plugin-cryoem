@@ -102,6 +102,12 @@ class CryoEMPluginTestCase(unittest.TestCase):
 
             await self.plugin.add_mapgz_to_group(self.map_file)
             self.assertTrue(isinstance(selected_mapgroup.map_complex, structure.Complex))
+
+            # Make sure if no groups exist when this is called, a new one is created.
+            self.plugin.groups = []
+            self.assertEqual(len(self.plugin.groups), 0)
+            await self.plugin.add_mapgz_to_group(self.map_file)
+            self.assertEqual(len(self.plugin.groups), 1)
         run_awaitable(validate_add_mapgz_to_group)
 
     def test_delete_mapgroup(self):

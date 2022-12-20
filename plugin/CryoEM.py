@@ -77,8 +77,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:
-            self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
-            return
+            if not self.groups:
+                self.add_mapgroup()
+                mapgroup = self.groups[0]
+            else:
+                self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+                return
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
