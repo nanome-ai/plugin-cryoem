@@ -43,6 +43,10 @@ class CryoEMPluginTestCase(unittest.TestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
+    def tearDown(self):
+        super().tearDown()
+        self.plugin.on_stop()
+
     def test_add_mapgroup(self):
         self.assertEqual(len(self.plugin.groups), 1)
         self.plugin.add_mapgroup()
