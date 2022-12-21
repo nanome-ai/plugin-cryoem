@@ -81,3 +81,42 @@ class EditMeshMenuTestCase(unittest.TestCase):
             self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
             self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
         run_awaitable(validate_generate_histogram_thread)
+
+    def test_open_edit_viewport(self):
+        async def validate_open_edit_viewport():
+            await self.map_group.add_map_gz(self.map_file)
+            await self.map_group.generate_mesh()
+            self.menu.render(self.map_group)
+            self.assertEqual(self.menu.viewport_editor, None)
+            self.assertEqual(self.menu.ln_edit_map.enabled, True)
+            self.assertEqual(self.menu.ln_edit_viewport.enabled, False)
+            await self.menu.open_edit_viewport(self.menu.btn_edit_viewport)
+            self.assertTrue(isinstance(self.menu.viewport_editor, models.ViewportEditor))
+            self.assertEqual(self.menu.ln_edit_map.enabled, False)
+            self.assertEqual(self.menu.ln_edit_viewport.enabled, True)
+        run_awaitable(validate_open_edit_viewport)
+
+    def test_apply_viewport(self):
+        async def validate_open_edit_viewport():
+            await self.map_group.add_map_gz(self.map_file)
+            await self.map_group.generate_mesh()
+            self.menu.render(self.map_group)
+
+            await self.menu.open_edit_viewport(self.menu.btn_edit_viewport)
+            self.assertTrue(isinstance(self.menu.viewport_editor, models.ViewportEditor))
+            self.assertEqual(self.menu.ln_edit_map.enabled, False)
+            self.assertEqual(self.menu.ln_edit_viewport.enabled, True)
+
+            # Set up request_complexes mock
+            request_complexes_fut = asyncio.Future()
+            request_complexes_fut.set_result([self.menu.viewport_editor.complex])
+            self.plugin.request_complexes.return_value = request_complexes_fut
+
+            await self.menu.apply_viewport(self.menu.btn_save_viewport)
+
+            self.assertEqual(self.menu.viewport_editor.complex, None)
+            self.assertEqual(self.menu.viewport_editor.sphere, None)
+            self.assertEqual(self.menu.ln_edit_map.enabled, True)
+            self.assertEqual(self.menu.ln_edit_viewport.enabled, False)
+
+        run_awaitable(validate_open_edit_viewport)
