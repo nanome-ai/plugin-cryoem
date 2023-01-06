@@ -59,6 +59,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         # Get new complex, and associate to MapGroup
         comp.name = Path(filepath).stem
         await self.add_bonds([comp])
+        self.remove_hydrogens(comp)
         comp.locked = True
         if mapgroup:
             mapgroup.add_pdb(filepath)
@@ -115,6 +116,15 @@ class CryoEM(nanome.AsyncPluginInstance):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         self.menu.render(selected_mapgroup=mapgroup)
+
+    @staticmethod
+    def remove_hydrogens(comp):
+        """Remove hydrogen atoms from the complex."""
+        for atom in [atom for atom in comp.atoms if atom.symbol == 'H']:
+            residue = atom.residue
+            residue.remove_atom(atom)
+            for bond in atom.bonds:
+                residue.remove_bond(bond)
 
 
 def main():
