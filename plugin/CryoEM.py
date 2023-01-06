@@ -120,7 +120,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     @staticmethod
     def remove_hydrogens(comp):
         """Remove hydrogen atoms from the complex."""
-        for atom in [atom for atom in comp.atoms if atom.symbol == 'H']:
+        for atom in [atm for atm in comp.atoms if atm.symbol == 'H']:
             residue = atom.residue
             residue.remove_atom(atom)
             for bond in atom.bonds:
