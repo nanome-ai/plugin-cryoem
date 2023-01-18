@@ -3,7 +3,6 @@ import os
 import tempfile
 import time
 
-import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
 import pyfqmr
@@ -14,7 +13,6 @@ from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
 from mmtbx.model.model import manager
 
-from matplotlib import cm
 from scipy.spatial import KDTree
 
 import nanome
@@ -240,6 +238,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        import matplotlib.pyplot as plt
         Logs.debug("Generating histogram...")
         start_time = time.time()
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -380,6 +379,7 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
+        from matplotlib import cm
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
