@@ -11,7 +11,8 @@ class EMDBMetadataParserTestCase(unittest.TestCase):
 
     def setUp(self):
         self.metadata_file = os.path.join(fixtures_dir, 'metadata_8216.xml')
-        metadata_str = open(self.metadata_file).read()
+        with open(self.metadata_file) as f:
+            metadata_str = f.read()
         self.parser = EMDBMetadataParser(metadata_str)
 
     def test_isovalue(self):
