@@ -204,8 +204,10 @@ class SearchMenu:
         # Populate rcsb text input with pdb from metadata
         if metadata_parser.pdb_list:
             pdb_id = metadata_parser.pdb_list[0]
-            self.ti_rcsb_query.input_text = pdb_id
-            self._plugin.update_content(self.ti_rcsb_query)
+        else:
+            pdb_id = ""
+        self.ti_rcsb_query.input_text = pdb_id
+        self._plugin.update_content(self.ti_rcsb_query)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
