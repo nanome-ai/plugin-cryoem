@@ -4,6 +4,7 @@ from pathlib import Path
 import nanome
 from nanome.util import Logs, enums, async_callback
 from nanome.api import structure
+from . import __version__
 from .menu import MainMenu, SearchMenu
 from .models import MapGroup
 
@@ -133,6 +134,7 @@ def main():
         "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces",
         "other",
         False,
+        version=__version__
     )
     plugin.set_plugin_class(CryoEM)
     plugin.run()

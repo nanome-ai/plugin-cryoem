@@ -1,6 +1,7 @@
 import nanome
 import requests
 import time
+import urllib
 from functools import partial
 from nanome.api import ui, shapes
 from nanome.util import async_callback, enums, Logs
@@ -272,8 +273,12 @@ class SearchMenu:
         return file_path
 
     def on_browse_emdb(self, btn):
-        emdb_url = "https://www.ebi.ac.uk/emdb/search/"
-        self._plugin.open_url(emdb_url)
+        """Open the EMDB website in the user's browser"""
+        base_search_url = "www.ebi.ac.uk/emdb/search"
+        # query only low molecular weight maps, because download speeds are really bad.
+        query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
+        url = f"{base_search_url}/{query}?rows=10&sort=release_date desc"
+        self._plugin.open_url(url)
 
 
 class EditMeshMenu:
