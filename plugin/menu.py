@@ -147,6 +147,8 @@ class SearchMenu:
         # rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
+        self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
+        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
 
     @property
     def temp_dir(self):
@@ -202,8 +204,10 @@ class SearchMenu:
         # Populate rcsb text input with pdb from metadata
         if metadata_parser.pdb_list:
             pdb_id = metadata_parser.pdb_list[0]
-            self.ti_rcsb_query.input_text = pdb_id
-            self._plugin.update_content(self.ti_rcsb_query)
+        else:
+            pdb_id = ""
+        self.ti_rcsb_query.input_text = pdb_id
+        self._plugin.update_content(self.ti_rcsb_query)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
@@ -257,12 +261,19 @@ class SearchMenu:
                         kb_downloaded = downloaded_chunks / 1000
                         Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
                         loading_bar.percentage = kb_downloaded / file_size
-                        self._plugin.update_content(loading_bar)
+                        self.btn_embl_submit.text.value.unusable = \
+                            f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                        self.btn_embl_submit.unusable = True
+                        self._plugin.update_content(loading_bar, self.btn_embl_submit)
                         data_check = now
         loading_bar.percentage = 0
         self.lb_embl_download.enabled = False
         self._plugin.update_node(self.lb_embl_download)
         return file_path
+
+    def on_browse_emdb(self, btn):
+        emdb_url = "https://www.ebi.ac.uk/emdb/search/"
+        self._plugin.open_url(emdb_url)
 
 
 class EditMeshMenu:
