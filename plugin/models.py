@@ -1,22 +1,21 @@
 import gzip
-import os
-import tempfile
-import time
-
+import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
+import os
 import pyfqmr
 import randomcolor
-from typing import List
+import tempfile
+import time
+from matplotlib import cm
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
 from mmtbx.model.model import manager
-
 from scipy.spatial import KDTree
+from typing import List
 
-import nanome
-from nanome.api import shapes, structure
+from nanome.api import shapes, structure, PluginInstance
 from nanome.util import Color, Logs, enums, Vector3
 
 from .utils import cpk_colors, create_hidden_complex
@@ -238,7 +237,6 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
-        import matplotlib.pyplot as plt
         Logs.debug("Generating histogram...")
         start_time = time.time()
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -379,7 +377,6 @@ class MapGroup:
         map_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
-        from matplotlib import cm
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -456,7 +453,7 @@ class ViewportEditor:
 
     DEFAULT_RADIUS = 15
 
-    def __init__(self, plugin_instance: nanome.PluginInstance, map_group: MapGroup):
+    def __init__(self, plugin_instance: PluginInstance, map_group: MapGroup):
         self.map_group = map_group
         self.plugin = plugin_instance
 
