@@ -22,7 +22,7 @@ VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
 
-__all__ = ['MainMenu', 'SearchMenu', 'EditMeshMenu']
+__all__ = ['MainMenu', 'EditMeshMenu']
 
 
 class MainMenu:
@@ -35,11 +35,31 @@ class MainMenu:
         self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
 
         root: ui.LayoutNode = self._menu.root
-        self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
-        self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
+        # self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
+        # self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         self.btn_add_group.register_pressed_callback(self.add_mapgroup)
+
+        self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
+        self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
+        self.btn_rcsb_submit.disable_on_press = True
+        self.btn_embl_submit.disable_on_press = True
+        self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
+        self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
+        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
+        # For development only
+        # rcsb, embl = ['4znn', '3001']  # 94.33º
+        rcsb, embl = ['5k7n', '8216']  # 111.55º
+        # rcsb, embl = ['5vos', '8720']  # 100.02º
+        # rcsb, embl = ['7c4u', '30288']  # small molecule
+        # rcsb, embl = ['7q1u', '13764']  # large protein
+        self.ti_rcsb_query.input_text = rcsb
+        self.ti_embl_query.input_text = embl
+        self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
+        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
 
     def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
@@ -52,14 +72,14 @@ class MainMenu:
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
         self.render()
-
-    def on_btn_search_menu_pressed(self, btn):
-        Logs.message('Loading Search menu')
-        self._plugin.enable_search_menu()
 
     def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
@@ -118,47 +138,6 @@ class MainMenu:
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
         self._plugin.update_content(btn)
         self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
-
-
-class SearchMenu:
-
-    def __init__(self, plugin_instance: nanome.PluginInstance):
-        self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
-        self._menu.index = 2
-        self._plugin = plugin_instance
-
-        root: ui.LayoutNode = self._menu.root
-        self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
-        self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
-        self.btn_rcsb_submit.disable_on_press = True
-        self.btn_embl_submit.disable_on_press = True
-
-        self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
-        self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
-
-        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
-        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
-        self.current_group = "Group 1"
-        # For development only
-        # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
-        # rcsb, embl = ['5vos', '8720']  # 100.02º
-        # rcsb, embl = ['7c4u', '30288']  # small molecule
-        # rcsb, embl = ['7q1u', '13764']  # large protein
-        self.ti_rcsb_query.input_text = rcsb
-        self.ti_embl_query.input_text = embl
-        self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
-        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
-
-    @property
-    def temp_dir(self):
-        return self._plugin.temp_dir.name
-
-    def render(self, force_enable=False):
-        if force_enable:
-            self._menu.enabled = True
-        self._plugin.update_menu(self._menu)
 
     @async_callback
     async def on_rcsb_submit(self, btn):
@@ -279,7 +258,6 @@ class SearchMenu:
         query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
         url = f"{base_search_url}/{query}?rows=10&sort=release_date desc"
         self._plugin.open_url(url)
-
 
 class EditMeshMenu:
 
