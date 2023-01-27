@@ -26,7 +26,7 @@ class CryoEMPluginTestCase(unittest.TestCase):
     def setUp(self):
         super().setUp()
         PluginInstance._instance = MagicMock()
-        nanome._internal._network.PluginNetwork._instance = MagicMock()
+        nanome._internal.network.PluginNetwork._instance = MagicMock()
         self.plugin = CryoEM()
         # Mock args that are passed to setup plugin instance networking
         session_id = plugin_network = pm_queue_in = pm_queue_out = custom_data = \

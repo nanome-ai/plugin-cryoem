@@ -29,7 +29,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
         self.plugin = MagicMock()
         self.plugin.temp_dir = tempfile.TemporaryDirectory()
         nanome.PluginInstance._instance = MagicMock()
-        nanome._internal._network.PluginNetwork._instance = MagicMock()
+        nanome._internal.network.PluginNetwork._instance = MagicMock()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_group = models.MapGroup(self.plugin)
