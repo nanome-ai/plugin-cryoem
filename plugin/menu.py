@@ -168,26 +168,32 @@ class MainMenu:
         self.btn_rcsb_submit.unusable = True
         self.btn_rcsb_submit.text.value.unusable = "Search"
         self._plugin.update_content(self.btn_rcsb_submit)
-
-        metadata_parser = self.download_metadata_from_emdbid(embid_id)
-        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
-        isovalue = metadata_parser.isovalue
-
-        # Update message to say generating mesh
-        self._plugin.update_content(btn)
-        btn.text.value.unusable = "Generating..."
-        btn.unusable = True
-        self._plugin.update_content(btn)
-
-        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
-
-        # Populate rcsb text input with pdb from metadata
-        if metadata_parser.pdb_list:
-            pdb_id = metadata_parser.pdb_list[0]
+        try:
+            metadata_parser = self.download_metadata_from_emdbid(embid_id)
+        except requests.exceptions.HTTPError:
+            msg = "EMDB ID not found"
+            Logs.warning(msg)
+            self._plugin.send_notification(enums.NotificationTypes.error, msg)
         else:
-            pdb_id = ""
-        self.ti_rcsb_query.input_text = pdb_id
-        self._plugin.update_content(self.ti_rcsb_query)
+            # Download map data
+            map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
+            isovalue = metadata_parser.isovalue
+
+            # Update message to say generating mesh
+            self._plugin.update_content(btn)
+            btn.text.value.unusable = "Generating..."
+            btn.unusable = True
+            self._plugin.update_content(btn)
+
+            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+
+            # Populate rcsb text input with pdb from metadata
+            if metadata_parser.pdb_list:
+                pdb_id = metadata_parser.pdb_list[0]
+            else:
+                pdb_id = ""
+            self.ti_rcsb_query.input_text = pdb_id
+            self._plugin.update_content(self.ti_rcsb_query)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
@@ -213,6 +219,7 @@ class MainMenu:
         Logs.message("Downloading EM metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
+        response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
     def download_cryoem_map_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
@@ -258,6 +265,7 @@ class MainMenu:
         query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
         url = f"{base_search_url}/{query}?rows=10&sort=release_date desc"
         self._plugin.open_url(url)
+
 
 class EditMeshMenu:
 
