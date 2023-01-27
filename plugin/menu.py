@@ -22,7 +22,7 @@ VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
 
-__all__ = ['MainMenu', 'SearchMenu', 'EditMeshMenu']
+__all__ = ['MainMenu', 'EditMeshMenu']
 
 
 class MainMenu:
@@ -35,11 +35,31 @@ class MainMenu:
         self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
 
         root: ui.LayoutNode = self._menu.root
-        self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
-        self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
+        # self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
+        # self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         self.btn_add_group.register_pressed_callback(self.add_mapgroup)
+
+        self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
+        self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
+        self.btn_rcsb_submit.disable_on_press = True
+        self.btn_embl_submit.disable_on_press = True
+        self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
+        self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
+        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
+        # For development only
+        # rcsb, embl = ['4znn', '3001']  # 94.33º
+        rcsb, embl = ['5k7n', '8216']  # 111.55º
+        # rcsb, embl = ['5vos', '8720']  # 100.02º
+        # rcsb, embl = ['7c4u', '30288']  # small molecule
+        # rcsb, embl = ['7q1u', '13764']  # large protein
+        self.ti_rcsb_query.input_text = rcsb
+        self.ti_embl_query.input_text = embl
+        self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
+        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
 
     def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
@@ -52,14 +72,14 @@ class MainMenu:
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
         self.render()
-
-    def on_btn_search_menu_pressed(self, btn):
-        Logs.message('Loading Search menu')
-        self._plugin.enable_search_menu()
 
     def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
@@ -102,6 +122,11 @@ class MainMenu:
                 return label.text_value
 
     def open_edit_mesh_menu(self, map_group, btn=None):
+        if not map_group.has_map():
+            msg = "Please add Map from EMDB before opening menu"
+            self._plugin.send_notification(enums.NotificationTypes.warning, msg)
+            Logs.warning('Tried to open menu before adding map.')
+            return
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
@@ -118,47 +143,6 @@ class MainMenu:
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
         self._plugin.update_content(btn)
         self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
-
-
-class SearchMenu:
-
-    def __init__(self, plugin_instance: nanome.PluginInstance):
-        self._menu = ui.Menu.io.from_json(EMBL_MENU_PATH)
-        self._menu.index = 2
-        self._plugin = plugin_instance
-
-        root: ui.LayoutNode = self._menu.root
-        self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
-        self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
-        self.btn_rcsb_submit.disable_on_press = True
-        self.btn_embl_submit.disable_on_press = True
-
-        self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
-        self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
-
-        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
-        self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
-        self.current_group = "Group 1"
-        # For development only
-        # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
-        # rcsb, embl = ['5vos', '8720']  # 100.02º
-        # rcsb, embl = ['7c4u', '30288']  # small molecule
-        # rcsb, embl = ['7q1u', '13764']  # large protein
-        self.ti_rcsb_query.input_text = rcsb
-        self.ti_embl_query.input_text = embl
-        self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
-        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
-
-    @property
-    def temp_dir(self):
-        return self._plugin.temp_dir.name
-
-    def render(self, force_enable=False):
-        if force_enable:
-            self._menu.enabled = True
-        self._plugin.update_menu(self._menu)
 
     @async_callback
     async def on_rcsb_submit(self, btn):
@@ -189,26 +173,32 @@ class SearchMenu:
         self.btn_rcsb_submit.unusable = True
         self.btn_rcsb_submit.text.value.unusable = "Search"
         self._plugin.update_content(self.btn_rcsb_submit)
-
-        metadata_parser = self.download_metadata_from_emdbid(embid_id)
-        map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
-        isovalue = metadata_parser.isovalue
-
-        # Update message to say generating mesh
-        self._plugin.update_content(btn)
-        btn.text.value.unusable = "Generating..."
-        btn.unusable = True
-        self._plugin.update_content(btn)
-
-        await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
-
-        # Populate rcsb text input with pdb from metadata
-        if metadata_parser.pdb_list:
-            pdb_id = metadata_parser.pdb_list[0]
+        try:
+            metadata_parser = self.download_metadata_from_emdbid(embid_id)
+        except requests.exceptions.HTTPError:
+            msg = "EMDB ID not found"
+            Logs.warning(msg)
+            self._plugin.send_notification(enums.NotificationTypes.error, msg)
         else:
-            pdb_id = ""
-        self.ti_rcsb_query.input_text = pdb_id
-        self._plugin.update_content(self.ti_rcsb_query)
+            # Download map data
+            map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
+            isovalue = metadata_parser.isovalue
+
+            # Update message to say generating mesh
+            self._plugin.update_content(btn)
+            btn.text.value.unusable = "Generating..."
+            btn.unusable = True
+            self._plugin.update_content(btn)
+
+            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+
+            # Populate rcsb text input with pdb from metadata
+            if metadata_parser.pdb_list:
+                pdb_id = metadata_parser.pdb_list[0]
+            else:
+                pdb_id = ""
+            self.ti_rcsb_query.input_text = pdb_id
+            self._plugin.update_content(self.ti_rcsb_query)
         # Reenable rcsb search button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
@@ -234,6 +224,7 @@ class SearchMenu:
         Logs.message("Downloading EM metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
+        response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
     def download_cryoem_map_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):

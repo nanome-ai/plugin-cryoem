@@ -29,7 +29,7 @@ class MapGroupTestCase(unittest.TestCase):
     def setUp(self):
         self.plugin = MagicMock()
         PluginInstance._instance = self.plugin
-        nanome._internal._network.PluginNetwork._instance = MagicMock()
+        nanome._internal.network.PluginNetwork._instance = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
@@ -50,7 +50,7 @@ class MapGroupTestCase(unittest.TestCase):
             self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, map_manager))
         run_awaitable(validate_add_map_gz, self)
 
-    @patch('nanome._internal._network.PluginNetwork._instance', return_value=asyncio.Future())
+    @patch('nanome._internal.network.PluginNetwork._instance', return_value=asyncio.Future())
     def test_generate_mesh(self, instance_mock):
         # Assert that attributes are set after load_map called.
         async def validate_generate_mesh(self):
@@ -168,7 +168,7 @@ class ViewportEditorTestCase(unittest.TestCase):
         super().setUp()
         self.plugin = MagicMock()
         nanome.PluginInstance._instance = MagicMock()
-        nanome._internal._network.PluginNetwork._instance = MagicMock()
+        nanome._internal.network.PluginNetwork._instance = MagicMock()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_group = models.MapGroup(self.plugin)

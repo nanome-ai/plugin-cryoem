@@ -5,7 +5,7 @@ import nanome
 from nanome.util import Logs, enums, async_callback
 from nanome.api import structure
 from . import __version__
-from .menu import MainMenu, SearchMenu
+from .menu import MainMenu
 from .models import MapGroup
 
 
@@ -14,7 +14,6 @@ class CryoEM(nanome.AsyncPluginInstance):
     def start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
-        self.search_menu = SearchMenu(self)
         self.groups = []
         self.add_mapgroup()
 
