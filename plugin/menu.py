@@ -1,26 +1,28 @@
 import nanome
+import os
 import requests
 import time
 import urllib
 from functools import partial
 from nanome.api import ui, shapes
 from nanome.util import async_callback, enums, Logs
-from os import path
 from threading import Thread
 
 from .models import MapGroup, ViewportEditor
 from .utils import EMDBMetadataParser
 
-ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
-MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
-EMBL_MENU_PATH = path.join(ASSETS_PATH, 'embl_search_menu.json')
-GROUP_DETAIL_MENU_PATH = path.join(ASSETS_PATH, 'group_details.json')
-GROUP_ITEM_PATH = path.join(ASSETS_PATH, 'group_item.json')
+ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
+MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
+EMBL_MENU_PATH = os.path.join(ASSETS_PATH, 'embl_search_menu.json')
+GROUP_DETAIL_MENU_PATH = os.path.join(ASSETS_PATH, 'group_details.json')
+GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
 
-DELETE_ICON = path.join(ASSETS_PATH, 'delete.png')
-VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
-INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
+DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
+VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
+INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
+
+MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 
 __all__ = ['MainMenu', 'EditMeshMenu']
 
@@ -48,7 +50,7 @@ class MainMenu:
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
         self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
@@ -165,9 +167,9 @@ class MainMenu:
         self._plugin.update_content(self.btn_embl_submit, btn)
 
     @async_callback
-    async def on_embl_submit(self, btn):
+    async def on_emdb_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
-        Logs.debug(f"EMBL query: {embid_id}")
+        Logs.debug(f"EMDB query: {embid_id}")
 
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
@@ -175,15 +177,20 @@ class MainMenu:
         self._plugin.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
+            # Validate file size is within limit.
+            if metadata_parser.map_filesize > MAX_MAP_SIZE_KB:
+                raise Exception
         except requests.exceptions.HTTPError:
             msg = "EMDB ID not found"
             Logs.warning(msg)
             self._plugin.send_notification(enums.NotificationTypes.error, msg)
+        except Exception:
+            msg = "Map file must be smaller than 500MB"
+            self._plugin.send_notification(enums.NotificationTypes.error, msg)
         else:
             # Download map data
-            map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
+            map_file = self.download_mapgz_from_emdbid(embid_id, metadata_parser)
             isovalue = metadata_parser.isovalue
-
             # Update message to say generating mesh
             self._plugin.update_content(btn)
             btn.text.value.unusable = "Generating..."
@@ -227,7 +234,7 @@ class MainMenu:
         response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
-    def download_cryoem_map_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+    def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
