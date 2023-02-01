@@ -54,10 +54,10 @@ class MainMenu:
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
+        # rcsb, embl = ['5k7n', '8216']  # 111.55º
         # rcsb, embl = ['5vos', '8720']  # 100.02º
         # rcsb, embl = ['7c4u', '30288']  # small molecule
-        # rcsb, embl = ['7q1u', '13764']  # large protein
+        rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
@@ -228,13 +228,14 @@ class MainMenu:
         return file_path
 
     def download_metadata_from_emdbid(self, emdbid):
-        Logs.message("Downloading EM metadata for EMDBID:", emdbid)
+        Logs.debug("Downloading metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
         response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
     def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+        return os.path.join(os.getcwd(), 'tests', 'fixtures', 'emd_13764.map.gz')
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
@@ -302,7 +303,7 @@ class EditMeshMenu:
 
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
-        self.sld_isovalue.register_released_callback(self.redraw_map)
+        self.sld_isovalue.register_released_callback(self.redraw_new_isovalue)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
@@ -329,6 +330,56 @@ class EditMeshMenu:
         self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
+    def render(self, map_group: MapGroup):
+        self._menu.title = f'{map_group.group_name} Map'
+        # Populate file list
+        self.lst_files.items.clear()
+        group_objs = []
+        if map_group.map_gz_file:
+            map_comp = map_group.map_mesh.complex
+            group_objs.append(map_comp)
+        if map_group.model_complex:
+            group_objs.append(map_group.model_complex)
+
+        for comp in group_objs:
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            btn.text.value.set_all(comp.full_name)
+            btn.comp = comp
+            btn.toggle_on_press = True
+            self.lst_files.items.append(ln)
+
+        # Populate color scheme dropdown
+        current_scheme = map_group.color_scheme
+        for item in self.dd_color_scheme.items:
+            if item.name.lower() == current_scheme.name.lower():
+                item.selected = True
+            else:
+                item.selected = False
+        if map_group.metadata:
+            resolution = map_group.metadata.resolution
+            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
+        self.set_isovalue_ui(self.map_group.isovalue)
+        self.set_opacity_ui(self.map_group.opacity)
+
+        if map_group.has_map():
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
+            self._plugin.update_content(self.sld_isovalue)
+
+        if map_group.has_map() and not map_group.png_tempfile:
+            self.ln_img_histogram.add_new_label('Loading Histogram...')
+            self._plugin.update_node(self.ln_img_histogram)
+            # self.generate_histogram_thread(map_group)
+            thread = Thread(
+                target=self.generate_histogram_thread,
+                args=[map_group])
+            thread.start()
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self._plugin.update_menu(self._menu)
+        self._plugin.update_node(self.ln_img_histogram)
+
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
         self.update_isovalue_lbl(self.sld_isovalue)
@@ -342,18 +393,25 @@ class EditMeshMenu:
         self.sld_radius_update(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
-        self.lbl_isovalue.text_value = f'{round(sld.current_value, 2)} A'
+        if getattr(sld, 'locked', False):
+            Logs.warning("map is reloading, can't update isovalue.")
+            sld.current_value = sld.locked_value
+            slider_value = sld.locked_value
+        else:
+            slider_value = sld.current_value
+        self.lbl_isovalue.text_value = f'{round(slider_value, 2)} A'
         self._plugin.update_content(self.lbl_isovalue, sld)
 
         # /!\ calculation is sensitive to menu and image dimensions
         # position histogram line based on isovalue
         # plot width 800, left padding 100, right padding 80
-        x_min = self.map_group.hist_x_min
-        x_max = self.map_group.hist_x_max
-        x = (sld.current_value - x_min) / (x_max - x_min)
-        left = (100 + x * 620) / 800
-        self.ln_isovalue_line.set_padding(left=left)
-        self._plugin.update_node(self.ln_isovalue_line)
+        if self.map_group.has_histogram():
+            x_min = self.map_group.hist_x_min
+            x_max = self.map_group.hist_x_max
+            x = (sld.current_value - x_min) / (x_max - x_min)
+            left = (100 + x * 620) / 800
+            self.ln_isovalue_line.set_padding(left=left)
+            self._plugin.update_node(self.ln_isovalue_line)
 
     def update_opacity_lbl(self, sld):
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
@@ -401,60 +459,22 @@ class EditMeshMenu:
         if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
+    @async_callback
+    async def redraw_new_isovalue(self, sld):
+        if getattr(sld, 'locked', False):
+            Logs.warning("map is already reloading.")
+            return
+        sld.locked = True
+        sld.locked_value = sld.current_value
+        #TODO: https://stackoverflow.com/questions/44345139/python-asyncio-add-done-callback-with-async-def
+        self._plugin.update_content(sld)
+        await self.redraw_map(sld)
+        sld.locked = False
+        self._plugin.update_content(sld)
+
     @property
     def temp_dir(self):
         return self._plugin.temp_dir.name
-
-    def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map'
-
-        # Populate file list
-        self.lst_files.items.clear()
-        group_objs = []
-        if map_group.map_gz_file:
-            map_comp = map_group.map_mesh.complex
-            group_objs.append(map_comp)
-        if map_group.model_complex:
-            group_objs.append(map_group.model_complex)
-
-        for comp in group_objs:
-            ln = ui.LayoutNode()
-            btn = ln.add_new_button()
-            btn.text.value.set_all(comp.full_name)
-            btn.comp = comp
-            btn.toggle_on_press = True
-            self.lst_files.items.append(ln)
-
-        # Populate color scheme dropdown
-        current_scheme = map_group.color_scheme
-        for item in self.dd_color_scheme.items:
-            if item.name.lower() == current_scheme.name.lower():
-                item.selected = True
-            else:
-                item.selected = False
-        if map_group.metadata:
-            resolution = map_group.metadata.resolution
-            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
-        self.set_isovalue_ui(self.map_group.isovalue)
-        self.set_opacity_ui(self.map_group.opacity)
-
-        self._plugin.update_menu(self._menu)
-        if map_group.has_map():
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
-        if map_group.has_map() and not map_group.png_tempfile:
-            self.ln_img_histogram.add_new_label('Loading Histogram...')
-            self._plugin.update_node(self.ln_img_histogram)
-            # self.generate_histogram_thread(map_group)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
-        if map_group.png_tempfile:
-            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-
-        self._plugin.update_node(self.ln_img_histogram)
-        self._plugin.update_content(self.sld_isovalue)
 
     def generate_histogram_thread(self, map_group):
         map_group.generate_histogram(self.temp_dir)
