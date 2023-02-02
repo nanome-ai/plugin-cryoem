@@ -14,7 +14,7 @@ from .utils import EMDBMetadataParser
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
 EMBL_MENU_PATH = os.path.join(ASSETS_PATH, 'embl_search_menu.json')
-GROUP_DETAIL_MENU_PATH = os.path.join(ASSETS_PATH, 'group_details.json')
+EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
 GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
 
 DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
@@ -285,7 +285,7 @@ class EditMeshMenu:
         self.map_group = map_group
         self.viewport_editor = None
 
-        self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
+        self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
 
