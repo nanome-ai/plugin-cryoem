@@ -369,7 +369,7 @@ class EditMeshMenu:
             self._plugin.update_content(self.sld_isovalue)
 
         if map_group.has_map() and not map_group.png_tempfile:
-            self.ln_img_histogram.add_new_label('Loading Histogram... (This may take a while)')
+            self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
             # self.generate_histogram_thread(map_group)
             thread = Thread(

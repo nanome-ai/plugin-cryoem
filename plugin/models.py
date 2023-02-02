@@ -239,13 +239,14 @@ class MapGroup:
     def generate_histogram(self, temp_dir: str):
         Logs.debug("Generating histogram...")
         start_time = time.time()
-        flat = list(self.map_mesh.map_manager.map_data().as_1d())
+        flat = np.array(self.map_mesh.map_manager.map_data().as_1d(), dtype=np.float32)
         minmap = np.min(flat)
         flat_offset = flat + abs(minmap) + 0.001
         hist, bins = np.histogram(flat_offset, bins=1000)
         logbins = np.logspace(np.log10(bins[0]), np.log10(bins[-1]), len(bins))
+        bins = logbins - abs(minmap)
         plt.figure(figsize=(8, 3))
-        plt.hist(flat, bins=logbins - abs(minmap))
+        plt.hist(flat, bins=bins)
         plt.ylim(bottom=10)
         plt.yscale('log')
         plt.title("Level histogram")
