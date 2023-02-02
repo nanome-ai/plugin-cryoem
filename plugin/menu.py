@@ -54,10 +54,10 @@ class MainMenu:
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
-        # rcsb, embl = ['5k7n', '8216']  # 111.55º
+        rcsb, embl = ['5k7n', '8216']  # 111.55º
         # rcsb, embl = ['5vos', '8720']  # 100.02º
         # rcsb, embl = ['7c4u', '30288']  # small molecule
-        rcsb, embl = ['7q1u', '13764']  # large protein
+        # rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
@@ -235,7 +235,6 @@ class MainMenu:
         return EMDBMetadataParser(response.content)
 
     def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
-        return os.path.join(os.getcwd(), 'tests', 'fixtures', 'emd_13764.map.gz')
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
@@ -303,9 +302,9 @@ class EditMeshMenu:
 
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
+        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
-        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
@@ -370,7 +369,7 @@ class EditMeshMenu:
             self._plugin.update_content(self.sld_isovalue)
 
         if map_group.has_map() and not map_group.png_tempfile:
-            self.ln_img_histogram.add_new_label('Loading Histogram...')
+            self.ln_img_histogram.add_new_label('Loading Histogram... (This may take a while)')
             self._plugin.update_node(self.ln_img_histogram)
             # self.generate_histogram_thread(map_group)
             thread = Thread(
@@ -379,8 +378,8 @@ class EditMeshMenu:
             thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+            self._plugin.update_node(self.ln_img_histogram)
         self._plugin.update_menu(self._menu)
-        self._plugin.update_node(self.ln_img_histogram)
 
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
@@ -458,8 +457,12 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_new_isovalue(self, btn):
+        rendered_isovalue = self.sld_isovalue.current_value
         await self.redraw_map(btn)
-        self._plugin.update_content(btn)
+        # Set slider back to initial value, in case user
+        # moved it while map was being redrawn
+        self.sld_isovalue.current_value = rendered_isovalue
+        self._plugin.update_content(btn, self.sld_isovalue)
 
     @property
     def temp_dir(self):
