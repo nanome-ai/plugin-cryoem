@@ -332,7 +332,7 @@ class EditMeshMenu:
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
     def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map'
+        self._menu.title = f'{map_group.group_name} Map (Primary contour: {map_group.isovalue})'
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
