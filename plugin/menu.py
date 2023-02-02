@@ -301,9 +301,11 @@ class EditMeshMenu:
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
+        self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
+        self.btn_redraw_map.disable_on_press = True
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
-        self.sld_isovalue.register_released_callback(self.redraw_new_isovalue)
+        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
@@ -393,12 +395,7 @@ class EditMeshMenu:
         self.sld_radius_update(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
-        if getattr(sld, 'locked', False):
-            Logs.warning("map is reloading, can't update isovalue.")
-            sld.current_value = sld.locked_value
-            slider_value = sld.locked_value
-        else:
-            slider_value = sld.current_value
+        slider_value = sld.current_value
         self.lbl_isovalue.text_value = f'{round(slider_value, 2)} A'
         self._plugin.update_content(self.lbl_isovalue, sld)
 
@@ -460,17 +457,9 @@ class EditMeshMenu:
             await self.map_group.generate_mesh()
 
     @async_callback
-    async def redraw_new_isovalue(self, sld):
-        if getattr(sld, 'locked', False):
-            Logs.warning("map is already reloading.")
-            return
-        sld.locked = True
-        sld.locked_value = sld.current_value
-        #TODO: https://stackoverflow.com/questions/44345139/python-asyncio-add-done-callback-with-async-def
-        self._plugin.update_content(sld)
-        await self.redraw_map(sld)
-        sld.locked = False
-        self._plugin.update_content(sld)
+    async def redraw_new_isovalue(self, btn):
+        await self.redraw_map(btn)
+        self._plugin.update_content(btn)
 
     @property
     def temp_dir(self):
