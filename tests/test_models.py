@@ -58,7 +58,7 @@ class MapGroupTestCase(unittest.TestCase):
             fut.set_result([structure.Complex()])
             self.plugin.add_to_workspace.return_value = fut
 
-            map_file = os.path.join(fixtures_dir, 'emd_13764.map.gz')
+            map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 14735
             # Make sure vertices are added to mesh
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
