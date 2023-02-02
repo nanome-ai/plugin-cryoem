@@ -1,26 +1,28 @@
 import nanome
+import os
 import requests
 import time
 import urllib
 from functools import partial
 from nanome.api import ui, shapes
 from nanome.util import async_callback, enums, Logs
-from os import path
 from threading import Thread
 
 from .models import MapGroup, ViewportEditor
 from .utils import EMDBMetadataParser
 
-ASSETS_PATH = path.join(path.dirname(f'{path.realpath(__file__)}'), 'assets')
-MAIN_MENU_PATH = path.join(ASSETS_PATH, 'main_menu.json')
-EMBL_MENU_PATH = path.join(ASSETS_PATH, 'embl_search_menu.json')
-GROUP_DETAIL_MENU_PATH = path.join(ASSETS_PATH, 'group_details.json')
-GROUP_ITEM_PATH = path.join(ASSETS_PATH, 'group_item.json')
+ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
+MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
+EMBL_MENU_PATH = os.path.join(ASSETS_PATH, 'embl_search_menu.json')
+EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
+GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
 
-DELETE_ICON = path.join(ASSETS_PATH, 'delete.png')
-VISIBLE_ICON = path.join(ASSETS_PATH, 'visible.png')
-INVISIBLE_ICON = path.join(ASSETS_PATH, 'invisible.png')
+DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
+VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
+INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
 MAP_FILETYPES = ['.map', '.map.gz']
+
+MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 
 __all__ = ['MainMenu', 'EditMeshMenu']
 
@@ -48,7 +50,7 @@ class MainMenu:
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
         self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_embl_submit)
+        self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33º
@@ -165,9 +167,9 @@ class MainMenu:
         self._plugin.update_content(self.btn_embl_submit, btn)
 
     @async_callback
-    async def on_embl_submit(self, btn):
+    async def on_emdb_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
-        Logs.debug(f"EMBL query: {embid_id}")
+        Logs.debug(f"EMDB query: {embid_id}")
 
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
@@ -175,15 +177,20 @@ class MainMenu:
         self._plugin.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
+            # Validate file size is within limit.
+            if metadata_parser.map_filesize > MAX_MAP_SIZE_KB:
+                raise Exception
         except requests.exceptions.HTTPError:
             msg = "EMDB ID not found"
             Logs.warning(msg)
             self._plugin.send_notification(enums.NotificationTypes.error, msg)
+        except Exception:
+            msg = "Map file must be smaller than 500MB"
+            self._plugin.send_notification(enums.NotificationTypes.error, msg)
         else:
             # Download map data
-            map_file = self.download_cryoem_map_from_emdbid(embid_id, metadata_parser)
+            map_file = self.download_mapgz_from_emdbid(embid_id, metadata_parser)
             isovalue = metadata_parser.isovalue
-
             # Update message to say generating mesh
             self._plugin.update_content(btn)
             btn.text.value.unusable = "Generating..."
@@ -221,13 +228,13 @@ class MainMenu:
         return file_path
 
     def download_metadata_from_emdbid(self, emdbid):
-        Logs.message("Downloading EM metadata for EMDBID:", emdbid)
+        Logs.debug("Downloading metadata for EMDBID:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
         response = requests.get(url)
         response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
-    def download_cryoem_map_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+    def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
@@ -278,7 +285,7 @@ class EditMeshMenu:
         self.map_group = map_group
         self.viewport_editor = None
 
-        self._menu = ui.Menu.io.from_json(GROUP_DETAIL_MENU_PATH)
+        self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
 
@@ -293,9 +300,11 @@ class EditMeshMenu:
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
+        self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
+        self.btn_redraw_map.disable_on_press = True
+        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
-        self.sld_isovalue.register_released_callback(self.redraw_map)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
@@ -322,6 +331,56 @@ class EditMeshMenu:
         self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
+    def render(self, map_group: MapGroup):
+        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {map_group.isovalue})'
+        # Populate file list
+        self.lst_files.items.clear()
+        group_objs = []
+        if map_group.map_gz_file:
+            map_comp = map_group.map_mesh.complex
+            group_objs.append(map_comp)
+        if map_group.model_complex:
+            group_objs.append(map_group.model_complex)
+
+        for comp in group_objs:
+            ln = ui.LayoutNode()
+            btn = ln.add_new_button()
+            btn.text.value.set_all(comp.full_name)
+            btn.comp = comp
+            btn.toggle_on_press = True
+            self.lst_files.items.append(ln)
+
+        # Populate color scheme dropdown
+        current_scheme = map_group.color_scheme
+        for item in self.dd_color_scheme.items:
+            if item.name.lower() == current_scheme.name.lower():
+                item.selected = True
+            else:
+                item.selected = False
+        if map_group.metadata:
+            resolution = map_group.metadata.resolution
+            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
+        self.set_isovalue_ui(self.map_group.isovalue)
+        self.set_opacity_ui(self.map_group.opacity)
+
+        if map_group.has_map():
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
+            self._plugin.update_content(self.sld_isovalue)
+
+        if map_group.has_map() and not map_group.png_tempfile:
+            self.ln_img_histogram.add_new_label('Loading Histogram... (This may take a while)')
+            self._plugin.update_node(self.ln_img_histogram)
+            # self.generate_histogram_thread(map_group)
+            thread = Thread(
+                target=self.generate_histogram_thread,
+                args=[map_group])
+            thread.start()
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+            self._plugin.update_node(self.ln_img_histogram)
+        self._plugin.update_menu(self._menu)
+
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
         self.update_isovalue_lbl(self.sld_isovalue)
@@ -335,18 +394,20 @@ class EditMeshMenu:
         self.sld_radius_update(self.sld_radius)
 
     def update_isovalue_lbl(self, sld):
-        self.lbl_isovalue.text_value = f'{round(sld.current_value, 2)} A'
+        slider_value = sld.current_value
+        self.lbl_isovalue.text_value = f'{round(slider_value, 2)} A'
         self._plugin.update_content(self.lbl_isovalue, sld)
 
         # /!\ calculation is sensitive to menu and image dimensions
         # position histogram line based on isovalue
         # plot width 800, left padding 100, right padding 80
-        x_min = self.map_group.hist_x_min
-        x_max = self.map_group.hist_x_max
-        x = (sld.current_value - x_min) / (x_max - x_min)
-        left = (100 + x * 620) / 800
-        self.ln_isovalue_line.set_padding(left=left)
-        self._plugin.update_node(self.ln_isovalue_line)
+        if self.map_group.has_histogram():
+            x_min = self.map_group.hist_x_min
+            x_max = self.map_group.hist_x_max
+            x = (sld.current_value - x_min) / (x_max - x_min)
+            left = (100 + x * 620) / 800
+            self.ln_isovalue_line.set_padding(left=left)
+            self._plugin.update_node(self.ln_isovalue_line)
 
     def update_opacity_lbl(self, sld):
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
@@ -394,60 +455,18 @@ class EditMeshMenu:
         if self.map_group.has_map():
             await self.map_group.generate_mesh()
 
+    @async_callback
+    async def redraw_new_isovalue(self, btn):
+        rendered_isovalue = self.sld_isovalue.current_value
+        await self.redraw_map(btn)
+        # Set slider back to initial value, in case user
+        # moved it while map was being redrawn
+        self.sld_isovalue.current_value = rendered_isovalue
+        self._plugin.update_content(btn, self.sld_isovalue)
+
     @property
     def temp_dir(self):
         return self._plugin.temp_dir.name
-
-    def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map'
-
-        # Populate file list
-        self.lst_files.items.clear()
-        group_objs = []
-        if map_group.map_gz_file:
-            map_comp = map_group.map_mesh.complex
-            group_objs.append(map_comp)
-        if map_group.model_complex:
-            group_objs.append(map_group.model_complex)
-
-        for comp in group_objs:
-            ln = ui.LayoutNode()
-            btn = ln.add_new_button()
-            btn.text.value.set_all(comp.full_name)
-            btn.comp = comp
-            btn.toggle_on_press = True
-            self.lst_files.items.append(ln)
-
-        # Populate color scheme dropdown
-        current_scheme = map_group.color_scheme
-        for item in self.dd_color_scheme.items:
-            if item.name.lower() == current_scheme.name.lower():
-                item.selected = True
-            else:
-                item.selected = False
-        if map_group.metadata:
-            resolution = map_group.metadata.resolution
-            self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
-        self.set_isovalue_ui(self.map_group.isovalue)
-        self.set_opacity_ui(self.map_group.opacity)
-
-        self._plugin.update_menu(self._menu)
-        if map_group.has_map():
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
-        if map_group.has_map() and not map_group.png_tempfile:
-            self.ln_img_histogram.add_new_label('Loading Histogram...')
-            self._plugin.update_node(self.ln_img_histogram)
-            # self.generate_histogram_thread(map_group)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
-        if map_group.png_tempfile:
-            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-
-        self._plugin.update_node(self.ln_img_histogram)
-        self._plugin.update_content(self.sld_isovalue)
 
     def generate_histogram_thread(self, map_group):
         map_group.generate_histogram(self.temp_dir)
