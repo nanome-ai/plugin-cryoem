@@ -1,3 +1,4 @@
+import os
 import tempfile
 from pathlib import Path
 
@@ -113,6 +114,9 @@ class CryoEM(nanome.AsyncPluginInstance):
         except ValueError:
             Logs.warning("Tried to delete a map group that doesn't exist.")
 
+        # Delete map file if it exists.
+        if map_group.map_gz_file:
+            os.remove(map_group.map_gz_file)
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         self.menu.render(selected_mapgroup=mapgroup)

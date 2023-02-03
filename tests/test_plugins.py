@@ -1,6 +1,7 @@
 import asyncio
 import os
 import nanome
+import tempfile
 import unittest
 
 from nanome.api import structure, PluginInstance
@@ -38,6 +39,8 @@ class CryoEMPluginTestCase(unittest.TestCase):
         self.plugin.start()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
+
+        # Make temp copy of mapfile, because a test will delete it.
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
     def tearDown(self):
@@ -110,12 +113,23 @@ class CryoEMPluginTestCase(unittest.TestCase):
     def test_delete_mapgroup(self):
         async def validate_delete_mapgroup():
             self.assertEqual(len(self.plugin.groups), 1)
-
             remove_from_workspace_fut = asyncio.Future()
             remove_from_workspace_fut.set_result([structure.Complex()])
             self.plugin.remove_from_workspace = MagicMock(return_value=remove_from_workspace_fut)
 
             existing_group = self.plugin.groups[0]
+            # Copy map file to temp file, because the test will delete it.
+            temp_map_file = tempfile.NamedTemporaryFile()
+            with open(self.map_file, 'rb') as f:
+                temp_map_file.write(f.read())
+            # Add a map to the group, but add mock so its not rendered
+            existing_group.map_mesh._load_map_file = MagicMock()
+            await existing_group.add_map_gz(temp_map_file.name)
+            self.assertTrue(os.path.exists(existing_group.map_gz_file))
+
             await self.plugin.delete_mapgroup(existing_group)
             self.assertEqual(len(self.plugin.groups), 0)
+            # Validate that the map file was deleted
+            self.assertFalse(os.path.exists(existing_group.map_gz_file))
+
         run_awaitable(validate_delete_mapgroup)
