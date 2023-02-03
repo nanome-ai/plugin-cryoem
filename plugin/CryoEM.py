@@ -112,7 +112,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         try:
             self.groups.remove(map_group)
         except ValueError:
-            Logs.warning("Tried to delete a map group that doesn't exist.")    
+            Logs.warning("Tried to delete a map group that doesn't exist.")
 
         # Delete map file if it exists.
         if map_group.map_gz_file:
