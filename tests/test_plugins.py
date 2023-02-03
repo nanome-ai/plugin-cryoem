@@ -110,12 +110,19 @@ class CryoEMPluginTestCase(unittest.TestCase):
     def test_delete_mapgroup(self):
         async def validate_delete_mapgroup():
             self.assertEqual(len(self.plugin.groups), 1)
-
             remove_from_workspace_fut = asyncio.Future()
             remove_from_workspace_fut.set_result([structure.Complex()])
             self.plugin.remove_from_workspace = MagicMock(return_value=remove_from_workspace_fut)
 
             existing_group = self.plugin.groups[0]
+            # Add a map to the group, but add mock so its not rendered
+            existing_group.map_mesh._load_map_file = MagicMock()
+            await existing_group.add_map_gz(self.map_file)
+            self.assertTrue(os.path.exists(existing_group.map_gz_file))
+
             await self.plugin.delete_mapgroup(existing_group)
             self.assertEqual(len(self.plugin.groups), 0)
+            # Validate that the map file was deleted
+            self.assertFalse(os.path.exists(existing_group.map_gz_file))
+
         run_awaitable(validate_delete_mapgroup)
