@@ -33,6 +33,8 @@ class MapMesh:
         self._plugin = plugin
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
+        self.backface = False
+        self.mesh_inverted: shapes.Mesh = shapes.Mesh()
         self.map_manager: map_manager = None
         if map_gz_file:
             self._load_map_file()
@@ -52,6 +54,7 @@ class MapMesh:
     @color.setter
     def color(self, value: Color):
         self.mesh.color = value
+        self.mesh2.color = value
 
     @property
     def colors(self):
@@ -60,9 +63,12 @@ class MapMesh:
     @colors.setter
     def colors(self, value: Color):
         self.mesh.colors = value
+        self.mesh2.colors = value
 
     def upload(self):
         self.mesh.upload()
+        if self.backface:
+            self.mesh_inverted.upload()
 
     async def load(self, isovalue, opacity, radius, position, map_data=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -77,6 +83,7 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
+            self.mesh2.anchors[0] = anchor
 
     def _load_map_file(self):
         dm = DataManager()
@@ -129,8 +136,12 @@ class MapMesh:
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
         self.mesh.triangles = triangles.flatten()
+        self.mesh2.vertices = vertices.flatten()
+        self.mesh2.normals = np.array([-n for n in normals]).flatten()
+        self.mesh2.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
 
         self.mesh.color = Color(255, 255, 255, int(opacity * 255))
+        self.mesh2.color = Color(255, 255, 255, int(opacity * 255))
         Logs.message("Mesh generated")
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
