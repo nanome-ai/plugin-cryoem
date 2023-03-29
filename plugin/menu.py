@@ -275,7 +275,11 @@ class MainMenu:
         base_search_url = "www.ebi.ac.uk/emdb/search"
         # query only low molecular weight maps, because download speeds are really bad.
         query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
-        url = f"{base_search_url}/{query}?rows=10&sort=release_date desc"
+        query_params = urllib.parse.urlencode({
+            'rows': 10,
+            'sort': 'release_date desc'
+        })
+        url = f"{base_search_url}/{query}?{query_params}"
         self._plugin.open_url(url)
 
 
