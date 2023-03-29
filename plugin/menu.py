@@ -13,14 +13,11 @@ from .utils import EMDBMetadataParser
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
-EMBL_MENU_PATH = os.path.join(ASSETS_PATH, 'embl_search_menu.json')
 EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
 GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
-
 DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
 VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
-MAP_FILETYPES = ['.map', '.map.gz']
 
 MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 
