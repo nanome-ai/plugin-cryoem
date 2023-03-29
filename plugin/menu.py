@@ -52,7 +52,7 @@ class MainMenu:
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
-        rcsb, embl = ['5k7n', '8216']  # 111.55 degree unit cell
+        rcsb, embl = ['', '8216']  # 111.55 degree unit cell  5k7n RCSB code
         # rcsb, embl = ['5vos', '8720']  # 100.02 degree unit cell
         # rcsb, embl = ['7c4u', '30288']  # small molecule
         # rcsb, embl = ['7q1u', '13764']  # large protein
