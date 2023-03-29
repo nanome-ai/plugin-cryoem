@@ -95,8 +95,9 @@ class MainMenu:
             btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
-            btn: ui.Button = ln.get_content()
-            btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
+            ln_group_details = ln.find_node('ln_group_details')
+            edit_mesh_btn: ui.Button = ln_group_details.get_content()
+            edit_mesh_btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
             btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
