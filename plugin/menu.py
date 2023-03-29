@@ -71,6 +71,7 @@ class MainMenu:
         # By default, select the first group
         if groups and not selected_mapgroup:
             selected_mapgroup = groups[0]
+
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
@@ -328,7 +329,7 @@ class EditMeshMenu:
 
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
-        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
+        self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
         self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
         self.ligand_zoom: ui.Button = root.find_node('btn_ligand_zoom').get_content()
@@ -384,6 +385,7 @@ class EditMeshMenu:
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
             self._plugin.update_node(self.ln_img_histogram)
+        self.set_color_scheme()
         self._plugin.update_menu(self._menu)
 
     def set_isovalue_ui(self, isovalue: float):
@@ -513,6 +515,13 @@ class EditMeshMenu:
                 if item_comp:
                     strucs.append(item_comp)
         self._plugin.zoom_on_structures(strucs)
+
+    def set_color_scheme(self, *args):
+        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
+        if self.dd_color_scheme.permanent_title != color_scheme_text:
+            self.dd_color_scheme.permanent_title = color_scheme_text
+            self._plugin.update_content(self.dd_color_scheme)
+        self.update_color()
 
     @async_callback
     async def zoom_to_ligand(self, btn: ui.Button):
