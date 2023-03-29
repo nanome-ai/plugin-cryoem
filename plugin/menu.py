@@ -379,7 +379,9 @@ class EditMeshMenu:
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
             self._plugin.update_node(self.ln_img_histogram)
-        self.set_color_scheme()
+
+        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
+        self.dd_color_scheme.permanent_title = color_scheme_text
         self._plugin.update_menu(self._menu)
 
     def set_isovalue_ui(self, isovalue: float):
@@ -510,12 +512,11 @@ class EditMeshMenu:
                     strucs.append(item_comp)
         self._plugin.zoom_on_structures(strucs)
 
-    def set_color_scheme(self, *args):
-        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
-        if self.dd_color_scheme.permanent_title != color_scheme_text:
-            self.dd_color_scheme.permanent_title = color_scheme_text
-            self._plugin.update_content(self.dd_color_scheme)
-        self.update_color()
+    @async_callback
+    async def set_color_scheme(self, *args):
+        self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
+        self._plugin.update_content(self.dd_color_scheme)
+        await self.map_group.update_color(self.color_scheme, self.opacity)
 
     @async_callback
     async def zoom_to_ligand(self, btn: ui.Button):
