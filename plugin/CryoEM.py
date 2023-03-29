@@ -25,9 +25,6 @@ class CryoEM(nanome.AsyncPluginInstance):
     async def on_run(self):
         self.menu.render(force_enable=True)
 
-    def enable_search_menu(self):
-        self.search_menu.render(force_enable=True)
-
     def add_mapgroup(self):
         group_num = 1
         existing_group_names = [group.group_name for group in self.groups]

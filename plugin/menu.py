@@ -13,14 +13,11 @@ from .utils import EMDBMetadataParser
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
-EMBL_MENU_PATH = os.path.join(ASSETS_PATH, 'embl_search_menu.json')
 EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
 GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
-
 DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
 VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
-MAP_FILETYPES = ['.map', '.map.gz']
 
 MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 
@@ -37,8 +34,6 @@ class MainMenu:
         self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
 
         root: ui.LayoutNode = self._menu.root
-        # self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
-        # self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         self.btn_add_group.register_pressed_callback(self.add_mapgroup)
@@ -53,9 +48,9 @@ class MainMenu:
         self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
-        # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
-        # rcsb, embl = ['5vos', '8720']  # 100.02º
+        # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
+        rcsb, embl = ['', '8216']  # 111.55 degree unit cell  5k7n RCSB code
+        # rcsb, embl = ['5vos', '8720']  # 100.02 degree unit cell
         # rcsb, embl = ['7c4u', '30288']  # small molecule
         # rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
@@ -71,6 +66,7 @@ class MainMenu:
         # By default, select the first group
         if groups and not selected_mapgroup:
             selected_mapgroup = groups[0]
+
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.update_menu(self._menu)
 
@@ -95,8 +91,9 @@ class MainMenu:
             btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
-            btn: ui.Button = ln.get_content()
-            btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
+            ln_group_details = ln.find_node('ln_group_details')
+            edit_mesh_btn: ui.Button = ln_group_details.get_content()
+            edit_mesh_btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
             btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
@@ -153,7 +150,7 @@ class MainMenu:
 
         # Disable RCSB button
         self.btn_embl_submit.unusable = True
-        self.btn_embl_submit.text.value.unusable = "Search"
+        self.btn_embl_submit.text.value.unusable = "Load"
         self._plugin.update_content(self.btn_embl_submit)
 
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
@@ -173,7 +170,7 @@ class MainMenu:
 
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
-        self.btn_rcsb_submit.text.value.unusable = "Search"
+        self.btn_rcsb_submit.text.value.unusable = "Load"
         self._plugin.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
@@ -206,7 +203,7 @@ class MainMenu:
                 pdb_id = ""
             self.ti_rcsb_query.input_text = pdb_id
             self._plugin.update_content(self.ti_rcsb_query)
-        # Reenable rcsb search button
+        # Reenable rcsb load button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
         btn.text.value.unusable = "Downloading..."
@@ -275,7 +272,11 @@ class MainMenu:
         base_search_url = "www.ebi.ac.uk/emdb/search"
         # query only low molecular weight maps, because download speeds are really bad.
         query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
-        url = f"{base_search_url}/{query}?rows=10&sort=release_date desc"
+        query_params = urllib.parse.urlencode({
+            'rows': 10,
+            'sort': 'release_date desc'
+        })
+        url = f"{base_search_url}/{query}?{query_params}"
         self._plugin.open_url(url)
 
 
@@ -323,7 +324,7 @@ class EditMeshMenu:
 
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
-        self.dd_color_scheme.register_item_clicked_callback(self.update_color)
+        self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
         self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
         self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
         self.ligand_zoom: ui.Button = root.find_node('btn_ligand_zoom').get_content()
@@ -332,7 +333,7 @@ class EditMeshMenu:
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
 
     def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {map_group.isovalue})'
+        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
@@ -371,7 +372,6 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            # self.generate_histogram_thread(map_group)
             thread = Thread(
                 target=self.generate_histogram_thread,
                 args=[map_group])
@@ -379,6 +379,9 @@ class EditMeshMenu:
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
             self._plugin.update_node(self.ln_img_histogram)
+
+        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
+        self.dd_color_scheme.permanent_title = color_scheme_text
         self._plugin.update_menu(self._menu)
 
     def set_isovalue_ui(self, isovalue: float):
@@ -508,6 +511,12 @@ class EditMeshMenu:
                 if item_comp:
                     strucs.append(item_comp)
         self._plugin.zoom_on_structures(strucs)
+
+    @async_callback
+    async def set_color_scheme(self, *args):
+        self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
+        self._plugin.update_content(self.dd_color_scheme)
+        await self.map_group.update_color(self.color_scheme, self.opacity)
 
     @async_callback
     async def zoom_to_ligand(self, btn: ui.Button):
