@@ -37,8 +37,6 @@ class MainMenu:
         self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
 
         root: ui.LayoutNode = self._menu.root
-        # self.btn_search_menu: ui.Button = root.find_node('btn_embi_db').get_content()
-        # self.btn_search_menu.register_pressed_callback(self.on_btn_search_menu_pressed)
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         self.btn_add_group.register_pressed_callback(self.add_mapgroup)
@@ -53,9 +51,9 @@ class MainMenu:
         self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
-        # rcsb, embl = ['4znn', '3001']  # 94.33º
-        rcsb, embl = ['5k7n', '8216']  # 111.55º
-        # rcsb, embl = ['5vos', '8720']  # 100.02º
+        # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
+        rcsb, embl = ['5k7n', '8216']  # 111.55 degree unit cell
+        # rcsb, embl = ['5vos', '8720']  # 100.02 degree unit cell
         # rcsb, embl = ['7c4u', '30288']  # small molecule
         # rcsb, embl = ['7q1u', '13764']  # large protein
         self.ti_rcsb_query.input_text = rcsb
@@ -155,7 +153,7 @@ class MainMenu:
 
         # Disable RCSB button
         self.btn_embl_submit.unusable = True
-        self.btn_embl_submit.text.value.unusable = "Search"
+        self.btn_embl_submit.text.value.unusable = "Load"
         self._plugin.update_content(self.btn_embl_submit)
 
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
@@ -175,7 +173,7 @@ class MainMenu:
 
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
-        self.btn_rcsb_submit.text.value.unusable = "Search"
+        self.btn_rcsb_submit.text.value.unusable = "Load"
         self._plugin.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
@@ -208,7 +206,7 @@ class MainMenu:
                 pdb_id = ""
             self.ti_rcsb_query.input_text = pdb_id
             self._plugin.update_content(self.ti_rcsb_query)
-        # Reenable rcsb search button
+        # Reenable rcsb load button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
         btn.text.value.unusable = "Downloading..."
@@ -377,7 +375,6 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
             self._plugin.update_node(self.ln_img_histogram)
-            # self.generate_histogram_thread(map_group)
             thread = Thread(
                 target=self.generate_histogram_thread,
                 args=[map_group])
