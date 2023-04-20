@@ -472,7 +472,6 @@ class ViewportEditor:
     def __init__(self, plugin_instance: PluginInstance, map_group: MapGroup):
         self.map_group = map_group
         self.plugin = plugin_instance
-
         self.is_editing = False
         self.complex = None
         self.sphere = None
@@ -485,13 +484,12 @@ class ViewportEditor:
             ])
         if not self.sphere:
             # create viewport sphere
-            sphere = shapes.Sphere()
-            self.sphere = sphere
+            self.sphere = shapes.Sphere()
             preset_radius = self.map_group.radius
-            sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
-            sphere.color = Color(100, 100, 100, 127)
+            self.sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
+            self.sphere.color = Color(0, 0, 200, 127)
 
-            anchor = sphere.anchors[0]
+            anchor = self.sphere.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
         shapes.Shape.upload(self.sphere)
@@ -507,8 +505,12 @@ class ViewportEditor:
         self.plugin.update_structures_shallow([self.map_group.map_complex])
 
     async def apply(self):
-        Logs.message("Applying Viewport")
         """Apply viewport position and radius to MapGroup."""
+        Logs.message("Applying Viewport")
+        if not self.sphere:
+            Logs.warning("Missing Sphere, can not apply Viewport. Disabling.")
+            self.disable()
+            return
         # Get latest states of viewport complex and mapgroup
         viewport_comp_index = self.complex.index
         [viewport_comp] = await self.plugin.request_complexes([viewport_comp_index])
