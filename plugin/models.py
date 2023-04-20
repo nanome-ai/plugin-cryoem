@@ -117,7 +117,7 @@ class MapMesh:
             vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
 
         Logs.debug("Simplifying mesh...")
-        decimation_factor = 5
+        decimation_factor = 3
         target = max(1000, len(triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(vertices, triangles)
@@ -140,8 +140,9 @@ class MapMesh:
         self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
         self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
 
-        self.mesh.color = Color(255, 255, 255, int(opacity * 255))
-        self.mesh_inverted.color = Color(255, 255, 255, int(opacity * 255))
+        opacity_a = int(opacity * 255)
+        self.mesh.color = Color(255, 255, 255, opacity_a)
+        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
         Logs.message("Mesh generated")
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
@@ -334,13 +335,13 @@ class MapGroup:
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
         _, indices = kdtree.query(verts, distance_upper_bound=2)
-        colors = []
+        colors = np.array([], dtype=np.uint8)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
-                colors += cpk_colors(atoms[i])
+                colors = np.append(colors, cpk_colors(atoms[i]))
             else:
-                colors += [255, 255, 255, 0]
-        map_mesh.colors = np.array(colors)
+                colors = np.append(colors, [255, 255, 255, 50])
+        map_mesh.colors = colors
 
     def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
@@ -364,13 +365,12 @@ class MapGroup:
             for _ in c.atoms:
                 color_per_atom.append(chain_color)
 
-        colors = []
-
+        colors = np.array([], dtype=np.uint8)
         # No need for neighbor search as all vertices have the same color
         if n_chain == 1:
             for i in range(len(verts)):
-                colors += color_per_atom[0]
-            map_mesh.colors = np.array(colors)
+                colors = np.append(colors, color_per_atom[0])
+            map_mesh.colors = colors
             return
 
         atom_positions = []
@@ -387,10 +387,10 @@ class MapGroup:
             verts, distance_upper_bound=20)
         for i in indices:
             if i >= 0 and i < len(atom_positions):
-                colors += color_per_atom[i]
+                colors = np.append(colors, color_per_atom[i])
             else:
-                colors += [255, 255, 255, 0]
-        map_mesh.colors = np.array(colors)
+                colors = np.append(colors, [255, 255, 255, 0])
+        map_mesh.colors = colors
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
@@ -414,7 +414,7 @@ class MapGroup:
         _, indices = kdtree.query(
             verts, distance_upper_bound=20)
 
-        colors = []
+        colors = np.array([], dtype=np.uint8)
         bfactors = np.array([a.bfactor for a in atoms])
         minbf = np.min(bfactors)
         maxbf = np.max(bfactors)
@@ -426,10 +426,10 @@ class MapGroup:
                 bf = bfactors[i]
                 norm_bf = (bf - minbf) / (maxbf - minbf)
                 id_color = int(norm_bf * (sections - 1))
-                colors += colors_rainbow[int(id_color)]
+                colors = np.append(colors, colors_rainbow[int(id_color)])
             else:
-                colors += [255, 255, 255, 0]
-        map_mesh.colors = np.array(colors)
+                colors = np.append(colors, [255, 255, 255, 0])
+        map_mesh.colors = colors
 
     @property
     def visible(self):
