@@ -7,10 +7,10 @@ import pyfqmr
 import randomcolor
 import tempfile
 import time
-from matplotlib import cm
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
+from matplotlib import cm
 from mmtbx.model.model import manager
 from scipy.spatial import KDTree
 from typing import List
@@ -295,13 +295,15 @@ class MapGroup:
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
-        # if model:
-        #     origin_shift = mmm.map_manager().origin_shift_grid_units
-        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=1.0)
-        #     mmm.map_manager().origin_shift_grid_units = origin_shift
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
+        # if model:
+        #     Logs.debug("Extracting map around Model.")
+        #     # Box map to fit model
+        #     mmm = mmm.extract_all_maps_around_model(box_cushion=1.)
+        #     mmm.shift_origin_to_match_original()
+        # Logs.debug("Map around model extracted.")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
