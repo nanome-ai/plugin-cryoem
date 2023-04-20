@@ -294,6 +294,10 @@ class MapGroup:
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
+        # if model:
+        #     origin_shift = mmm.map_manager().origin_shift_grid_units
+        #     mmm.box_all_maps_around_model_and_shift_origin(box_cushion=1.0)
+        #     mmm.map_manager().origin_shift_grid_units = origin_shift
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
