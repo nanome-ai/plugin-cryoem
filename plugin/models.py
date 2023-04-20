@@ -339,7 +339,7 @@ class MapGroup:
             if i >= 0 and i < len(atom_positions):
                 colors += cpk_colors(atoms[i])
             else:
-                colors += [0.0, 0.0, 0.0, 1.0]
+                colors += [255, 255, 255, 0]
         map_mesh.colors = np.array(colors)
 
     def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
@@ -389,7 +389,7 @@ class MapGroup:
             if i >= 0 and i < len(atom_positions):
                 colors += color_per_atom[i]
             else:
-                colors += [0.0, 0.0, 0.0, 1.0]
+                colors += [255, 255, 255, 0]
         map_mesh.colors = np.array(colors)
 
     def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
@@ -428,7 +428,7 @@ class MapGroup:
                 id_color = int(norm_bf * (sections - 1))
                 colors += colors_rainbow[int(id_color)]
             else:
-                colors += [0.0, 0.0, 0.0, 1.0]
+                colors += [255, 255, 255, 0]
         map_mesh.colors = np.array(colors)
 
     @property
