@@ -331,6 +331,7 @@ class EditMeshMenu:
         self.ligand_zoom.register_pressed_callback(self.zoom_to_ligand)
         self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
+        self._menu.register_closed_callback(self.on_menu_closed)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
@@ -542,3 +543,9 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
+
+    def on_menu_closed(self, *args):
+        # if viewport editor is open, disable
+        Logs.message("Closing EditMeshMenu")
+        if self.viewport_editor:
+            self.viewport_editor.disable()

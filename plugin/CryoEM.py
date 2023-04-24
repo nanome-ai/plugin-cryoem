@@ -61,6 +61,8 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp.locked = True
         if mapgroup:
             mapgroup.add_pdb(filepath)
+            # if mapgroup.has_map():
+            #     await mapgroup.generate_mesh()
             # align complex to mapmesh
             comp.locked = True
             comp.boxed = False
