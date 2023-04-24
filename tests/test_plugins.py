@@ -122,8 +122,6 @@ class CryoEMPluginTestCase(unittest.TestCase):
             temp_map_file = tempfile.NamedTemporaryFile()
             with open(self.map_file, 'rb') as f:
                 temp_map_file.write(f.read())
-            # Add a map to the group, but add mock so its not rendered
-            existing_group.map_mesh._load_map_file = MagicMock()
             await existing_group.add_map_gz(temp_map_file.name)
             self.assertTrue(os.path.exists(existing_group.map_gz_file))
 

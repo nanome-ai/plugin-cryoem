@@ -37,15 +37,17 @@ class MapMesh:
         self.backface = True
         self.map_manager: map_manager = None
         if map_gz_file:
-            self._load_map_file()
+            self.map_manager = self.load_map_file(map_gz_file)
+            self.complex = self.create_map_complex()
 
     @property
     def map_gz_file(self):
         return self.__map_gz_file
 
-    def add_map_gz_file(self, filepath):
+    def add_map_gz_file(self, filepath: str):
         self.__map_gz_file = filepath
-        self._load_map_file()
+        self.map_manager = self.load_map_file(filepath)
+        self.complex = self.create_map_complex(self.map_manager, filepath)
 
     @property
     def color(self):
@@ -85,22 +87,28 @@ class MapMesh:
             anchor.target = self.complex.index
             self.mesh_inverted.anchors[0] = anchor
 
-    def _load_map_file(self):
+    @staticmethod
+    def load_map_file(map_gz_file):
+        # Load map.gz file into map_manager
         dm = DataManager()
         with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
             mrc_filepath = mrc_file.name
-            with gzip.open(self.map_gz_file, 'rb') as f:
+            with gzip.open(map_gz_file, 'rb') as f:
                 mrc_file.write(f.read())
-                self.map_manager = dm.get_real_map(mrc_filepath)
+                map_manager = dm.get_real_map(mrc_filepath)
+        return map_manager
 
-        grid_min = self.map_manager.origin
-        grid_max = self.map_manager.data.last()
-        angstrom_min = self.map_manager.grid_units_to_cart(grid_min)
-        angstrom_max = self.map_manager.grid_units_to_cart(grid_max)
+    @staticmethod
+    def create_map_complex(map_manager, map_gz_file: str):
+        """Create complex which represents the map in the Entry list"""
+        grid_min = map_manager.origin
+        grid_max = map_manager.data.last()
+        angstrom_min = map_manager.grid_units_to_cart(grid_min)
+        angstrom_max = map_manager.grid_units_to_cart(grid_max)
         bounds = [angstrom_min, angstrom_max]
-
-        self.complex = create_hidden_complex(self.map_gz_file, bounds)
-        self.complex.name = os.path.basename(self.map_gz_file)
+        comp = create_hidden_complex(map_gz_file, bounds)
+        comp.name = os.path.basename(map_gz_file)
+        return comp
 
     def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
         Logs.debug("Generating Mesh from map...")
