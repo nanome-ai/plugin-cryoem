@@ -49,6 +49,12 @@ class MapMesh:
         self.map_manager = self.load_map_file(filepath)
         self.complex = self.create_map_complex(self.map_manager, filepath)
 
+    async def recreate_complex(self, map_manager):
+        current_index = self.complex.index
+        self.complex = self.create_map_complex(map_manager, self.map_gz_file)
+        self.complex.index = current_index
+        await self._plugin.update_structures_deep([self.complex])
+
     @property
     def color(self):
         return self.mesh.color
@@ -107,6 +113,8 @@ class MapMesh:
         angstrom_max = map_manager.grid_units_to_cart(grid_max)
         bounds = [angstrom_min, angstrom_max]
         comp = create_hidden_complex(map_gz_file, bounds)
+        comp.boxed = True
+        comp.locked = True
         comp.name = os.path.basename(map_gz_file)
         return comp
 
@@ -246,6 +254,7 @@ class MapGroup:
     async def add_map_gz(self, map_gz_file):
         # Unpack map.gz
         self.map_mesh.add_map_gz_file(map_gz_file)
+        await self._plugin.update_structures_deep([self.map_mesh.complex])
 
     def add_model_complex(self, comp):
         self.__model_complex = comp
@@ -306,12 +315,6 @@ class MapGroup:
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
-        # if model:
-        #     Logs.debug("Extracting map around Model.")
-        #     # Box map to fit model
-        #     mmm = mmm.extract_all_maps_around_model(box_cushion=1.)
-        #     mmm.shift_origin_to_match_original()
-        # Logs.debug("Map around model extracted.")
         map_data = mmm.map_manager().map_data().as_numpy_array()
         await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
@@ -473,6 +476,34 @@ class MapGroup:
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
         self.hist_x_min = np.min(flat)
         self.hist_x_max = np.max(flat)
+
+    async def redraw_around_selection(self):
+        """Get selected atoms on model, and redraw map around them."""
+        if not self.model_complex:
+            return
+        # Get latest changes to model_complex
+        [updated_model_comp] = await self._plugin.request_complexes([self.model_complex.index])
+        sel_residues = list(set([a.residue for a in updated_model_comp.atoms if a.selected]))
+        if len(sel_residues) == 0:
+            Logs.warning("No residues selected. Redraw cancelled.")
+            return
+        # Phenix selection query for sel_residues
+        residue_serials = [r.serial for r in sel_residues]
+        query_str = ' or '.join([f"resid {s}" for s in residue_serials])
+
+        model = self._model.deep_copy()
+        map_manager = self.map_mesh.map_manager
+        mmm = map_model_manager(model=model, map_manager=map_manager)
+        origin = mmm.map_manager().map_data().origin()
+        boxed_mmm = mmm.extract_all_maps_around_model(query_str)
+        boxed_mmm.map_manager().shift_origin(origin)
+
+        # Regenerate complex matching the new map
+        await self.map_mesh.recreate_complex(boxed_mmm.map_manager())
+
+        map_data = boxed_mmm.map_manager().map_data().as_numpy_array()
+        await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
+        self.map_mesh.upload()
 
 
 class ViewportEditor:
