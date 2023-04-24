@@ -59,7 +59,7 @@ class MapGroupTestCase(unittest.TestCase):
             self.plugin.add_to_workspace.return_value = fut
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 23581
+            expected_vertices = 14735
             # Make sure vertices are added to mesh
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
             await self.map_group.add_map_gz(map_file)
@@ -113,9 +113,9 @@ class MapMeshTestCase(unittest.TestCase):
         """
         async def validate_load(self):
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 464814
-            expected_normals = 895215
-            expected_triangles = 895215
+            expected_vertices = 285798
+            expected_normals = 537129
+            expected_triangles = 537129
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
@@ -142,9 +142,9 @@ class MapMeshTestCase(unittest.TestCase):
         """
         async def validate_load_limit_view(self):
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 7740
-            expected_normals = 7740
-            expected_triangles = 14241
+            expected_vertices = 4440
+            expected_normals = 4440
+            expected_triangles = 8034
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65

@@ -117,7 +117,7 @@ class MapMesh:
             vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
 
         Logs.debug("Simplifying mesh...")
-        decimation_factor = 3
+        decimation_factor = 5
         target = max(1000, len(triangles) / decimation_factor)
         mesh_simplifier = pyfqmr.Simplify()
         mesh_simplifier.setMesh(vertices, triangles)
