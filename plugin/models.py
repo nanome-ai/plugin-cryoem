@@ -160,41 +160,25 @@ class MapMesh:
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
     def limit_view(self, vertices, normals, triangles, selected_residues):
-        import itertools
         verts = self.computed_vertices
         if len(verts) < 3:
             return
 
-        atoms = itertools.chain(*[r.atoms for r in selected_residues])
         atom_positions = []
         atoms = []
-        for a in model_complex.atoms:
-            atoms.append(a)
-            p = a.position
-            atom_positions.append(np.array([p.x, p.y, p.z]))
+        for residue in selected_residues:
+            for a in residue.atoms:
+                atoms.append(a)
+                p = a.position
+                atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
         _, indices = kdtree.query(verts, distance_upper_bound=2)
-        colors = np.array([], dtype=np.uint8)
-        for i in indices:
-            if i >= 0 and i < len(atom_positions):
-                colors = np.append(colors, cpk_colors(atoms[i]))
-            else:
-                colors = np.append(colors, [255, 255, 255, 50])
-        radius = 1
-        position = [0, 0, 0]
-        if radius <= 0:
-            return (vertices, normals, triangles)
-        Logs.debug(f"Radius: {radius}")
-        Logs.debug("Limiting view...")
-        pos = np.asarray(position)
-        idv = 0
+
         to_keep = []
-        for v in vertices:
-            vert = np.asarray(v)
-            dist = np.linalg.norm(vert - pos)
-            if dist <= radius:
-                to_keep.append(idv)
-            idv += 1
+        for vert_id in indices:
+            if vert_id >= 0 and vert_id < len(atom_positions):
+                to_keep.append(vert_id)
+
         if len(to_keep) == len(vertices):
             return (vertices, normals, triangles)
 
@@ -202,12 +186,10 @@ class MapMesh:
         new_triangles = []
         new_normals = []
         mapping = np.full(len(vertices), -1, np.int32)
-        idv = 0
-        for i in to_keep:
-            mapping[i] = idv
-            new_vertices.append(vertices[i])
-            new_normals.append(normals[i])
-            idv += 1
+        for i, vert_id in enumerate(to_keep):
+            mapping[vert_id] = i
+            new_vertices.append(vertices[vert_id])
+            new_normals.append(normals[vert_id])
 
         for t in triangles:
             if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
@@ -370,9 +352,7 @@ class MapGroup:
         if len(verts) < 3:
             return
         atom_positions = []
-        atoms = []
         for a in model_complex.atoms:
-            atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
