@@ -94,7 +94,12 @@ class CryoEM(nanome.AsyncPluginInstance):
         if mapgroup.model_complex:
             # Get latest position of model complex
             [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
-            mapgroup.add_model_complex(deep_comp)
+            if not deep_comp:
+                Logs.warning("model complex was deleted.")
+                return
+            else:
+                mapgroup.add_model_complex(deep_comp)
+        await mapgroup.generate_mesh()
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
         self.menu.render(selected_mapgroup=mapgroup)

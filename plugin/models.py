@@ -246,9 +246,7 @@ class MapGroup:
         self._model = dm.get_model(pdb_file)
 
     async def add_map_gz(self, map_gz_file):
-        # Unpack map.gz
         self.map_mesh.add_map_gz_file(map_gz_file)
-        await self._plugin.update_structures_deep([self.map_mesh.complex])
 
     def add_model_complex(self, comp):
         self.__model_complex = comp
