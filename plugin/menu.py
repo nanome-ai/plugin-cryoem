@@ -429,6 +429,7 @@ class EditMeshMenu:
     async def open_edit_viewport(self, btn: ui.Button):
         self.ln_edit_map.enabled = False
         self.ln_edit_viewport.enabled = True
+
         self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
         radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
         self.set_radius_ui(radius)
