@@ -427,15 +427,16 @@ class EditMeshMenu:
 
     @async_callback
     async def open_edit_viewport(self, btn: ui.Button):
-        self.ln_edit_map.enabled = False
-        self.ln_edit_viewport.enabled = True
+        self.redraw_map(use_selected_residues=True)
+        # self.ln_edit_map.enabled = False
+        # self.ln_edit_viewport.enabled = True
 
-        self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
-        radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
-        self.set_radius_ui(radius)
-        self._plugin.update_content(self.sld_radius)
-        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        await self.viewport_editor.enable()
+        # self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
+        # radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
+        # self.set_radius_ui(radius)
+        # self._plugin.update_content(self.sld_radius)
+        # self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        # await self.viewport_editor.enable()
 
     @async_callback
     async def apply_viewport(self, btn):
@@ -452,12 +453,13 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self, btn=None):
+    async def redraw_map(self, btn=None, use_selected_residues=False):
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
-            await self.map_group.generate_mesh()
+            await self.map_group.generate_mesh(
+                use_selected_residues=use_selected_residues)
 
     @async_callback
     async def redraw_new_isovalue(self, btn):
