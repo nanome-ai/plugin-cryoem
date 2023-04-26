@@ -74,19 +74,6 @@ class CryoEM(nanome.AsyncPluginInstance):
         await self.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
-
-        # Create sphere at origin of complex space
-        mol = next(comp.molecules)
-        ch = structure.Chain()
-        res = structure.Residue()
-        atom = structure.Atom()
-        atom.set_visible(True)
-        atom.position.set(0, 0, 0)
-        atom.labeled = True
-        atom.label_text = "Model Origin"
-        res.add_atom(atom)
-        ch.add_residue(res)
-        mol.add_chain(ch)
         return comp
 
     async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None, metadata=None):

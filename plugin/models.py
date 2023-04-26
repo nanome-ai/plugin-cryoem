@@ -49,12 +49,6 @@ class MapMesh:
         self.map_manager = self.load_map_file(filepath)
         self.complex = self.create_map_complex(self.map_manager, filepath)
 
-    async def recreate_complex(self, map_manager):
-        current_index = self.complex.index
-        self.complex = self.create_map_complex(map_manager, self.map_gz_file)
-        self.complex.index = current_index
-        await self._plugin.update_structures_deep([self.complex])
-
     @property
     def color(self):
         return self.mesh.color
@@ -476,34 +470,6 @@ class MapGroup:
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
         self.hist_x_min = np.min(flat)
         self.hist_x_max = np.max(flat)
-
-    async def redraw_around_selection(self):
-        """Get selected atoms on model, and redraw map around them."""
-        if not self.model_complex:
-            return
-        # Get latest changes to model_complex
-        [updated_model_comp] = await self._plugin.request_complexes([self.model_complex.index])
-        sel_residues = list(set([a.residue for a in updated_model_comp.atoms if a.selected]))
-        if len(sel_residues) == 0:
-            Logs.warning("No residues selected. Redraw cancelled.")
-            return
-        # Phenix selection query for sel_residues
-        residue_serials = [r.serial for r in sel_residues]
-        query_str = ' or '.join([f"resid {s}" for s in residue_serials])
-
-        model = self._model.deep_copy()
-        map_manager = self.map_mesh.map_manager
-        mmm = map_model_manager(model=model, map_manager=map_manager)
-        origin = mmm.map_manager().map_data().origin()
-        boxed_mmm = mmm.extract_all_maps_around_model(query_str)
-        boxed_mmm.map_manager().shift_origin(origin)
-
-        # Regenerate complex matching the new map
-        await self.map_mesh.recreate_complex(boxed_mmm.map_manager())
-
-        map_data = boxed_mmm.map_manager().map_data().as_numpy_array()
-        await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
-        self.map_mesh.upload()
 
 
 class ViewportEditor:

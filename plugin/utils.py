@@ -216,12 +216,4 @@ def create_hidden_complex(comp_name=None, bounds=None):
         atom.set_visible(False)
         atom.position.set(x, y, z)
         residue.add_atom(atom)
-    # Create visible atom at origin of complex space
-    atom = structure.Atom()
-    atom.set_visible(True)
-    atom.position.set(0, 0, 0)
-    atom.labeled = True
-    atom.label_text = "Origin"
-    residue.add_atom(atom)
-
     return comp

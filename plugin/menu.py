@@ -427,15 +427,14 @@ class EditMeshMenu:
 
     @async_callback
     async def open_edit_viewport(self, btn: ui.Button):
-        await self.map_group.redraw_around_selection()
-        # self.ln_edit_map.enabled = False
-        # self.ln_edit_viewport.enabled = True
-        # self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
-        # radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
-        # self.set_radius_ui(radius)
-        # self._plugin.update_content(self.sld_radius)
-        # self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        # await self.viewport_editor.enable()
+        self.ln_edit_map.enabled = False
+        self.ln_edit_viewport.enabled = True
+        self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
+        radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
+        self.set_radius_ui(radius)
+        self._plugin.update_content(self.sld_radius)
+        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
+        await self.viewport_editor.enable()
 
     @async_callback
     async def apply_viewport(self, btn):
