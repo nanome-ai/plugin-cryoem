@@ -53,26 +53,28 @@ class CryoEM(nanome.AsyncPluginInstance):
             else:
                 self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
                 return
-        comp = structure.Complex.io.from_pdb(path=filepath)
+        model_comp = await self.create_model_complex(filepath)
+        if mapgroup:
+            mapgroup.add_pdb(filepath)
+            model_comp.locked = True
+            model_comp.boxed = False
+            map_complex = mapgroup.map_complex
+            if map_complex:
+                model_comp.position = map_complex.position
+                model_comp.rotation = map_complex.rotation
+
+        [created_comp] = await self.add_to_workspace([model_comp])
+        if mapgroup:
+            mapgroup.add_model_complex(created_comp)
+
+    async def create_model_complex(self, pdb_filepath: str):
+        comp = structure.Complex.io.from_pdb(path=pdb_filepath)
         # Get new complex, and associate to MapGroup
-        comp.name = Path(filepath).stem
+        comp.name = Path(pdb_filepath).stem
         await self.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
-        if mapgroup:
-            mapgroup.add_pdb(filepath)
-            # if mapgroup.has_map():
-            #     await mapgroup.generate_mesh()
-            # align complex to mapmesh
-            comp.locked = True
-            comp.boxed = False
-            map_complex = mapgroup.map_complex
-            if map_complex:
-                comp.position = map_complex.position
-                comp.rotation = map_complex.rotation
-        [created_comp] = await self.add_to_workspace([comp])
-        if mapgroup:
-            mapgroup.add_model_complex(created_comp)
+        return comp
 
     async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None, metadata=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
@@ -92,7 +94,10 @@ class CryoEM(nanome.AsyncPluginInstance):
         if mapgroup.model_complex:
             # Get latest position of model complex
             [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
-            mapgroup.add_model_complex(deep_comp)
+            if not deep_comp:
+                Logs.warning("model complex was deleted.")
+            else:
+                mapgroup.add_model_complex(deep_comp)
         await mapgroup.generate_mesh()
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
