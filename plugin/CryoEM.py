@@ -96,7 +96,6 @@ class CryoEM(nanome.AsyncPluginInstance):
             [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
             if not deep_comp:
                 Logs.warning("model complex was deleted.")
-                return
             else:
                 mapgroup.add_model_complex(deep_comp)
         await mapgroup.generate_mesh()
