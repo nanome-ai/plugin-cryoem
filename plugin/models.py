@@ -170,47 +170,46 @@ class MapMesh:
 
     @staticmethod
     def limit_view(vertices, normals, triangles, selected_residues):
-        if len(vertices) < 3:
+        if len(vertices) < 3 or not selected_residues:
             return
+
         atom_positions = []
-        atoms = []
         for residue in selected_residues:
             for a in residue.atoms:
-                atoms.append(a)
-                p = a.position
-                atom_positions.append(np.array([p.x, p.y, p.z]))
+                pos = a.position
+                atom_positions.append(np.array([pos.x, pos.y, pos.z]))
         kdtree = KDTree(atom_positions)
-        _, indices = kdtree.query(vertices, distance_upper_bound=2)
+        _, atom_pos_indices = kdtree.query(vertices, distance_upper_bound=2)
 
-        to_keep = []
+        vertices_to_keep = []
         mapping = []
-        for i, id in enumerate(indices):
-            if id >= 0 and id < len(atom_positions):
-                to_keep.append(i)
-                mapping.append(i)
+        for vertex_index, atom_index in enumerate(atom_pos_indices):
+            if atom_index >= 0 and atom_index < len(atom_positions):
+                vertices_to_keep.append(vertex_index)
+                mapping.append(vertex_index)
             else:
                 mapping.append(-1)
 
-        if len(to_keep) == len(vertices):
+        if len(vertices_to_keep) == len(vertices):
             return (vertices, normals, triangles)
 
         # Create new lists of vertices, normals, and triangles
         new_vertices = []
         new_triangles = []
         new_normals = []
-        for i in to_keep:
+        for i in vertices_to_keep:
             new_vertices.append(vertices[i])
             new_normals.append(normals[i])
 
         for t in triangles:
-            if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
-                new_triangles.append(
-                    [mapping[t[0]], mapping[t[1]], mapping[t[2]]])
+            updated_tri = [mapping[t[0]], mapping[t[1]], mapping[t[2]]]
+            if -1 not in updated_tri:
+                new_triangles.append(updated_tri)
 
         return (
-            np.asarray(new_vertices),
-            np.asarray(new_normals),
-            np.asarray(new_triangles),
+            np.asarray(new_vertices).flatten(),
+            np.asarray(new_normals).flatten(),
+            np.asarray(new_triangles).flatten(),
         )
 
     @property
@@ -523,11 +522,11 @@ class MapGroup:
         normals = np.reshape(normals, (int(len(normals) / 3), 3))
         triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
         vertices, normals, triangles = self.map_mesh.limit_view(
-            vertices, normals, triangles, selected_residues)        
+            vertices, normals, triangles, selected_residues)
 
-        self.map_mesh.mesh.vertices = vertices.flatten()
-        self.map_mesh.mesh.normals = normals.flatten()
-        self.map_mesh.mesh.triangles = triangles.flatten()
+        self.map_mesh.mesh.vertices = vertices
+        self.map_mesh.mesh.normals = normals
+        self.map_mesh.mesh.triangles = triangles
         # self.map_mesh.mesh_inverted.vertices = vertices.flatten()
         # self.map_mesh.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
         # self.map_mesh.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
