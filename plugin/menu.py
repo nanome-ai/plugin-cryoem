@@ -427,7 +427,7 @@ class EditMeshMenu:
 
     @async_callback
     async def open_edit_viewport(self, btn: ui.Button):
-        self.redraw_map(use_selected_residues=True)
+        await self.map_group.limit_to_selection()
         # self.ln_edit_map.enabled = False
         # self.ln_edit_viewport.enabled = True
 

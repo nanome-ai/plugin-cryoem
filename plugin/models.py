@@ -34,7 +34,7 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = True
+        self.backface = False
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
@@ -138,13 +138,17 @@ class MapMesh:
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
 
-        vertices = np.array(vertices)
-        normals = np.array(normals)
-        triangles = np.array(triangles)
+        vertices = np.array(vertices).flatten()
+        normals = np.array(normals).flatten()
+        triangles = np.array(triangles).flatten()
 
-        if selected_residues:
-            vertices, normals, triangles = self.limit_view(
-                vertices, normals, triangles, selected_residues)
+        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
+        normals = np.reshape(normals, (int(len(normals) / 3), 3))
+        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
+
+        # if selected_residues:
+        #     vertices, normals, triangles = self.limit_view(
+        #         vertices, normals, triangles, selected_residues)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -159,11 +163,14 @@ class MapMesh:
         Logs.message("Mesh generated")
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
 
-    def limit_view(self, vertices, normals, triangles, selected_residues):
-        verts = self.computed_vertices
-        if len(verts) < 3:
-            return
+    @property
+    def map_origin(self):
+        if hasattr(self, 'map_manager'):
+            return self.map_manager.origin
 
+    def limit_view(self, vertices, normals, triangles, selected_residues):
+        if len(vertices) < 3:
+            return
         atom_positions = []
         atoms = []
         for residue in selected_residues:
@@ -172,24 +179,27 @@ class MapMesh:
                 p = a.position
                 atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
-        _, indices = kdtree.query(verts, distance_upper_bound=2)
+        _, indices = kdtree.query(vertices, distance_upper_bound=2)
 
         to_keep = []
-        for vert_id in indices:
-            if vert_id >= 0 and vert_id < len(atom_positions):
-                to_keep.append(vert_id)
+        mapping = []
+        for i, id in enumerate(indices):
+            if id >= 0 and id < len(atom_positions):
+                to_keep.append(i)
+                mapping.append(i)
+            else:
+                mapping.append(-1)
 
         if len(to_keep) == len(vertices):
             return (vertices, normals, triangles)
 
+        # Create new lists of vertices, normals, and triangles
         new_vertices = []
         new_triangles = []
         new_normals = []
-        mapping = np.full(len(vertices), -1, np.int32)
-        for i, vert_id in enumerate(to_keep):
-            mapping[vert_id] = i
-            new_vertices.append(vertices[vert_id])
-            new_normals.append(normals[vert_id])
+        for i in to_keep:
+            new_vertices.append(vertices[i])
+            new_normals.append(normals[i])
 
         for t in triangles:
             if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
@@ -490,6 +500,37 @@ class MapGroup:
 
     async def refresh_model_complex(self):
         [self.__model_complex] = await self._plugin.request_complexes([self.model_complex.index])
+
+    async def limit_to_selection(self):
+        # Compute iso-surface with marching cubes algorithm
+        Logs.message("Limiting to selected residues...")
+
+        # Get selected residues
+        selected_residues = []
+        await self.refresh_model_complex()
+        model_comp = self.model_complex
+        selected_residues = [
+            res for res in model_comp.residues
+            if any([atom.selected for atom in res.atoms])
+        ]
+        mesh = self.map_mesh.mesh
+        vertices = mesh.vertices
+        triangles = mesh.triangles
+        normals = mesh.normals
+
+        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
+        normals = np.reshape(normals, (int(len(normals) / 3), 3))
+        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
+        vertices, normals, triangles = self.map_mesh.limit_view(
+            vertices, normals, triangles, selected_residues)        
+
+        self.map_mesh.mesh.vertices = vertices.flatten()
+        self.map_mesh.mesh.normals = normals.flatten()
+        self.map_mesh.mesh.triangles = triangles.flatten()
+        # self.map_mesh.mesh_inverted.vertices = vertices.flatten()
+        # self.map_mesh.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
+        # self.map_mesh.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+        self.map_mesh.upload()
 
 
 class ViewportEditor:
