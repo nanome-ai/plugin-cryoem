@@ -352,7 +352,9 @@ class MapGroup:
         if len(verts) < 3:
             return
         atom_positions = []
+        atoms = []
         for a in model_complex.atoms:
+            atoms.append(a)
             p = a.position
             atom_positions.append(np.array([p.x, p.y, p.z]))
         kdtree = KDTree(atom_positions)
