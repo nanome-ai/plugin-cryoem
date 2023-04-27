@@ -168,7 +168,8 @@ class MapMesh:
         if hasattr(self, 'map_manager'):
             return self.map_manager.origin
 
-    def limit_view(self, vertices, normals, triangles, selected_residues):
+    @staticmethod
+    def limit_view(vertices, normals, triangles, selected_residues):
         if len(vertices) < 3:
             return
         atom_positions = []
