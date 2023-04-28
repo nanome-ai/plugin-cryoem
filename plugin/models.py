@@ -183,10 +183,12 @@ class MapMesh:
 
         vertices_to_keep = []
         mapping = []
+        vertex_id = 0
         for vertex_index, atom_index in enumerate(atom_pos_indices):
             if atom_index >= 0 and atom_index < len(atom_positions):
                 vertices_to_keep.append(vertex_index)
-                mapping.append(vertex_index)
+                mapping.append(vertex_id)
+                vertex_id += 1
             else:
                 mapping.append(-1)
 
@@ -521,16 +523,45 @@ class MapGroup:
         vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
         normals = np.reshape(normals, (int(len(normals) / 3), 3))
         triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
+
         vertices, normals, triangles = self.map_mesh.limit_view(
             vertices, normals, triangles, selected_residues)
 
-        self.map_mesh.mesh.vertices = vertices
-        self.map_mesh.mesh.normals = normals
-        self.map_mesh.mesh.triangles = triangles
+        new_mesh = shapes.Mesh()
+        new_mesh.vertices = vertices
+        new_mesh.normals = normals
+        new_mesh.triangles = triangles
+        new_mesh.anchors = self.map_mesh.mesh.anchors
+        new_mesh.colors = []
+        shapes.Shape.destroy(self.map_mesh.mesh)
+        self.map_mesh.mesh = new_mesh
         # self.map_mesh.mesh_inverted.vertices = vertices.flatten()
         # self.map_mesh.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
         # self.map_mesh.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
-        self.map_mesh.upload()
+        self.map_mesh.mesh.upload(self.print_uploaded)
+
+        verts = np.reshape(new_mesh.vertices, (int(len(new_mesh.vertices) / 3), 3))
+        norms = np.reshape(new_mesh.normals, (int(len(new_mesh.normals) / 3), 3))
+        tris = np.reshape(new_mesh.triangles, (int(len(new_mesh.triangles) / 3), 3))
+
+        f = open("DebugMesh.obj", "w")
+
+        for v in verts:
+            # f.write("v %.3f %.3f %.3f\n".format(verts[0], verts[1], verts[2]))
+            f.write(f"v {v[0]} {v[1]} {v[2]}\n")
+
+        for n in norms:
+            # f.write("vn %.3f %.3f %.3f\n".format(norms[0], norms[1], norms[2]))
+            f.write(f"vn {n[0]} {n[1]} {n[2]}\n")
+
+        for t in tris:
+            # f.write("f %d %d %d\n".format(tris[0] + 1, tris[1] + 1, tris[2] + 1))
+            f.write(f"f {t[0] + 1} {t[1] + 1} {t[2] + 1}\n")
+
+        f.close()
+
+    def print_uploaded(self, *args, **kwargs):
+        print("Uploaded")
 
 
 class ViewportEditor:
