@@ -34,7 +34,7 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = True
+        self.backface = False
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
@@ -72,13 +72,28 @@ class MapMesh:
         if self.backface:
             self.mesh_inverted.upload()
 
-    async def load(self, isovalue, opacity, map_data=None, selected_residues=None):
+    def load_backface_mesh(self):
+        vertices = self.mesh.vertices
+        normals = self.mesh.normals
+        triangles = np.reshape(self.mesh.triangles, (int(len(self.mesh.triangles) / 3), 3))
+        self.mesh_inverted.vertices = vertices
+        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
+        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+
+    async def load(self, map_manager: map_manager, isovalue, opacity, map_data=None, selected_residues=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
         selected_residues = selected_residues or []
-        if map_data is None:
-            map_data = self.map_manager.map_data().as_numpy_array()
+        self.map_manager = map_manager
+        self.mesh = self.generate_mesh_from_map_manager(map_manager, isovalue)
+        if self.backface:
+            self.load_backface_mesh()
 
-        self._generate_mesh(map_data, isovalue, opacity)
+        Logs.message("Mesh generated")
+        Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
+        opacity_a = int(opacity * 255)
+        self.mesh.color = Color(255, 255, 255, opacity_a)
+        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
+
         if self.complex.index == -1:
             # Create complex to attach mesh to.
             self.complex.boxed = True
@@ -114,18 +129,20 @@ class MapMesh:
         comp.name = os.path.basename(map_gz_file)
         return comp
 
-    def _generate_mesh(self, map_data, isovalue, opacity):
+    @staticmethod
+    def generate_mesh_from_map_manager(map_manager, isovalue):
         Logs.debug("Generating Mesh from map...")
         Logs.debug("Marching Cubes...")
+        map_origin = map_manager.origin
+        map_data = map_manager.map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         Logs.debug("Cubes Marched")
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
-        vertices += np.asarray(self.map_origin)
-
+        vertices += np.asarray(map_origin)
         # convert vertices from grid units to cartesian angstroms
         for i in range(vertices.shape[0]):
-            vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
+            vertices[i] = map_manager.grid_units_to_cart(vertices[i])
 
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
@@ -137,18 +154,11 @@ class MapMesh:
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
 
-        self.mesh.vertices = vertices.flatten()
-        self.mesh.normals = normals.flatten()
-        self.mesh.triangles = triangles.flatten()
-        self.mesh_inverted.vertices = vertices.flatten()
-        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
-        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
-
-        opacity_a = int(opacity * 255)
-        self.mesh.color = Color(255, 255, 255, opacity_a)
-        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
-        Logs.message("Mesh generated")
-        Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
+        mesh = shapes.Mesh()
+        mesh.vertices = vertices.flatten()
+        mesh.normals = normals.flatten()
+        mesh.triangles = triangles.flatten()
+        return mesh
 
     @property
     def map_origin(self):
@@ -159,6 +169,10 @@ class MapMesh:
     def limit_view(vertices, normals, triangles, selected_residues):
         if len(vertices) < 3 or not selected_residues:
             return
+
+        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
+        normals = np.reshape(normals, (int(len(normals) / 3), 3))
+        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
 
         atom_positions = []
         for residue in selected_residues:
@@ -314,7 +328,7 @@ class MapGroup:
 
         mmm.generate_map()
         Logs.debug("Map Generated")
-        map_data = mmm.map_manager().map_data().as_numpy_array()
+        # map_data = mmm.map_manager().map_data().as_numpy_array()
 
         # Get selected residues
         selected_residues = []
@@ -326,7 +340,7 @@ class MapGroup:
                 if any([atom.selected for atom in res.atoms])
             ]
         await self.map_mesh.load(
-            self.isovalue, self.opacity, map_data=map_data,
+            mmm.map_manager(), self.isovalue, self.opacity,
             selected_residues=selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
@@ -510,13 +524,9 @@ class MapGroup:
         vertices = mesh.vertices
         triangles = mesh.triangles
         normals = mesh.normals
-
-        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
-        normals = np.reshape(normals, (int(len(normals) / 3), 3))
-        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
-
-        vertices, normals, triangles = self.map_mesh.limit_view(
-            vertices, normals, triangles, selected_residues)
+        if selected_residues:
+            vertices, normals, triangles = self.map_mesh.limit_view(
+                vertices, normals, triangles, selected_residues)
 
         self.map_mesh.mesh.vertices = vertices
         self.map_mesh.mesh.normals = normals
