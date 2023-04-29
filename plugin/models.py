@@ -359,7 +359,8 @@ class MapGroup:
         map_mesh.upload()
         Logs.message("Mesh colored")
 
-    def color_by_element(self, map_mesh, model_complex):
+    @staticmethod
+    def color_by_element(map_mesh, model_complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -379,7 +380,8 @@ class MapGroup:
                 colors = np.append(colors, [255, 255, 255, 50])
         map_mesh.colors = colors
 
-    def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
+    @staticmethod
+    def color_by_chain(map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -428,7 +430,8 @@ class MapGroup:
                 colors = np.append(colors, [255, 255, 255, 0])
         map_mesh.colors = colors
 
-    def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
+    @staticmethod
+    def color_by_bfactor(map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -527,41 +530,15 @@ class MapGroup:
         vertices, normals, triangles = self.map_mesh.limit_view(
             vertices, normals, triangles, selected_residues)
 
-        new_mesh = shapes.Mesh()
-        new_mesh.vertices = vertices
-        new_mesh.normals = normals
-        new_mesh.triangles = triangles
-        new_mesh.anchors = self.map_mesh.mesh.anchors
-        new_mesh.colors = []
-        shapes.Shape.destroy(self.map_mesh.mesh)
-        self.map_mesh.mesh = new_mesh
-        # self.map_mesh.mesh_inverted.vertices = vertices.flatten()
-        # self.map_mesh.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
-        # self.map_mesh.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
-        self.map_mesh.mesh.upload(self.print_uploaded)
+        self.map_mesh.mesh.vertices = vertices
+        self.map_mesh.mesh.normals = normals
+        self.map_mesh.mesh.triangles = triangles
+        self.map_mesh.mesh.anchors = self.map_mesh.mesh.anchors
+        self.map_mesh.color = Color.White()
+        self.map_mesh.color.a = 75
 
-        verts = np.reshape(new_mesh.vertices, (int(len(new_mesh.vertices) / 3), 3))
-        norms = np.reshape(new_mesh.normals, (int(len(new_mesh.normals) / 3), 3))
-        tris = np.reshape(new_mesh.triangles, (int(len(new_mesh.triangles) / 3), 3))
-
-        f = open("DebugMesh.obj", "w")
-
-        for v in verts:
-            # f.write("v %.3f %.3f %.3f\n".format(verts[0], verts[1], verts[2]))
-            f.write(f"v {v[0]} {v[1]} {v[2]}\n")
-
-        for n in norms:
-            # f.write("vn %.3f %.3f %.3f\n".format(norms[0], norms[1], norms[2]))
-            f.write(f"vn {n[0]} {n[1]} {n[2]}\n")
-
-        for t in tris:
-            # f.write("f %d %d %d\n".format(tris[0] + 1, tris[1] + 1, tris[2] + 1))
-            f.write(f"f {t[0] + 1} {t[1] + 1} {t[2] + 1}\n")
-
-        f.close()
-
-    def print_uploaded(self, *args, **kwargs):
-        print("Uploaded")
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.mesh.upload()
 
 
 class ViewportEditor:
