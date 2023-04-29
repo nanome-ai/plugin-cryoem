@@ -34,7 +34,7 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = False
+        self.backface = True
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
@@ -78,7 +78,7 @@ class MapMesh:
         if map_data is None:
             map_data = self.map_manager.map_data().as_numpy_array()
 
-        self._generate_mesh(map_data, isovalue, opacity, selected_residues)
+        self._generate_mesh(map_data, isovalue, opacity)
         if self.complex.index == -1:
             # Create complex to attach mesh to.
             self.complex.boxed = True
@@ -114,15 +114,14 @@ class MapMesh:
         comp.name = os.path.basename(map_gz_file)
         return comp
 
-    def _generate_mesh(self, map_data, isovalue, opacity, selected_residues):
+    def _generate_mesh(self, map_data, isovalue, opacity):
         Logs.debug("Generating Mesh from map...")
         Logs.debug("Marching Cubes...")
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         Logs.debug("Cubes Marched")
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
-        map_origin = self.map_manager.origin
-        vertices += np.asarray(map_origin)
+        vertices += np.asarray(self.map_origin)
 
         # convert vertices from grid units to cartesian angstroms
         for i in range(vertices.shape[0]):
@@ -137,18 +136,6 @@ class MapMesh:
             target_count=target, aggressiveness=7, preserve_border=True, verbose=0)
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
-
-        vertices = np.array(vertices).flatten()
-        normals = np.array(normals).flatten()
-        triangles = np.array(triangles).flatten()
-
-        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
-        normals = np.reshape(normals, (int(len(normals) / 3), 3))
-        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
-
-        # if selected_residues:
-        #     vertices, normals, triangles = self.limit_view(
-        #         vertices, normals, triangles, selected_residues)
 
         self.mesh.vertices = vertices.flatten()
         self.mesh.normals = normals.flatten()
@@ -324,6 +311,7 @@ class MapGroup:
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
         Logs.debug("Generating Map...")
+
         mmm.generate_map()
         Logs.debug("Map Generated")
         map_data = mmm.map_manager().map_data().as_numpy_array()
@@ -536,73 +524,5 @@ class MapGroup:
         self.map_mesh.mesh.anchors = self.map_mesh.mesh.anchors
         self.map_mesh.color = Color.White()
         self.map_mesh.color.a = 75
-
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.mesh.upload()
-
-
-class ViewportEditor:
-
-    DEFAULT_RADIUS = 15
-
-    def __init__(self, plugin_instance: PluginInstance, map_group: MapGroup):
-        self.map_group = map_group
-        self.plugin = plugin_instance
-        self.is_editing = False
-        self.complex = None
-        self.sphere = None
-
-    async def enable(self):
-        Logs.message("Enabling viewport editor")
-        if not self.complex:
-            [self.complex] = await self.plugin.add_to_workspace([
-                create_hidden_complex(self.map_group.map_complex.full_name)
-            ])
-        if not self.sphere:
-            # create viewport sphere
-            self.sphere = shapes.Sphere()
-            preset_radius = self.map_group.radius
-            self.sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
-            self.sphere.color = Color(0, 0, 200, 127)
-
-            anchor = self.sphere.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = self.complex.index
-        shapes.Shape.upload(self.sphere)
-
-    def disable(self):
-        Logs.message("Hiding viewport editor")
-        if self.complex:
-            self.plugin.remove_from_workspace([self.complex])
-            self.complex = None
-        if self.sphere:
-            shapes.Shape.destroy(self.sphere)
-            self.sphere = None
-        self.plugin.update_structures_shallow([self.map_group.map_complex])
-
-    async def apply(self):
-        """Apply viewport position and radius to MapGroup."""
-        Logs.message("Applying Viewport")
-        if not self.sphere:
-            Logs.warning("Missing Sphere, can not apply Viewport. Disabling.")
-            self.disable()
-            return
-        # Get latest states of viewport complex and mapgroup
-        viewport_comp_index = self.complex.index
-        [viewport_comp] = await self.plugin.request_complexes([viewport_comp_index])
-        # get viewport complex position
-        c_to_w = viewport_comp.get_complex_to_workspace_matrix()
-        pos = c_to_w * Vector3(*self.map_group.position)
-
-        # set mapgroup radius and position
-        self.map_group.position = [*pos]
-        self.map_group.radius = self.sphere.radius
-
-        # update mapgroup complex
-        self.plugin.update_structures_shallow([self.map_group.map_complex])
-        # redraw map
-        await self.map_group.generate_mesh()
-
-    def update_radius(self, radius):
-        self.sphere.radius = radius
-        self.sphere.upload()

@@ -4,11 +4,11 @@ import requests
 import time
 import urllib
 from functools import partial
-from nanome.api import ui, shapes
+from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
 from threading import Thread
 
-from .models import MapGroup, ViewportEditor
+from .models import MapGroup
 from .utils import EMDBMetadataParser
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
@@ -284,8 +284,6 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self.viewport_editor = None
-
         self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
@@ -295,9 +293,8 @@ class EditMeshMenu:
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
 
         self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(self.open_edit_viewport)
+        self.btn_edit_viewport.register_pressed_callback(self.limit_to_selected_residues)
         self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-        self.btn_save_viewport.register_pressed_callback(self.apply_viewport)
 
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
 
@@ -331,7 +328,6 @@ class EditMeshMenu:
         self.ligand_zoom.register_pressed_callback(self.zoom_to_ligand)
         self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
         self.btn_delete.register_pressed_callback(self.delete_group_objects)
-        self._menu.register_closed_callback(self.on_menu_closed)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
@@ -420,31 +416,11 @@ class EditMeshMenu:
     def sld_radius_update(self, sld):
         sld_current_val = sld.current_value
         self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
-        if self.viewport_editor.sphere:
-            self.viewport_editor.sphere.radius = sld_current_val
-            shapes.Shape.upload(self.viewport_editor.sphere)
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def open_edit_viewport(self, btn: ui.Button):
+    async def limit_to_selected_residues(self, btn: ui.Button):
         await self.map_group.limit_to_selection()
-        # self.ln_edit_map.enabled = False
-        # self.ln_edit_viewport.enabled = True
-
-        # self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
-        # radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
-        # self.set_radius_ui(radius)
-        # self._plugin.update_content(self.sld_radius)
-        # self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        # await self.viewport_editor.enable()
-
-    @async_callback
-    async def apply_viewport(self, btn):
-        await self.viewport_editor.apply()
-        self.ln_edit_map.enabled = True
-        self.ln_edit_viewport.enabled = False
-        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        self.viewport_editor.disable()
 
     @async_callback
     async def update_color(self, *args):
@@ -545,9 +521,3 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
-
-    def on_menu_closed(self, *args):
-        # if viewport editor is open, disable
-        Logs.message("Closing EditMeshMenu")
-        if self.viewport_editor:
-            self.viewport_editor.disable()
