@@ -15,8 +15,8 @@ from mmtbx.model.model import manager
 from scipy.spatial import KDTree
 from typing import List
 
-from nanome.api import shapes, structure, PluginInstance
-from nanome.util import Color, Logs, enums, Vector3
+from nanome.api import shapes, structure
+from nanome.util import Color, Logs, enums
 
 from .utils import cpk_colors, create_hidden_complex
 
@@ -80,11 +80,21 @@ class MapMesh:
         self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
         self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
 
-    async def load(self, map_manager: map_manager, isovalue, opacity, map_data=None, selected_residues=None):
+    async def load(self, map_manager: map_manager, isovalue, opacity, selected_residues=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
         selected_residues = selected_residues or []
         self.map_manager = map_manager
-        self.mesh = self.generate_mesh_from_map_manager(map_manager, isovalue)
+
+        new_mesh = self.generate_mesh_from_map_manager(map_manager, isovalue)
+        if len(list(selected_residues)) > 0:
+            new_mesh.vertices, new_mesh.normals, new_mesh.triangles = self.limit_view(
+                new_mesh.vertices,
+                new_mesh.normals,
+                new_mesh.triangles,
+                selected_residues)
+        new_mesh._index = self.mesh.index
+        self.mesh = new_mesh
+
         if self.backface:
             self.load_backface_mesh()
 
@@ -103,6 +113,12 @@ class MapMesh:
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
             self.mesh_inverted.anchors[0] = anchor
+        else:
+            new_comp = self.create_map_complex(self.map_manager, self.map_gz_file)
+            comp_index = self.complex.index
+            new_comp.index = comp_index
+            self.complex = new_comp
+            await self._plugin.update_structures_deep([self.complex])
 
     @staticmethod
     def load_map_file(map_gz_file):
@@ -310,7 +326,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, color_scheme)
             self.map_mesh.upload()
 
-    async def generate_mesh(self, use_selected_residues=False):
+    def create_map_model_manager(self):
         # Compute iso-surface with marching cubes algorithm
         Logs.message("Generating mesh...")
         # Set up map model manager
@@ -324,15 +340,41 @@ class MapGroup:
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
-        Logs.debug("Generating Map...")
+        return mmm
 
+    async def generate_mesh_around_model(self):
+        mmm = self.create_map_model_manager()
+        selected_residues = []
+        if self.model_complex:
+            await self.refresh_model_complex()
+            selected_residues = list(self.model_complex.residues)
+        if not selected_residues:
+            Logs.warning("No residues selected")
+            return
+        await self.map_mesh.load(
+            mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.upload()
+
+    async def generate_full_mesh(self):
+        mmm = self.create_map_model_manager()
+        Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
-        # map_data = mmm.map_manager().map_data().as_numpy_array()
+        await self.map_mesh.load(
+            mmm.map_manager(), self.isovalue, self.opacity)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.upload()
+        self._set_hist_x_min_max()
 
+    async def generate_mesh_around_selection(self):
+        mmm = self.create_map_model_manager()
+        Logs.debug("Generating Map...")
+        mmm.generate_map()
+        Logs.debug("Map Generated")
         # Get selected residues
         selected_residues = []
-        if use_selected_residues and self.model_complex:
+        if self.model_complex:
             await self.refresh_model_complex()
             model_comp = self.model_complex
             selected_residues = [
@@ -340,11 +382,9 @@ class MapGroup:
                 if any([atom.selected for atom in res.atoms])
             ]
         await self.map_mesh.load(
-            mmm.map_manager(), self.isovalue, self.opacity,
-            selected_residues=selected_residues)
+            mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
-        self._set_hist_x_min_max()
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -508,7 +548,7 @@ class MapGroup:
     async def refresh_model_complex(self):
         [self.__model_complex] = await self._plugin.request_complexes([self.model_complex.index])
 
-    async def limit_to_selection(self):
+    async def extract_around_selection(self):
         # Compute iso-surface with marching cubes algorithm
         Logs.message("Limiting to selected residues...")
 

@@ -98,7 +98,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                 Logs.warning("model complex was deleted.")
             else:
                 mapgroup.add_model_complex(deep_comp)
-        await mapgroup.generate_mesh()
+        await mapgroup.generate_full_mesh()
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
         self.menu.render(selected_mapgroup=mapgroup)

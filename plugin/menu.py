@@ -416,18 +416,18 @@ class EditMeshMenu:
     @async_callback
     async def show_full_map(self, btn):
         Logs.message("Showing full map...")
-        pass
+        await self.map_group.generate_full_mesh()
 
     @async_callback
     async def extract_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
-        await self.map_group.limit_to_selection()
+        await self.map_group.generate_mesh_around_selection()
 
     @async_callback
     async def extract_around_model(self, btn):
         Logs.message("Extracting map around model...")
+        await self.map_group.generate_mesh_around_model()
         pass
-
 
     @async_callback
     async def update_color(self, *args):
@@ -441,8 +441,7 @@ class EditMeshMenu:
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
-            await self.map_group.generate_mesh(
-                use_selected_residues=use_selected_residues)
+            await self.map_group.generate_full_mesh()
 
     @async_callback
     async def redraw_new_isovalue(self, btn):
@@ -487,16 +486,6 @@ class EditMeshMenu:
         elif item.name == "Chain":
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
-
-    def zoom_to_struct(self, btn: ui.Button):
-        strucs = []
-        for item in self.lst_files.items:
-            item_btn = item.get_content()
-            if item_btn.selected:
-                item_comp = getattr(item_btn, 'comp', None)
-                if item_comp:
-                    strucs.append(item_comp)
-        self._plugin.zoom_on_structures(strucs)
 
     @async_callback
     async def set_color_scheme(self, *args):
