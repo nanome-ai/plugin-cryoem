@@ -1,3 +1,4 @@
+import enum
 import gzip
 import matplotlib.pyplot as plt
 import mcubes
@@ -19,6 +20,12 @@ from nanome.api import shapes, structure
 from nanome.util import Color, Logs, enums
 
 from .utils import cpk_colors, create_hidden_complex
+
+
+class EXTRACTION_TYPE(enum.Enum):
+    FULL_MAP = 0
+    MODEL = 1
+    SELECTION = 2
 
 
 class MapMesh:
@@ -264,6 +271,7 @@ class MapGroup:
 
         self._model: manager = None
         self.__model_complex: structure.Complex = None
+        self.extraction_type = EXTRACTION_TYPE.FULL_MAP
 
     @property
     def model_complex(self):
@@ -343,6 +351,7 @@ class MapGroup:
         return mmm
 
     async def generate_mesh_around_model(self):
+        self.extraction_type = EXTRACTION_TYPE.MODEL
         mmm = self.create_map_model_manager()
         selected_residues = []
         if self.model_complex:
@@ -357,6 +366,7 @@ class MapGroup:
         self.map_mesh.upload()
 
     async def generate_full_mesh(self):
+        self.extraction_type = EXTRACTION_TYPE.FULL_MAP
         mmm = self.create_map_model_manager()
         Logs.debug("Generating Map...")
         mmm.generate_map()
@@ -368,6 +378,7 @@ class MapGroup:
         self._set_hist_x_min_max()
 
     async def generate_mesh_around_selection(self):
+        self.extraction_type = EXTRACTION_TYPE.SELECTION
         mmm = self.create_map_model_manager()
         Logs.debug("Generating Map...")
         mmm.generate_map()
@@ -576,3 +587,11 @@ class MapGroup:
         self.map_mesh.color.a = 75
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.mesh.upload()
+
+    async def redraw_mesh(self):
+        if self.extraction_type == EXTRACTION_TYPE.FULL_MAP:
+            await self.generate_full_mesh()
+        elif self.extraction_type == EXTRACTION_TYPE.SELECTION:
+            await self.generate_mesh_around_selection()
+        elif self.extraction_type == EXTRACTION_TYPE.MODEL:
+            await self.generate_mesh_around_model()

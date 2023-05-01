@@ -436,12 +436,12 @@ class EditMeshMenu:
         await self.map_group.update_color(color_scheme, opacity)
 
     @async_callback
-    async def redraw_map(self, btn=None, use_selected_residues=False):
+    async def redraw_map(self, btn=None):
         self.map_group.isovalue = self.isovalue
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
-            await self.map_group.generate_full_mesh()
+            await self.map_group.redraw_mesh()
 
     @async_callback
     async def redraw_new_isovalue(self, btn):
