@@ -291,13 +291,7 @@ class EditMeshMenu:
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
-
-        self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(self.limit_to_selected_residues)
-        self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
-
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
         self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
@@ -322,12 +316,13 @@ class EditMeshMenu:
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
-        self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
-        self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
-        self.ligand_zoom: ui.Button = root.find_node('btn_ligand_zoom').get_content()
-        self.ligand_zoom.register_pressed_callback(self.zoom_to_ligand)
-        self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
-        self.btn_delete.register_pressed_callback(self.delete_group_objects)
+        
+        self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
+        self.btn_show_full_map.register_pressed_callback(self.show_full_map)
+        self.btn_extract_around_model: ui.Button = root.find_node('btn_extract_around_model').get_content()
+        self.btn_extract_around_model.register_pressed_callback(self.extract_around_model)
+        self.btn_extract_around_selection: ui.Button = root.find_node('btn_extract_around_selection').get_content()
+        self.btn_extract_around_selection.register_pressed_callback(self.extract_around_selection)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
@@ -419,8 +414,20 @@ class EditMeshMenu:
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def limit_to_selected_residues(self, btn: ui.Button):
+    async def show_full_map(self, btn):
+        Logs.message("Showing full map...")
+        pass
+
+    @async_callback
+    async def extract_around_selection(self, btn: ui.Button):
+        Logs.message("Extracting map around selection...")
         await self.map_group.limit_to_selection()
+
+    @async_callback
+    async def extract_around_model(self, btn):
+        Logs.message("Extracting map around model...")
+        pass
+
 
     @async_callback
     async def update_color(self, *args):
@@ -496,17 +503,6 @@ class EditMeshMenu:
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
         self._plugin.update_content(self.dd_color_scheme)
         await self.map_group.update_color(self.color_scheme, self.opacity)
-
-    @async_callback
-    async def zoom_to_ligand(self, btn: ui.Button):
-        self._current_ligand = getattr(self, '_current_ligand', 0)
-        model_comp = self.map_group.model_complex
-        model_mol = list(model_comp.molecules)[model_comp.current_frame]
-        ligands = await model_mol.get_ligands()
-        ligand_to_zoom = ligands[self._current_ligand]
-        residues = ligand_to_zoom.residues
-        self._plugin.zoom_on_structures(residues)
-        self._current_ligand = (self._current_ligand + 1) % len(ligands)
 
     def delete_group_objects(self, btn: ui.Button):
         Logs.message("Delete group objects button clicked.")
