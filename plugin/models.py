@@ -1,5 +1,6 @@
 import enum
 import gzip
+import logging
 import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
@@ -303,6 +304,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        logging.getLogger('matplotlib').setLevel(logging.CRITICAL)
         Logs.debug("Generating histogram...")
         start_time = time.time()
         flat = np.array(self.map_mesh.map_manager.map_data().as_1d(), dtype=np.float32)
