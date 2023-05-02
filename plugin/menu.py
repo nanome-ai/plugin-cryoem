@@ -320,7 +320,7 @@ class EditMeshMenu:
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
         self.btn_show_full_map.disable_on_press = True
         self.btn_show_full_map.register_pressed_callback(self.show_full_map)
-        
+
         self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
         self.btn_box_around_model.disable_on_press = True
         self.btn_box_around_model.register_pressed_callback(self.box_map_around_model)
