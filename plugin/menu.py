@@ -316,7 +316,7 @@ class EditMeshMenu:
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
-        
+
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
         self.btn_show_full_map.register_pressed_callback(self.show_full_map)
         self.btn_extract_around_model: ui.Button = root.find_node('btn_extract_around_model').get_content()
