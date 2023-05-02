@@ -93,7 +93,6 @@ class MapMeshTestCase(unittest.TestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_mesh = MapMesh(self.plugin)
-        self.map_mesh.add_map_gz_file(self.map_file)
 
         dm = DataManager()
         model = dm.get_model(self.pdb_file)
@@ -127,6 +126,9 @@ class MapMeshTestCase(unittest.TestCase):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
             self.plugin.add_to_workspace.return_value = fut
+
+            self.map_mesh.add_map_gz_file(self.map_file)
+
             mesh = self.map_mesh.mesh
             self.assertEqual(len(mesh.vertices), 0)
             self.assertEqual(len(mesh.normals), 0)
@@ -138,28 +140,32 @@ class MapMeshTestCase(unittest.TestCase):
             self.assertEqual(len(mesh.triangles), expected_triangles)
         run_awaitable(validate_load, self)
 
-    def test_load_limit_view(self):
-        """Validate that running load() generates the NanomeMesh.
-
-        when radius is set >= 0, only partial mesh should be generated.
-        """
-        async def validate_load_limit_view(self):
+    def test_load_selected_residues(self):
+        """Validate that running load() generates the MapMesh."""
+        async def validate_load_selected_residues(self):
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-            expected_vertices = 4440
-            expected_normals = 4440
-            expected_triangles = 8034
+            expected_vertices = 3255
+            expected_normals = 3255
+            expected_triangles = 5976
             self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
-            radius = 5  # Indicates limit view to 15 angstroms around position
-            position = [0, 0, 0]
+
+            model_comp = structure.Complex.io.from_pdb(path=self.pdb_file)
+            fut = asyncio.Future()
+            fut.set_result([model_comp])
+            self.plugin.request_complexes.return_value = fut
 
             mesh = self.map_mesh.mesh
             self.assertEqual(len(mesh.vertices), 0)
             self.assertEqual(len(mesh.normals), 0)
             self.assertEqual(len(mesh.triangles), 0)
-            await self.map_mesh.load(isovalue, opacity, radius, position)
+
+            selected_residues = list(model_comp.residues)[:3]
+            await self.map_mesh.load(self.map_manager, isovalue, opacity, selected_residues)
+            mesh = self.map_mesh.mesh
+
             self.assertEqual(len(mesh.vertices), expected_vertices)
             self.assertEqual(len(mesh.normals), expected_normals)
             self.assertEqual(len(mesh.triangles), expected_triangles)
-        run_awaitable(validate_load_limit_view, self)
+        run_awaitable(validate_load_selected_residues, self)
