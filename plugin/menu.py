@@ -4,11 +4,11 @@ import requests
 import time
 import urllib
 from functools import partial
-from nanome.api import ui, shapes
+from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
 from threading import Thread
 
-from .models import MapGroup, ViewportEditor
+from .models import MapGroup
 from .utils import EMDBMetadataParser
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
@@ -284,8 +284,6 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self.viewport_editor = None
-
         self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
         self._menu.index = 20
@@ -293,14 +291,7 @@ class EditMeshMenu:
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
-
-        self.btn_edit_viewport: ui.Button = root.find_node('btn_edit_viewport').get_content()
-        self.btn_edit_viewport.register_pressed_callback(self.open_edit_viewport)
-        self.btn_save_viewport: ui.Button = root.find_node('btn_save_viewport').get_content()
-        self.btn_save_viewport.register_pressed_callback(self.apply_viewport)
-
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
-
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
         self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
@@ -325,13 +316,18 @@ class EditMeshMenu:
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
         self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
-        self.btn_zoom: ui.Button = root.find_node('btn_zoom').get_content()
-        self.btn_zoom.register_pressed_callback(self.zoom_to_struct)
-        self.ligand_zoom: ui.Button = root.find_node('btn_ligand_zoom').get_content()
-        self.ligand_zoom.register_pressed_callback(self.zoom_to_ligand)
-        self.btn_delete: ui.Button = root.find_node('btn_delete').get_content()
-        self.btn_delete.register_pressed_callback(self.delete_group_objects)
-        self._menu.register_closed_callback(self.on_menu_closed)
+
+        self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
+        self.btn_show_full_map.disable_on_press = True
+        self.btn_show_full_map.register_pressed_callback(self.show_full_map)
+
+        self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
+        self.btn_box_around_model.disable_on_press = True
+        self.btn_box_around_model.register_pressed_callback(self.box_map_around_model)
+
+        self.btn_box_around_selection: ui.Button = root.find_node('btn_box_around_selection').get_content()
+        self.btn_box_around_selection.disable_on_press = True
+        self.btn_box_around_selection.register_pressed_callback(self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
@@ -420,30 +416,25 @@ class EditMeshMenu:
     def sld_radius_update(self, sld):
         sld_current_val = sld.current_value
         self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
-        if self.viewport_editor.sphere:
-            self.viewport_editor.sphere.radius = sld_current_val
-            shapes.Shape.upload(self.viewport_editor.sphere)
         self._plugin.update_content(self.lbl_radius, sld)
 
     @async_callback
-    async def open_edit_viewport(self, btn: ui.Button):
-        self.ln_edit_map.enabled = False
-        self.ln_edit_viewport.enabled = True
-
-        self.viewport_editor = ViewportEditor(self._plugin, self.map_group)
-        radius = self.map_group.radius if self.map_group.radius > 0 else ViewportEditor.DEFAULT_RADIUS
-        self.set_radius_ui(radius)
-        self._plugin.update_content(self.sld_radius)
-        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        await self.viewport_editor.enable()
+    async def show_full_map(self, btn):
+        Logs.message("Showing full map...")
+        await self.map_group.generate_full_mesh()
+        self._plugin.update_content(btn)
 
     @async_callback
-    async def apply_viewport(self, btn):
-        await self.viewport_editor.apply()
-        self.ln_edit_map.enabled = True
-        self.ln_edit_viewport.enabled = False
-        self._plugin.update_node(self.ln_edit_map, self.ln_edit_viewport)
-        self.viewport_editor.disable()
+    async def box_map_around_selection(self, btn: ui.Button):
+        Logs.message("Extracting map around selection...")
+        await self.map_group.generate_mesh_around_selection()
+        self._plugin.update_content(btn)
+
+    @async_callback
+    async def box_map_around_model(self, btn):
+        Logs.message("Extracting map around model...")
+        await self.map_group.generate_mesh_around_model()
+        self._plugin.update_content(btn)
 
     @async_callback
     async def update_color(self, *args):
@@ -457,7 +448,7 @@ class EditMeshMenu:
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
-            await self.map_group.generate_mesh()
+            await self.map_group.redraw_mesh()
 
     @async_callback
     async def redraw_new_isovalue(self, btn):
@@ -503,32 +494,11 @@ class EditMeshMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    def zoom_to_struct(self, btn: ui.Button):
-        strucs = []
-        for item in self.lst_files.items:
-            item_btn = item.get_content()
-            if item_btn.selected:
-                item_comp = getattr(item_btn, 'comp', None)
-                if item_comp:
-                    strucs.append(item_comp)
-        self._plugin.zoom_on_structures(strucs)
-
     @async_callback
     async def set_color_scheme(self, *args):
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
         self._plugin.update_content(self.dd_color_scheme)
         await self.map_group.update_color(self.color_scheme, self.opacity)
-
-    @async_callback
-    async def zoom_to_ligand(self, btn: ui.Button):
-        self._current_ligand = getattr(self, '_current_ligand', 0)
-        model_comp = self.map_group.model_complex
-        model_mol = list(model_comp.molecules)[model_comp.current_frame]
-        ligands = await model_mol.get_ligands()
-        ligand_to_zoom = ligands[self._current_ligand]
-        residues = ligand_to_zoom.residues
-        self._plugin.zoom_on_structures(residues)
-        self._current_ligand = (self._current_ligand + 1) % len(ligands)
 
     def delete_group_objects(self, btn: ui.Button):
         Logs.message("Delete group objects button clicked.")
@@ -543,9 +513,3 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
-
-    def on_menu_closed(self, *args):
-        # if viewport editor is open, disable
-        Logs.message("Closing EditMeshMenu")
-        if self.viewport_editor:
-            self.viewport_editor.disable()

@@ -1,4 +1,6 @@
+import enum
 import gzip
+import logging
 import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
@@ -15,10 +17,16 @@ from mmtbx.model.model import manager
 from scipy.spatial import KDTree
 from typing import List
 
-from nanome.api import shapes, structure, PluginInstance
-from nanome.util import Color, Logs, enums, Vector3
+from nanome.api import shapes, structure
+from nanome.util import Color, Logs, enums
 
 from .utils import cpk_colors, create_hidden_complex
+
+
+class EXTRACTION_TYPE(enum.Enum):
+    FULL_MAP = 0
+    MODEL = 1
+    SELECTION = 2
 
 
 class MapMesh:
@@ -34,7 +42,7 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = True
+        self.backface = False
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
@@ -72,11 +80,38 @@ class MapMesh:
         if self.backface:
             self.mesh_inverted.upload()
 
-    async def load(self, isovalue, opacity, radius, position, map_data=None):
+    def load_backface_mesh(self):
+        vertices = self.mesh.vertices
+        normals = self.mesh.normals
+        triangles = np.reshape(self.mesh.triangles, (int(len(self.mesh.triangles) / 3), 3))
+        self.mesh_inverted.vertices = vertices
+        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
+        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+
+    async def load(self, map_manager: map_manager, isovalue, opacity, selected_residues=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
-        if map_data is None:
-            map_data = self.map_manager.map_data().as_numpy_array()
-        self._generate_mesh(map_data, isovalue, opacity, radius, position)
+        selected_residues = selected_residues or []
+        self.map_manager = map_manager
+
+        new_mesh = self.generate_mesh_from_map_manager(map_manager, isovalue)
+        if len(list(selected_residues)) > 0:
+            new_mesh.vertices, new_mesh.normals, new_mesh.triangles = self.limit_view(
+                new_mesh.vertices,
+                new_mesh.normals,
+                new_mesh.triangles,
+                selected_residues)
+        new_mesh._index = self.mesh.index
+        self.mesh = new_mesh
+
+        if self.backface:
+            self.load_backface_mesh()
+
+        Logs.message("Mesh generated")
+        Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
+        opacity_a = int(opacity * 255)
+        self.mesh.color = Color(255, 255, 255, opacity_a)
+        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
+
         if self.complex.index == -1:
             # Create complex to attach mesh to.
             self.complex.boxed = True
@@ -85,7 +120,14 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
-            self.mesh_inverted.anchors[0] = anchor
+            if self.backface:
+                self.mesh_inverted.anchors[0] = anchor
+        else:
+            new_comp = self.create_map_complex(self.map_manager, self.map_gz_file)
+            comp_index = self.complex.index
+            new_comp.index = comp_index
+            self.complex = new_comp
+            await self._plugin.update_structures_deep([self.complex])
 
     @staticmethod
     def load_map_file(map_gz_file):
@@ -112,19 +154,20 @@ class MapMesh:
         comp.name = os.path.basename(map_gz_file)
         return comp
 
-    def _generate_mesh(self, map_data, isovalue, opacity, radius, position):
+    @staticmethod
+    def generate_mesh_from_map_manager(map_manager, isovalue):
         Logs.debug("Generating Mesh from map...")
         Logs.debug("Marching Cubes...")
+        map_origin = map_manager.origin
+        map_data = map_manager.map_data().as_numpy_array()
         vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         Logs.debug("Cubes Marched")
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
-        map_origin = self.map_manager.origin
         vertices += np.asarray(map_origin)
-
         # convert vertices from grid units to cartesian angstroms
         for i in range(vertices.shape[0]):
-            vertices[i] = self.map_manager.grid_units_to_cart(vertices[i])
+            vertices[i] = map_manager.grid_units_to_cart(vertices[i])
 
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
@@ -136,63 +179,65 @@ class MapMesh:
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
 
-        vertices = np.array(vertices)
-        normals = np.array(normals)
-        triangles = np.array(triangles)
+        mesh = shapes.Mesh()
+        mesh.vertices = vertices.flatten()
+        mesh.normals = normals.flatten()
+        mesh.triangles = triangles.flatten()
+        return mesh
 
-        vertices, normals, triangles = self.limit_view(
-            vertices, normals, triangles, radius, position)
+    @property
+    def map_origin(self):
+        if hasattr(self, 'map_manager'):
+            return self.map_manager.origin
 
-        self.mesh.vertices = vertices.flatten()
-        self.mesh.normals = normals.flatten()
-        self.mesh.triangles = triangles.flatten()
-        self.mesh_inverted.vertices = vertices.flatten()
-        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
-        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+    @staticmethod
+    def limit_view(vertices, normals, triangles, selected_residues):
+        if len(vertices) < 3 or not selected_residues:
+            return
 
-        opacity_a = int(opacity * 255)
-        self.mesh.color = Color(255, 255, 255, opacity_a)
-        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
-        Logs.message("Mesh generated")
-        Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
+        vertices = np.reshape(vertices, (int(len(vertices) / 3), 3))
+        normals = np.reshape(normals, (int(len(normals) / 3), 3))
+        triangles = np.reshape(triangles, (int(len(triangles) / 3), 3))
 
-    def limit_view(self, vertices, normals, triangles, radius, position):
-        if radius <= 0:
+        atom_positions = []
+        for residue in selected_residues:
+            for a in residue.atoms:
+                pos = a.position
+                atom_positions.append(np.array([pos.x, pos.y, pos.z]))
+        kdtree = KDTree(atom_positions)
+        _, atom_pos_indices = kdtree.query(vertices, distance_upper_bound=2)
+
+        vertices_to_keep = []
+        mapping = []
+        vertex_id = 0
+        for vertex_index, atom_index in enumerate(atom_pos_indices):
+            if atom_index >= 0 and atom_index < len(atom_positions):
+                vertices_to_keep.append(vertex_index)
+                mapping.append(vertex_id)
+                vertex_id += 1
+            else:
+                mapping.append(-1)
+
+        if len(vertices_to_keep) == len(vertices):
             return (vertices, normals, triangles)
-        Logs.debug(f"Radius: {radius}")
-        Logs.debug("Limiting view...")
-        pos = np.asarray(position)
-        idv = 0
-        to_keep = []
-        for v in vertices:
-            vert = np.asarray(v)
-            dist = np.linalg.norm(vert - pos)
-            if dist <= radius:
-                to_keep.append(idv)
-            idv += 1
-        if len(to_keep) == len(vertices):
-            return (vertices, normals, triangles)
 
+        # Create new lists of vertices, normals, and triangles
         new_vertices = []
         new_triangles = []
         new_normals = []
-        mapping = np.full(len(vertices), -1, np.int32)
-        idv = 0
-        for i in to_keep:
-            mapping[i] = idv
+        for i in vertices_to_keep:
             new_vertices.append(vertices[i])
             new_normals.append(normals[i])
-            idv += 1
 
         for t in triangles:
-            if mapping[t[0]] != -1 and mapping[t[1]] != -1 and mapping[t[2]] != -1:
-                new_triangles.append(
-                    [mapping[t[0]], mapping[t[1]], mapping[t[2]]])
+            updated_tri = [mapping[t[0]], mapping[t[1]], mapping[t[2]]]
+            if -1 not in updated_tri:
+                new_triangles.append(updated_tri)
 
         return (
-            np.asarray(new_vertices),
-            np.asarray(new_normals),
-            np.asarray(new_triangles),
+            np.asarray(new_vertices).flatten(),
+            np.asarray(new_normals).flatten(),
+            np.asarray(new_triangles).flatten(),
         )
 
     @property
@@ -228,6 +273,7 @@ class MapGroup:
 
         self._model: manager = None
         self.__model_complex: structure.Complex = None
+        self.extraction_type = EXTRACTION_TYPE.FULL_MAP
 
     @property
     def model_complex(self):
@@ -258,6 +304,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        logging.getLogger('matplotlib').setLevel(logging.CRITICAL)
         Logs.debug("Generating histogram...")
         start_time = time.time()
         flat = np.array(self.map_mesh.map_manager.map_data().as_1d(), dtype=np.float32)
@@ -290,7 +337,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, color_scheme)
             self.map_mesh.upload()
 
-    async def generate_mesh(self):
+    def create_map_model_manager(self):
         # Compute iso-surface with marching cubes algorithm
         Logs.message("Generating mesh...")
         # Set up map model manager
@@ -304,14 +351,60 @@ class MapGroup:
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
+        return mmm
+
+    async def generate_mesh_around_model(self):
+        self.extraction_type = EXTRACTION_TYPE.MODEL
+        mmm = self.create_map_model_manager()
+        selected_residues = []
+        if self.model_complex:
+            await self.refresh_model_complex()
+            selected_residues = list(self.model_complex.residues)
+        if not selected_residues:
+            Logs.warning("No residues selected")
+            return
+        await self.map_mesh.load(
+            mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.upload()
+
+    async def generate_full_mesh(self):
+        self.extraction_type = EXTRACTION_TYPE.FULL_MAP
+        mmm = self.create_map_model_manager()
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
-        map_data = mmm.map_manager().map_data().as_numpy_array()
-        await self.map_mesh.load(self.isovalue, self.opacity, self.radius, self.position, map_data=map_data)
+        await self.map_mesh.load(
+            mmm.map_manager(), self.isovalue, self.opacity)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
         self.map_mesh.upload()
         self._set_hist_x_min_max()
+
+    async def generate_mesh_around_selection(self):
+        self.extraction_type = EXTRACTION_TYPE.SELECTION
+        mmm = self.create_map_model_manager()
+        Logs.debug("Generating Map...")
+        mmm.generate_map()
+        Logs.debug("Map Generated")
+        # Get selected residues
+        selected_residues = []
+        if self.model_complex:
+            await self.refresh_model_complex()
+            model_comp = self.model_complex
+            selected_residues = [
+                res for res in model_comp.residues
+                if any([atom.selected for atom in res.atoms])
+            ]
+        if not selected_residues:
+            Logs.warning("No residues selected on model")
+            self._plugin.send_notification(
+                enums.NotificationTypes.warning, "No residues selected on model.")
+            return
+
+        await self.map_mesh.load(
+            mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.upload()
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -328,7 +421,8 @@ class MapGroup:
         map_mesh.upload()
         Logs.message("Mesh colored")
 
-    def color_by_element(self, map_mesh, model_complex):
+    @staticmethod
+    def color_by_element(map_mesh, model_complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -348,7 +442,8 @@ class MapGroup:
                 colors = np.append(colors, [255, 255, 255, 50])
         map_mesh.colors = colors
 
-    def color_by_chain(self, map_mesh: MapMesh, model_complex: structure.Complex):
+    @staticmethod
+    def color_by_chain(map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -397,7 +492,8 @@ class MapGroup:
                 colors = np.append(colors, [255, 255, 255, 0])
         map_mesh.colors = colors
 
-    def color_by_bfactor(self, map_mesh: MapMesh, model_complex: structure.Complex):
+    @staticmethod
+    def color_by_bfactor(map_mesh: MapMesh, model_complex: structure.Complex):
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -469,69 +565,42 @@ class MapGroup:
         self.hist_x_min = np.min(flat)
         self.hist_x_max = np.max(flat)
 
+    async def refresh_model_complex(self):
+        [self.__model_complex] = await self._plugin.request_complexes([self.model_complex.index])
 
-class ViewportEditor:
+    async def extract_around_selection(self):
+        # Compute iso-surface with marching cubes algorithm
+        Logs.message("Limiting to selected residues...")
 
-    DEFAULT_RADIUS = 15
+        # Get selected residues
+        selected_residues = []
+        await self.refresh_model_complex()
+        model_comp = self.model_complex
+        selected_residues = [
+            res for res in model_comp.residues
+            if any([atom.selected for atom in res.atoms])
+        ]
+        mesh = self.map_mesh.mesh
+        vertices = mesh.vertices
+        triangles = mesh.triangles
+        normals = mesh.normals
+        if selected_residues:
+            vertices, normals, triangles = self.map_mesh.limit_view(
+                vertices, normals, triangles, selected_residues)
 
-    def __init__(self, plugin_instance: PluginInstance, map_group: MapGroup):
-        self.map_group = map_group
-        self.plugin = plugin_instance
-        self.is_editing = False
-        self.complex = None
-        self.sphere = None
+        self.map_mesh.mesh.vertices = vertices
+        self.map_mesh.mesh.normals = normals
+        self.map_mesh.mesh.triangles = triangles
+        self.map_mesh.mesh.anchors = self.map_mesh.mesh.anchors
+        self.map_mesh.color = Color.White()
+        self.map_mesh.color.a = 75
+        self.color_by_scheme(self.map_mesh, self.color_scheme)
+        self.map_mesh.mesh.upload()
 
-    async def enable(self):
-        Logs.message("Enabling viewport editor")
-        if not self.complex:
-            [self.complex] = await self.plugin.add_to_workspace([
-                create_hidden_complex(self.map_group.map_complex.full_name)
-            ])
-        if not self.sphere:
-            # create viewport sphere
-            self.sphere = shapes.Sphere()
-            preset_radius = self.map_group.radius
-            self.sphere.radius = preset_radius if preset_radius > 0 else self.DEFAULT_RADIUS
-            self.sphere.color = Color(0, 0, 200, 127)
-
-            anchor = self.sphere.anchors[0]
-            anchor.anchor_type = enums.ShapeAnchorType.Complex
-            anchor.target = self.complex.index
-        shapes.Shape.upload(self.sphere)
-
-    def disable(self):
-        Logs.message("Hiding viewport editor")
-        if self.complex:
-            self.plugin.remove_from_workspace([self.complex])
-            self.complex = None
-        if self.sphere:
-            shapes.Shape.destroy(self.sphere)
-            self.sphere = None
-        self.plugin.update_structures_shallow([self.map_group.map_complex])
-
-    async def apply(self):
-        """Apply viewport position and radius to MapGroup."""
-        Logs.message("Applying Viewport")
-        if not self.sphere:
-            Logs.warning("Missing Sphere, can not apply Viewport. Disabling.")
-            self.disable()
-            return
-        # Get latest states of viewport complex and mapgroup
-        viewport_comp_index = self.complex.index
-        [viewport_comp] = await self.plugin.request_complexes([viewport_comp_index])
-        # get viewport complex position
-        c_to_w = viewport_comp.get_complex_to_workspace_matrix()
-        pos = c_to_w * Vector3(*self.map_group.position)
-
-        # set mapgroup radius and position
-        self.map_group.position = [*pos]
-        self.map_group.radius = self.sphere.radius
-
-        # update mapgroup complex
-        self.plugin.update_structures_shallow([self.map_group.map_complex])
-        # redraw map
-        await self.map_group.generate_mesh()
-
-    def update_radius(self, radius):
-        self.sphere.radius = radius
-        self.sphere.upload()
+    async def redraw_mesh(self):
+        if self.extraction_type == EXTRACTION_TYPE.FULL_MAP:
+            await self.generate_full_mesh()
+        elif self.extraction_type == EXTRACTION_TYPE.SELECTION:
+            await self.generate_mesh_around_selection()
+        elif self.extraction_type == EXTRACTION_TYPE.MODEL:
+            await self.generate_mesh_around_model()
