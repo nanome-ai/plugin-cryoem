@@ -318,10 +318,15 @@ class EditMeshMenu:
         self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
 
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
+        self.btn_show_full_map.disable_on_press = True
         self.btn_show_full_map.register_pressed_callback(self.show_full_map)
+        
         self.btn_extract_around_model: ui.Button = root.find_node('btn_extract_around_model').get_content()
+        self.btn_extract_around_model.disable_on_press = True
         self.btn_extract_around_model.register_pressed_callback(self.extract_around_model)
+
         self.btn_extract_around_selection: ui.Button = root.find_node('btn_extract_around_selection').get_content()
+        self.btn_extract_around_selection.disable_on_press = True
         self.btn_extract_around_selection.register_pressed_callback(self.extract_around_selection)
 
     def render(self, map_group: MapGroup):
@@ -417,17 +422,19 @@ class EditMeshMenu:
     async def show_full_map(self, btn):
         Logs.message("Showing full map...")
         await self.map_group.generate_full_mesh()
+        self._plugin.update_content(btn)
 
     @async_callback
     async def extract_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
         await self.map_group.generate_mesh_around_selection()
+        self._plugin.update_content(btn)
 
     @async_callback
     async def extract_around_model(self, btn):
         Logs.message("Extracting map around model...")
         await self.map_group.generate_mesh_around_model()
-        pass
+        self._plugin.update_content(btn)
 
     @async_callback
     async def update_color(self, *args):
