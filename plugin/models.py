@@ -119,7 +119,8 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
-            self.mesh_inverted.anchors[0] = anchor
+            if self.backface:
+                self.mesh_inverted.anchors[0] = anchor
         else:
             new_comp = self.create_map_complex(self.map_manager, self.map_gz_file)
             comp_index = self.complex.index

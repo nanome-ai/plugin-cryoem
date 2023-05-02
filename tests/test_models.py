@@ -4,9 +4,11 @@ import nanome
 import tempfile
 import unittest
 
-from nanome.api import structure, PluginInstance, shapes
+from nanome.api import structure, PluginInstance
 from unittest.mock import MagicMock, patch
+from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
+from iotbx.map_model_manager import map_model_manager
 
 from mmtbx.model.model import manager
 from plugin import models
@@ -91,6 +93,12 @@ class MapMeshTestCase(unittest.TestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_mesh = MapMesh(self.plugin)
+        self.map_mesh.add_map_gz_file(self.map_file)
+
+        dm = DataManager()
+        model = dm.get_model(self.pdb_file)
+        self.map_manager = self.map_mesh.load_map_file(self.map_file)
+        self.map_model_manager = map_model_manager(model=model, map_manager=self.map_manager)
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
@@ -106,21 +114,15 @@ class MapMeshTestCase(unittest.TestCase):
         self.map_mesh.add_map_gz_file(self.map_file)
         self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
 
-    def test_load_no_limit_view(self):
-        """Validate that running load() generates the NanomeMesh.
-
-        when radius is set to -1, the mesh should be generated for the entire map.
+    def test_load(self):
+        """Validate that running load() generates the MapMesh.
         """
         async def validate_load(self):
-            map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 285798
             expected_normals = 537129
             expected_triangles = 537129
-            self.map_mesh.add_map_gz_file(map_file)
             isovalue = 0.2
             opacity = 0.65
-            radius = -1  # Indicates no limit view
-            position = 0.1
 
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
@@ -129,7 +131,8 @@ class MapMeshTestCase(unittest.TestCase):
             self.assertEqual(len(mesh.vertices), 0)
             self.assertEqual(len(mesh.normals), 0)
             self.assertEqual(len(mesh.triangles), 0)
-            await self.map_mesh.load(isovalue, opacity, radius, position)
+            await self.map_mesh.load(self.map_manager, isovalue, opacity)
+            mesh = self.map_mesh.mesh
             self.assertEqual(len(mesh.vertices), expected_vertices)
             self.assertEqual(len(mesh.normals), expected_normals)
             self.assertEqual(len(mesh.triangles), expected_triangles)
