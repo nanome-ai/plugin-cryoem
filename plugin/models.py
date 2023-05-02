@@ -395,6 +395,12 @@ class MapGroup:
                 res for res in model_comp.residues
                 if any([atom.selected for atom in res.atoms])
             ]
+        if not selected_residues:
+            Logs.warning("No residues selected on model")
+            self._plugin.send_notification(
+                enums.NotificationTypes.warning, "No residues selected on model.")
+            return
+
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)

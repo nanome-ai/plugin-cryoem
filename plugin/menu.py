@@ -321,13 +321,13 @@ class EditMeshMenu:
         self.btn_show_full_map.disable_on_press = True
         self.btn_show_full_map.register_pressed_callback(self.show_full_map)
         
-        self.btn_extract_around_model: ui.Button = root.find_node('btn_extract_around_model').get_content()
-        self.btn_extract_around_model.disable_on_press = True
-        self.btn_extract_around_model.register_pressed_callback(self.extract_around_model)
+        self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
+        self.btn_box_around_model.disable_on_press = True
+        self.btn_box_around_model.register_pressed_callback(self.box_map_around_model)
 
-        self.btn_extract_around_selection: ui.Button = root.find_node('btn_extract_around_selection').get_content()
-        self.btn_extract_around_selection.disable_on_press = True
-        self.btn_extract_around_selection.register_pressed_callback(self.extract_around_selection)
+        self.btn_box_around_selection: ui.Button = root.find_node('btn_box_around_selection').get_content()
+        self.btn_box_around_selection.disable_on_press = True
+        self.btn_box_around_selection.register_pressed_callback(self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
@@ -425,13 +425,13 @@ class EditMeshMenu:
         self._plugin.update_content(btn)
 
     @async_callback
-    async def extract_around_selection(self, btn: ui.Button):
+    async def box_map_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
         await self.map_group.generate_mesh_around_selection()
         self._plugin.update_content(btn)
 
     @async_callback
-    async def extract_around_model(self, btn):
+    async def box_map_around_model(self, btn):
         Logs.message("Extracting map around model...")
         await self.map_group.generate_mesh_around_model()
         self._plugin.update_content(btn)
