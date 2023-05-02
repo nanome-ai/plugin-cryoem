@@ -53,9 +53,9 @@ class MapGroupTestCase(unittest.TestCase):
         run_awaitable(validate_add_map_gz, self)
 
     @patch('nanome._internal.network.PluginNetwork._instance', return_value=asyncio.Future())
-    def test_generate_mesh(self, instance_mock):
+    def test_generate_full_mesh(self, instance_mock):
         # Assert that attributes are set after load_map called.
-        async def validate_generate_mesh(self):
+        async def validate_generate_full_mesh(self):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
             self.plugin.add_to_workspace.return_value = fut
@@ -65,9 +65,9 @@ class MapGroupTestCase(unittest.TestCase):
             # Make sure vertices are added to mesh
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
             await self.map_group.add_map_gz(map_file)
-            await self.map_group.generate_mesh()
+            await self.map_group.generate_full_mesh()
             self.assertEqual(len(self.map_group.map_mesh.computed_vertices), expected_vertices)
-        run_awaitable(validate_generate_mesh, self)
+        run_awaitable(validate_generate_full_mesh, self)
 
     def test_generate_histogram(self):
         # Assert that attributes are set after load_map called.
@@ -78,7 +78,7 @@ class MapGroupTestCase(unittest.TestCase):
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             await self.map_group.add_map_gz(map_file)
-            await self.map_group.generate_mesh()
+            await self.map_group.generate_full_mesh()
             with tempfile.TemporaryDirectory() as tmpdir:
                 png_file = self.map_group.generate_histogram(tmpdir)
                 self.assertTrue(os.path.exists(png_file))
