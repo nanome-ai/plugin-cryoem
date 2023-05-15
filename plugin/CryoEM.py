@@ -133,19 +133,3 @@ class CryoEM(nanome.AsyncPluginInstance):
             residue.remove_atom(atom)
             for bond in atom.bonds:
                 residue.remove_bond(bond)
-
-
-def main():
-    plugin = nanome.Plugin(
-        "Cryo-EM",
-        "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces",
-        "other",
-        False,
-        version=__version__
-    )
-    plugin.set_plugin_class(CryoEM)
-    plugin.run()
-
-
-if __name__ == "__main__":
-    main()
