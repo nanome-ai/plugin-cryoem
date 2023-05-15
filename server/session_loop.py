@@ -1,0 +1,74 @@
+import os
+import asyncio
+import json
+import logging
+import sys
+from nanome._internal.network import Packet
+from nanome.api.serializers import CommandMessageSerializer
+
+from nanome.api.control.messages import Run
+import utils
+
+# Make sure plugin folder is in path
+filepath = os.path.dirname(os.path.abspath(__file__))
+parent_dir = sys.path.append(os.path.join(filepath, ".."))
+sys.path.append(parent_dir)
+from plugin import plugin_class
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(name="SessionInstance")
+
+__all__ = ["start"]
+
+
+async def start_session(plugin_instance, plugin_id, session_id, version_table):
+    logger.info("Starting Session!")
+    await plugin_instance.client.send_connect(plugin_id, session_id, version_table)
+    await start_session_loop(plugin_instance)
+
+
+async def start_session_loop(plugin_instance):
+    await plugin_instance.on_start()
+    reader = plugin_instance.client.reader
+    tasks = []
+    while True:
+        logger.debug("Waiting for input...")
+        received_bytes = await reader.readexactly(Packet.packet_header_length)
+        unpacked = Packet.header_unpack(received_bytes)
+        payload_length = unpacked[4]
+        received_bytes += await reader.readexactly(payload_length)
+        packet = utils.receive_bytes(received_bytes)
+        task = await route_incoming_payload(packet.payload, plugin_instance)
+        if task:
+            tasks.append(task)
+        await asyncio.sleep(0.1)
+
+
+async def route_incoming_payload(payload, plugin_instance):
+    logger.debug("Routing Payload")
+    serializer = CommandMessageSerializer()
+    received_obj_list, command_hash, request_id = serializer.deserialize_command(
+        payload, plugin_instance.version_table)
+    command = CommandMessageSerializer._commands[command_hash]
+    logger.debug(f"Command: {command.name()}")
+    logger.debug(f"Request ID: {request_id}")
+    if request_id in plugin_instance.request_futs:
+        fut = plugin_instance.request_futs[request_id]
+        fut.set_result(received_obj_list)
+
+    if isinstance(command, Run):
+        logger.info("on_run_called")
+        task = asyncio.create_task(plugin_instance.on_run())
+        return task
+
+
+if __name__ == "__main__":
+    plugin_id = int(sys.argv[1])
+    session_id = int(sys.argv[2])
+    plugin_class_filepath = sys.argv[3]
+    version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
+    logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
+    plugin_instance = plugin_class(plugin_id, session_id, version_table)
+    session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
+    loop = asyncio.get_event_loop()
+    session_loop = loop.run_until_complete(session_coro)
