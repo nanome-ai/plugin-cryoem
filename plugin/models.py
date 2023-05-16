@@ -113,7 +113,7 @@ class MapMesh:
             # Create complex to attach mesh to.
             self.complex.boxed = True
             self.complex.locked = True
-            [self.complex] = await self._plugin.add_to_workspace([self.complex])
+            [self.complex] = await self._plugin.client.add_to_workspace([self.complex])
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
@@ -122,7 +122,7 @@ class MapMesh:
             comp_index = self.complex.index
             new_comp.index = comp_index
             self.complex = new_comp
-            await self._plugin.update_structures_deep([self.complex])
+            await self._plugin.client.update_structures_deep([self.complex])
 
     @staticmethod
     def load_map_file(map_gz_file):
@@ -390,7 +390,7 @@ class MapGroup:
             ]
         if not selected_residues:
             Logs.warning("No residues selected on model")
-            self._plugin.send_notification(
+            self._plugin.client.send_notification(
                 enums.NotificationTypes.warning, "No residues selected on model.")
             return
 
@@ -551,7 +551,7 @@ class MapGroup:
         if self.map_complex in comp_list:
             comps_to_delete.append(self.map_complex)
             self.map_mesh = MapMesh(self._plugin)
-        self._plugin.remove_from_workspace(comps_to_delete)
+        self._plugin.client.remove_from_workspace(comps_to_delete)
 
     def _set_hist_x_min_max(self):
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -559,7 +559,7 @@ class MapGroup:
         self.hist_x_max = np.max(flat)
 
     async def refresh_model_complex(self):
-        [self.__model_complex] = await self._plugin.request_complexes([self.model_complex.index])
+        [self.__model_complex] = await self._plugin.client.request_complexes([self.model_complex.index])
 
     async def extract_around_selection(self):
         # Compute iso-surface with marching cubes algorithm

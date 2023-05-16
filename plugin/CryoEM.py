@@ -96,7 +96,7 @@ class CryoEM:
         await mapgroup.add_map_gz(map_gz_filepath)
         if mapgroup.model_complex:
             # Get latest position of model complex
-            [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
+            [deep_comp] = await self.client.request_complexes([mapgroup.model_complex.index])
             if not deep_comp:
                 Logs.warning("model complex was deleted.")
             else:
@@ -115,7 +115,7 @@ class CryoEM:
         if model_comp:
             comps_to_delete.append(model_comp)
         if comps_to_delete:
-            await self.remove_from_workspace(comps_to_delete)
+            await self.client.remove_from_workspace(comps_to_delete)
         try:
             self.groups.remove(map_group)
         except ValueError:

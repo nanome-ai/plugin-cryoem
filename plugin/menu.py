@@ -113,7 +113,7 @@ class MainMenu:
         for item in self.lst_groups.items:
             btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
             btn.selected = btn._content_id == selected_btn._content_id
-        self._plugin.update_content(self.lst_groups)
+        self._plugin.client.update_content(self.lst_groups)
 
     def get_selected_mapgroup(self):
         for item in self.lst_groups.items:
@@ -125,14 +125,14 @@ class MainMenu:
     def open_edit_mesh_menu(self, map_group, btn=None):
         if not map_group.has_map():
             msg = "Please add Map from EMDB before opening menu"
-            self._plugin.send_notification(enums.NotificationTypes.warning, msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
             Logs.warning('Tried to open menu before adding map.')
             return
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
-    @async_callback
+    # @async_callback
     async def delete_group(self, map_group, btn):
         Logs.message(f'Deleting group {map_group.group_name}')
         await self._plugin.delete_mapgroup(map_group)
@@ -142,10 +142,10 @@ class MainMenu:
         map_group.visible = not map_group.visible
         btn.icon.value.set_all(
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-        self._plugin.update_content(btn)
-        self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
+        self._plugin.client.update_content(btn)
+        self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
-    @async_callback
+    # @async_callback
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
@@ -153,7 +153,7 @@ class MainMenu:
         # Disable RCSB button
         self.btn_embl_submit.unusable = True
         self.btn_embl_submit.text.value.unusable = "Load"
-        self._plugin.update_content(self.btn_embl_submit)
+        self._plugin.client.update_content(self.btn_embl_submit)
 
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
@@ -163,9 +163,9 @@ class MainMenu:
         # Reenable embl search button
         self.btn_embl_submit.unusable = False
         self.btn_embl_submit.text.value.unusable = "Downloading..."
-        self._plugin.update_content(self.btn_embl_submit, btn)
+        self._plugin.client.update_content(self.btn_embl_submit, btn)
 
-    @async_callback
+    # @async_callback
     async def on_emdb_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMDB query: {embid_id}")
@@ -173,7 +173,7 @@ class MainMenu:
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
         self.btn_rcsb_submit.text.value.unusable = "Load"
-        self._plugin.update_content(self.btn_rcsb_submit)
+        self._plugin.client.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
             # Validate file size is within limit.
@@ -191,10 +191,10 @@ class MainMenu:
             map_file = self.download_mapgz_from_emdbid(embid_id, metadata_parser)
             isovalue = metadata_parser.isovalue
             # Update message to say generating mesh
-            self._plugin.update_content(btn)
+            self._plugin.client.update_content(btn)
             btn.text.value.unusable = "Generating..."
             btn.unusable = True
-            self._plugin.update_content(btn)
+            self._plugin.client.update_content(btn)
 
             await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
 
@@ -204,13 +204,13 @@ class MainMenu:
             else:
                 pdb_id = ""
             self.ti_rcsb_query.input_text = pdb_id
-            self._plugin.update_content(self.ti_rcsb_query)
+            self._plugin.client.update_content(self.ti_rcsb_query)
         # Reenable rcsb load button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
         btn.text.value.unusable = "Downloading..."
         btn.unusable = False
-        self._plugin.update_content(self.btn_rcsb_submit, btn)
+        self._plugin.client.update_content(self.btn_rcsb_submit, btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -240,7 +240,7 @@ class MainMenu:
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
         # Set up loading bar
         self.lb_embl_download.enabled = True
-        self._plugin.update_node(self.lb_embl_download)
+        self._plugin.client.update_node(self.lb_embl_download)
         loading_bar = self.lb_embl_download.get_content()
 
         file_size = metadata_parser.map_filesize
@@ -262,11 +262,11 @@ class MainMenu:
                         self.btn_embl_submit.text.value.unusable = \
                             f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
                         self.btn_embl_submit.unusable = True
-                        self._plugin.update_content(loading_bar, self.btn_embl_submit)
+                        self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
                         data_check = now
         loading_bar.percentage = 0
         self.lb_embl_download.enabled = False
-        self._plugin.update_node(self.lb_embl_download)
+        self._plugin.client.update_node(self.lb_embl_download)
         return file_path
 
     def on_browse_emdb(self, btn):
@@ -279,7 +279,7 @@ class MainMenu:
             'sort': 'release_date desc'
         })
         url = f"{base_search_url}/{query}?{query_params}"
-        self._plugin.open_url(url)
+        self._plugin.client.open_url(url)
 
 
 class EditMeshMenu:
@@ -367,19 +367,24 @@ class EditMeshMenu:
         self.set_opacity_ui(self.map_group.opacity)
 
         if map_group.has_map():
-            self.set_isovalue_slider_min_max(map_group)
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
+            self._plugin.client.update_content(self.sld_isovalue)
+
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
-        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
-        self.dd_color_scheme.permanent_title = color_scheme_text
-        self._plugin.update_menu(self._menu)
-        if map_group.has_map() and not map_group.png_tempfile:
-            # Generate histogram and add to menu.
-            map_group.generate_histogram(self.temp_dir)
+            self._plugin.client.update_node(self.ln_img_histogram)
+            thread = Thread(
+                target=self.generate_histogram_thread,
+                args=[map_group])
+            thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-        self.set_isovalue_slider_min_max(map_group)
-        self._plugin.update_node(self.ln_img_histogram)
+            self._plugin.client.update_node(self.ln_img_histogram)
+
+        color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
+        self.dd_color_scheme.permanent_title = color_scheme_text
+        self._plugin.client.update_menu(self._menu)
 
     def set_isovalue_ui(self, map_group):
         self.set_isovalue_slider_min_max(map_group)
@@ -392,7 +397,7 @@ class EditMeshMenu:
     def update_isovalue_lbl(self, sld):
         slider_value = self.get_isovalue_from_slider()
         self.lbl_isovalue.text_value = f'{round(slider_value, 3)} A'
-        self._plugin.update_content(self.lbl_isovalue, sld)
+        self._plugin.client.update_content(self.lbl_isovalue, sld)
 
         # /!\ calculation is sensitive to menu and image dimensions
         # position histogram line based on isovalue
@@ -404,42 +409,42 @@ class EditMeshMenu:
             x = (current_value - x_min) / (x_max - x_min)
             left = (100 + x * 620) / 800
             self.ln_isovalue_line.set_padding(left=left)
-            self._plugin.update_node(self.ln_isovalue_line)
+            self._plugin.client.update_node(self.ln_isovalue_line)
 
     def update_opacity_lbl(self, sld):
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
-        self._plugin.update_content(self.lbl_opacity, sld)
+        self._plugin.client.update_content(self.lbl_opacity, sld)
 
     def sld_radius_update(self, sld):
         sld_current_val = sld.current_value
         self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
-        self._plugin.update_content(self.lbl_radius, sld)
+        self._plugin.client.update_content(self.lbl_radius, sld)
 
-    @async_callback
+    # @async_callback
     async def show_full_map(self, btn):
         Logs.message("Showing full map...")
         await self.map_group.generate_full_mesh()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
+    # @async_callback
     async def box_map_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
         await self.map_group.generate_mesh_around_selection()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
+    # @async_callback
     async def box_map_around_model(self, btn):
         Logs.message("Extracting map around model...")
         await self.map_group.generate_mesh_around_model()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
+    # @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
 
-    @async_callback
+    # @async_callback
     async def redraw_map(self, btn=None):
         self.map_group.isovalue = self.get_isovalue_from_slider()
         self.map_group.opacity = self.opacity
@@ -447,14 +452,14 @@ class EditMeshMenu:
         if self.map_group.has_map():
             await self.map_group.redraw_mesh()
 
-    @async_callback
+    # @async_callback
     async def redraw_new_isovalue(self, btn):
         rendered_isovalue = self.sld_isovalue.current_value
         await self.redraw_map(btn)
         # Set slider back to initial value, in case user
         # moved it while map was being redrawn
         self.sld_isovalue.current_value = rendered_isovalue
-        self._plugin.update_content(btn, self.sld_isovalue)
+        self._plugin.client.update_content(btn, self.sld_isovalue)
 
     @property
     def temp_dir(self):
@@ -465,8 +470,8 @@ class EditMeshMenu:
         self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min
         self.sld_isovalue.max_value = map_group.hist_x_max
-        self._plugin.update_node(self.ln_img_histogram)
-        self._plugin.update_content(self.sld_isovalue)
+        self._plugin.client.update_node(self.ln_img_histogram)
+        self._plugin.client.update_content(self.sld_isovalue)
 
     @property
     def opacity(self):
@@ -487,10 +492,10 @@ class EditMeshMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    @async_callback
+    # @async_callback
     async def set_color_scheme(self, *args):
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
-        self._plugin.update_content(self.dd_color_scheme)
+        self._plugin.client.update_content(self.dd_color_scheme)
         await self.map_group.update_color(self.color_scheme, self.opacity)
 
     def delete_group_objects(self, btn: ui.Button):
