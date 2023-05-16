@@ -339,10 +339,8 @@ class MapGroup:
         kwargs = {
             'ignore_symmetry_conflicts': True
         }
-        model = None
         if hasattr(self, '_model') and self._model:
-            model = self._model
-            kwargs['model'] = model
+            kwargs['model'] = self._model
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)

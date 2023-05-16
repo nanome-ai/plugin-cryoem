@@ -11,7 +11,7 @@ import utils
 
 # Make sure plugin folder is in path
 filepath = os.path.dirname(os.path.abspath(__file__))
-parent_dir = sys.path.append(os.path.join(filepath, ".."))
+parent_dir = os.path.join(filepath, "..")
 sys.path.append(parent_dir)
 from plugin import plugin_class
 
@@ -68,7 +68,11 @@ if __name__ == "__main__":
     plugin_class_filepath = sys.argv[3]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
     logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
-    plugin_instance = plugin_class(plugin_id, session_id, version_table)
+
+    plugin_instance = plugin_class()
+    plugin_instance.plugin_id = plugin_id
+    plugin_instance.session_id = session_id
+    plugin_instance.version_table = version_table
     session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)

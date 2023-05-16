@@ -137,11 +137,10 @@ class Plugin_2_0:
         self.logger.info(f"Starting process for Session {session_id}")
         # env = os.environ.copy()
         # imported_modules = list(sys.modules.keys())
-        env = dict()
-        env.update({
+        env = {
             'NANOME_VERSION_TABLE': json.dumps(version_table),
             # 'IMPORTED_MODULES': json.dumps(imported_modules)
-        })
+        }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(
             sys.executable, 'server/session_loop.py', str(plugin_id), str(session_id), plugin_class_filepath,
@@ -158,7 +157,6 @@ class Plugin_2_0:
         self.logger.debug(f"Packet payload length: {payload_length}")
 
         connect_data += await session_process.stdout.read(payload_length)
-
 
         self.logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
         self.nts_writer.write(connect_data)
