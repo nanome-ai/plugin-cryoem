@@ -30,9 +30,6 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
 
 async def start_session_loop(plugin_instance):
     await plugin_instance.on_start()
-    logger.debug(plugin_instance)
-    logger.debug(plugin_instance.client)
-    logger.debug(f"Reader: {plugin_instance.client.reader}")
     reader = plugin_instance.client.reader
     tasks = []
     while True:

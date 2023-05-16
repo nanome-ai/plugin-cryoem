@@ -166,9 +166,8 @@ class Plugin_2_0:
             # Load header, and then payload
             outgoing_bytes = await process.stdout.read(Packet.packet_header_length)
             if not outgoing_bytes:
-                logger.debug("No outgoing bytes")
-                await asyncio.sleep(0.1)
-                continue
+                logger.debug("No outgoing bytes. Ending polling task.")
+                break
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
             outgoing_bytes += await process.stdout.read(payload_length)
             self.nts_writer.write(outgoing_bytes)

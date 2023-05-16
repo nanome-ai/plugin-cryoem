@@ -10,6 +10,10 @@ from nanome.util import async_callback, enums, Logs
 from .models import MapGroup
 from .utils import EMDBMetadataParser
 
+import logging 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
 EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
@@ -65,9 +69,8 @@ class MainMenu:
         # By default, select the first group
         if groups and not selected_mapgroup:
             selected_mapgroup = groups[0]
-
         self.render_map_groups(groups, selected_mapgroup)
-        self._plugin.update_menu(self._menu)
+        self._plugin.client.update_menu(self._menu)
 
     @property
     def temp_dir(self):
@@ -103,7 +106,7 @@ class MainMenu:
             btn_toggle.register_pressed_callback(partial(self.toggle_group, map_group))
 
             self.lst_groups.items.append(ln)
-        self._plugin.update_content(self.lst_groups)
+        self._plugin.client.update_content(self.lst_groups)
 
     def select_mapgroup(self, selected_btn: ui.Button):
         Logs.message('Selecting map group')

@@ -11,7 +11,7 @@ from .models import MapGroup
 from .session_client import SessionClient
 
 
-class CryoEM(nanome.AsyncPluginInstance):
+class CryoEM:
 
     async def on_start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -24,7 +24,7 @@ class CryoEM(nanome.AsyncPluginInstance):
     def on_stop(self):
         self.temp_dir.cleanup()
 
-    @async_callback
+    # @async_callback
     async def on_run(self):
         self.menu.render(force_enable=True)
 
@@ -136,3 +136,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             residue.remove_atom(atom)
             for bond in atom.bonds:
                 residue.remove_bond(bond)
+
+    @property
+    def request_futs(self):
+        return self.client.request_futs
