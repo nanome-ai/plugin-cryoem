@@ -9,7 +9,7 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
-from server.utils import get_env_data_as_dict, receive_bytes
+from server.utils import receive_bytes
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -58,7 +58,7 @@ class Plugin_2_0:
         """Send a packet to NTS to register plugin."""
         environ = os.environ
         key = environ["NTS_KEY"]
-        name = "[wip]-cryo-em-2"
+        name = environ['PLUGIN_NAME']
         category = ""
         tags = []
         has_advanced = False
@@ -135,11 +135,8 @@ class Plugin_2_0:
         plugin_id = packet.plugin_id
         session_id = packet.session_id
         self.logger.info(f"Starting process for Session {session_id}")
-        # env = os.environ.copy()
-        # imported_modules = list(sys.modules.keys())
         env = {
             'NANOME_VERSION_TABLE': json.dumps(version_table),
-            # 'IMPORTED_MODULES': json.dumps(imported_modules)
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(
@@ -168,6 +165,10 @@ class Plugin_2_0:
         while True:
             # Load header, and then payload
             outgoing_bytes = await process.stdout.read(Packet.packet_header_length)
+            if not outgoing_bytes:
+                logger.debug("No outgoing bytes")
+                await asyncio.sleep(0.1)
+                continue
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
             outgoing_bytes += await process.stdout.read(payload_length)
             self.nts_writer.write(outgoing_bytes)

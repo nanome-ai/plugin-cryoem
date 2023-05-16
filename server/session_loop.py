@@ -5,6 +5,7 @@ import logging
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
+from session_client import SessionClient
 
 from nanome.api.control.messages import Run
 import utils
@@ -18,7 +19,7 @@ from plugin import plugin_class
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(name="SessionInstance")
 
-__all__ = ["start"]
+__all__ = ["start_session"]
 
 
 async def start_session(plugin_instance, plugin_id, session_id, version_table):
@@ -29,6 +30,9 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
 
 async def start_session_loop(plugin_instance):
     await plugin_instance.on_start()
+    logger.debug(plugin_instance)
+    logger.debug(plugin_instance.client)
+    logger.debug(f"Reader: {plugin_instance.client.reader}")
     reader = plugin_instance.client.reader
     tasks = []
     while True:
@@ -68,11 +72,12 @@ if __name__ == "__main__":
     plugin_class_filepath = sys.argv[3]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
     logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
-
+    logger.info(f'Plugin Class {plugin_class.__name__}')
     plugin_instance = plugin_class()
     plugin_instance.plugin_id = plugin_id
     plugin_instance.session_id = session_id
     plugin_instance.version_table = version_table
+    plugin_instance.client = SessionClient(plugin_id, session_id, version_table)
     session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)

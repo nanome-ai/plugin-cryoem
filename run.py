@@ -12,7 +12,7 @@ def main():
     port = int(os.environ['NTS_PORT'])
     name = "Cryo-EM"
     description = "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces"
-    plugin_class = HelloNanomePlugin
+    plugin_class = CryoEM
     asyncio.run(plugin.run(host, port, name, description, plugin_class))
 
 

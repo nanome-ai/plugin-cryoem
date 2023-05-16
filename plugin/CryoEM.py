@@ -8,15 +8,18 @@ from nanome.api import structure
 from . import __version__
 from .menu import MainMenu
 from .models import MapGroup
+from .session_client import SessionClient
 
 
 class CryoEM(nanome.AsyncPluginInstance):
 
-    def start(self):
+    async def on_start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.groups = []
+        self.client = SessionClient(self.plugin_id, self.session_id, self.version_table)
         self.add_mapgroup()
+        await self.client.connect_stdin_stdout()
 
     def on_stop(self):
         self.temp_dir.cleanup()

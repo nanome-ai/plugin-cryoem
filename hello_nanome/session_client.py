@@ -12,7 +12,6 @@ import server.utils as utils
 class SessionClient:
     """Provides API for connecting to a Nanome session."""
 
-
     def __init__(self, plugin_id, session_id, version_table):
         self.version_table = version_table
         self.plugin_id = plugin_id

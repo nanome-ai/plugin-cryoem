@@ -18,6 +18,7 @@ class HelloNanomePlugin:
         self.session_id = session_id
         self.version_table = version_table
         self.client = SessionClient(self.plugin_id, self.session_id, self.version_table)
+        self.client.send_connect(plugin_id, session_id, version_table)
         self.menu = None
         self.label = None
 

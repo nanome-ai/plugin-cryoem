@@ -6,7 +6,7 @@ from nanome.api.serializers import CommandMessageSerializer
 from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
-from . import server_utils as utils
+import utils
 
 
 class SessionClient:
@@ -19,9 +19,6 @@ class SessionClient:
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
         self.reader = self.writer = None
-
-    async def connect_stdin_stdout(self):
-        self.reader, self.writer = await connect_stdin_stdout()
 
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
