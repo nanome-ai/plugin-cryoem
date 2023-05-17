@@ -39,8 +39,9 @@ class MainMenu:
         root: ui.LayoutNode = self._menu.root
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
+        client = self._plugin.client
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        self._plugin.client.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
+        client.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
@@ -48,8 +49,8 @@ class MainMenu:
         self.btn_embl_submit.disable_on_press = True
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
-        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
+        client.register_btn_pressed_callback(self.btn_rcsb_submit, self.on_rcsb_submit)
+        client.register_btn_pressed_callback(self.btn_embl_submit, self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
@@ -60,7 +61,7 @@ class MainMenu:
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
-        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
+        client.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
     def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
