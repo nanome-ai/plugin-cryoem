@@ -2,7 +2,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import nanome
 from nanome.util import Logs, enums, async_callback
 from nanome.api import structure
 from . import __version__

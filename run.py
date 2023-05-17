@@ -1,7 +1,6 @@
 import asyncio
 import os
 from plugin import CryoEM
-from hello_nanome.HelloNanome import HelloNanomePlugin
 from server.plugin_2_0 import Plugin_2_0
 
 

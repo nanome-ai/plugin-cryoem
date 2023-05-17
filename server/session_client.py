@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import sys
+from collections import defaultdict
 from nanome.api import ui
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
-import utils
+from nanome.api.ui.messages import UIHook
+from server import utils
 
 
 class SessionClient:
@@ -19,6 +21,10 @@ class SessionClient:
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
         self.reader = self.writer = None
+        self.callbacks = defaultdict(dict)  # {content_id: {hook_type: callback_fn}}
+
+    async def connect_stdin_stdout(self):
+        self.reader, self.writer = await connect_stdin_stdout()
 
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
@@ -296,6 +302,17 @@ class SessionClient:
             self.request_futs[request_id] = fut
         self.writer.write(pack)
         return request_id
+
+    def register_btn_pressed_callback(self, btn: ui.Button, callback_fn):
+        # hook_ui_callback = Messages.hook_ui_callback
+        ui_hook = 'button_press'  # Not acutally enumerated anywhere
+        content_id = btn._content_id
+        self.callbacks[content_id][ui_hook] = callback_fn
+        # btn._pressed_callback = callback_fn
+        # self._send_message(
+        #     hook_ui_callback,
+        #     [ui_hook, content_id],
+        #     expects_response=False)
 
 
 async def connect_stdin_stdout():

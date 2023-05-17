@@ -38,8 +38,9 @@ class MainMenu:
 
         root: ui.LayoutNode = self._menu.root
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        self.btn_add_group.register_pressed_callback(self.add_mapgroup)
+        self._plugin.client.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()

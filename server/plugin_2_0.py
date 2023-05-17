@@ -140,9 +140,10 @@ class Plugin_2_0:
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(
-            sys.executable, 'server/session_loop.py', str(plugin_id), str(session_id), plugin_class_filepath,
+            sys.executable, 'session_loop.py', str(plugin_id), str(session_id), plugin_class_filepath,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
+            cwd=os.getcwd(),
             env=env)
         connect_data = await session_process.stdout.read(Packet.packet_header_length)
         try:

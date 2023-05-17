@@ -1,14 +1,15 @@
 import os
 import asyncio
+import inspect
 import json
 import logging
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from session_client import SessionClient
+from server.session_client import SessionClient
 
-from nanome.api.control.messages import Run
-import utils
+from nanome.api import control, ui
+from server import utils
 
 # Make sure plugin folder is in path
 filepath = os.path.dirname(os.path.abspath(__file__))
@@ -57,10 +58,24 @@ async def route_incoming_payload(payload, plugin_instance):
         fut = plugin_instance.request_futs[request_id]
         fut.set_result(received_obj_list)
 
-    if isinstance(command, Run):
+    if isinstance(command, control.messages.Run):
         logger.info("on_run_called")
         task = asyncio.create_task(plugin_instance.on_run())
         return task
+    elif isinstance(command, ui.messages.ButtonCallback):
+        logger.info("Button Clicked.")
+        ui_hook_name = 'button_press'
+        # See if we have a registered callback for this button
+        content_id, is_selected = received_obj_list
+        callback_fn = plugin_instance.client.callbacks[content_id].get(ui_hook_name)
+        if callback_fn:
+            # Call the callback
+            if inspect.iscoroutinefunction(callback_fn):
+                await callback_fn(content_id)
+            else:
+                callback_fn(content_id)
+        else:
+            logger.warning(f"No callback registered for button {content_id}")
 
 
 if __name__ == "__main__":
