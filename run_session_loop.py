@@ -65,7 +65,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     elif isinstance(command, ui.messages.ButtonCallback):
         logger.info("Button Clicked.")
         # See if we have a registered callback for this button
-        content_id, is_selected = received_obj_list
+        content_id, _ = received_obj_list
         callback_fn = None
         menu_btn = None
         for btn in SessionClient.callbacks:
