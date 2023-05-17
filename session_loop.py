@@ -26,10 +26,10 @@ __all__ = ["start_session"]
 async def start_session(plugin_instance, plugin_id, session_id, version_table):
     logger.info("Starting Session!")
     await plugin_instance.client.send_connect(plugin_id, session_id, version_table)
-    await start_session_loop(plugin_instance)
+    await _start_session_loop(plugin_instance)
 
 
-async def start_session_loop(plugin_instance):
+async def _start_session_loop(plugin_instance):
     await plugin_instance.on_start()
     reader = plugin_instance.client.reader
     tasks = []
@@ -40,13 +40,13 @@ async def start_session_loop(plugin_instance):
         payload_length = unpacked[4]
         received_bytes += await reader.readexactly(payload_length)
         packet = utils.receive_bytes(received_bytes)
-        task = await route_incoming_payload(packet.payload, plugin_instance)
+        task = await _route_incoming_payload(packet.payload, plugin_instance)
         if task:
             tasks.append(task)
         await asyncio.sleep(0.1)
 
 
-async def route_incoming_payload(payload, plugin_instance):
+async def _route_incoming_payload(payload, plugin_instance):
     logger.debug("Routing Payload")
     serializer = CommandMessageSerializer()
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
