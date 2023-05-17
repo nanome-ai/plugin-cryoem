@@ -91,21 +91,30 @@ class MainMenu:
 
             btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
             btn_add_to_map.toggle_on_press = True
-            btn_add_to_map.register_pressed_callback(self.select_mapgroup)
+            self._plugin.client.register_btn_pressed_callback(
+                btn_add_to_map, self.select_mapgroup)
             btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
             ln_group_details = ln.find_node('ln_group_details')
             edit_mesh_btn: ui.Button = ln_group_details.get_content()
-            edit_mesh_btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
+            self._plugin.client.register_btn_pressed_callback(
+                edit_mesh_btn, partial(self.open_edit_mesh_menu, map_group))
+            self._plugin.client.register_btn_pressed_callback(
+                edit_mesh_btn,
+                partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
-            btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
+            self._plugin.client.register_btn_pressed_callback(
+                btn_delete,
+                partial(self.delete_group, map_group))
 
             btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
             btn_toggle.icon.value.set_all(
                 VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-            btn_toggle.register_pressed_callback(partial(self.toggle_group, map_group))
+            self._plugin.client.register_btn_pressed_callback(
+                btn_toggle,
+                partial(self.toggle_group, map_group))
 
             self.lst_groups.items.append(ln)
         self._plugin.client.update_content(self.lst_groups)
@@ -301,7 +310,7 @@ class EditMeshMenu:
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
-        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
+        self._plugin.client.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
         self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
 
@@ -326,15 +335,18 @@ class EditMeshMenu:
 
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
         self.btn_show_full_map.disable_on_press = True
-        self.btn_show_full_map.register_pressed_callback(self.show_full_map)
+        self._plugin.client.register_btn_pressed_callback(
+            self.btn_show_full_map, self.show_full_map)
 
         self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
         self.btn_box_around_model.disable_on_press = True
-        self.btn_box_around_model.register_pressed_callback(self.box_map_around_model)
+        self._plugin.client.register_btn_pressed_callback(
+            self.btn_box_around_model, self.box_map_around_model)
 
         self.btn_box_around_selection: ui.Button = root.find_node('btn_box_around_selection').get_content()
         self.btn_box_around_selection.disable_on_press = True
-        self.btn_box_around_selection.register_pressed_callback(self.box_map_around_selection)
+        self._plugin.client.register_btn_pressed_callback(
+            self.btn_box_around_selection, self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 3)})'

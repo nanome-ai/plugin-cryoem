@@ -20,14 +20,25 @@ class SessionClient:
         self.session_id = session_id
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
-        self.reader = self.writer = None
+        self.reader = self.writer = None        
 
     async def connect_stdin_stdout(self):
-        self.reader, self.writer = await connect_stdin_stdout()
+        """Wrap stdin and stdout in StreamReader and StreamWriter interface.
+
+        allows async reading and writing.
+        """
+        loop = asyncio.get_event_loop()
+        reader = asyncio.StreamReader(limit=2**32)
+        protocol = asyncio.StreamReaderProtocol(reader)
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+        w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
+        writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
+        self.reader = reader
+        self.writer = writer
 
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
-        SessionClient._menus[menu.index] = menu
+        self._menus[menu.index] = menu
         message_type = Messages.menu_update
         expects_response = False
         args = [menu, shallow]
@@ -45,7 +56,7 @@ class SessionClient:
         return result
 
     async def send_connect(self, plugin_id, session_id, version_table):
-        self.reader, self.writer = await connect_stdin_stdout()
+        await self.connect_stdin_stdout()
         self.logger.debug("Sending Connect")
         serializer = CommandMessageSerializer()
         message_type = Messages.connect
@@ -311,17 +322,3 @@ class SessionClient:
             cls.callbacks[btn] = dict()
         cls.callbacks[btn][ui_hook] = callback_fn
         btn._pressed_callback = callback_fn
-
-
-async def connect_stdin_stdout():
-    """Wrap stdin and stdout in StreamReader and StreamWriter interface.
-
-    allows async reading and writing.
-    """
-    loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader(limit=2**32)
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-    w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
-    writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
-    return reader, writer
