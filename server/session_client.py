@@ -1,18 +1,18 @@
 import asyncio
 import logging
 import sys
-from collections import defaultdict
 from nanome.api import ui
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
-from nanome.api.ui.messages import UIHook
 from server import utils
 
 
 class SessionClient:
     """Provides API for connecting to a Nanome session."""
+    callbacks = dict()  # {content_id: {hook_type: callback_fn}}
+    _menus = dict()  # {menu_index: menu}
 
     def __init__(self, plugin_id, session_id, version_table):
         self.version_table = version_table
@@ -21,13 +21,13 @@ class SessionClient:
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
         self.reader = self.writer = None
-        self.callbacks = defaultdict(dict)  # {content_id: {hook_type: callback_fn}}
 
     async def connect_stdin_stdout(self):
         self.reader, self.writer = await connect_stdin_stdout()
 
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
+        SessionClient._menus[menu.index] = menu
         message_type = Messages.menu_update
         expects_response = False
         args = [menu, shallow]
@@ -303,16 +303,14 @@ class SessionClient:
         self.writer.write(pack)
         return request_id
 
-    def register_btn_pressed_callback(self, btn: ui.Button, callback_fn):
+    @classmethod
+    def register_btn_pressed_callback(cls, btn: ui.Button, callback_fn):
         # hook_ui_callback = Messages.hook_ui_callback
         ui_hook = 'button_press'  # Not acutally enumerated anywhere
-        content_id = btn._content_id
-        self.callbacks[content_id][ui_hook] = callback_fn
-        # btn._pressed_callback = callback_fn
-        # self._send_message(
-        #     hook_ui_callback,
-        #     [ui_hook, content_id],
-        #     expects_response=False)
+        if btn not in cls.callbacks:
+            cls.callbacks[btn] = dict()
+        cls.callbacks[btn][ui_hook] = callback_fn
+        btn._pressed_callback = callback_fn
 
 
 async def connect_stdin_stdout():

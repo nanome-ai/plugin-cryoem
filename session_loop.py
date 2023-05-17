@@ -64,18 +64,22 @@ async def route_incoming_payload(payload, plugin_instance):
         return task
     elif isinstance(command, ui.messages.ButtonCallback):
         logger.info("Button Clicked.")
-        ui_hook_name = 'button_press'
         # See if we have a registered callback for this button
         content_id, is_selected = received_obj_list
-        callback_fn = plugin_instance.client.callbacks[content_id].get(ui_hook_name)
-        if callback_fn:
-            # Call the callback
-            if inspect.iscoroutinefunction(callback_fn):
-                await callback_fn(content_id)
-            else:
-                callback_fn(content_id)
-        else:
+        callback_fn = None
+        menu_btn = None
+        for btn in SessionClient.callbacks:
+            if btn._content_id == content_id:
+                menu_btn = btn
+                callback_fn = btn._pressed_callback
+        if not callback_fn:
             logger.warning(f"No callback registered for button {content_id}")
+            return
+        # Call the callback
+        if inspect.iscoroutinefunction(callback_fn):
+            await callback_fn(menu_btn)
+        else:
+            callback_fn(menu_btn)
 
 
 if __name__ == "__main__":
