@@ -1,5 +1,6 @@
 import os
 import asyncio
+import functools
 import inspect
 import json
 import logging
@@ -66,17 +67,21 @@ async def _route_incoming_payload(payload, plugin_instance):
         logger.info("Button Clicked.")
         # See if we have a registered callback for this button
         content_id, _ = received_obj_list
-        callback_fn = None
         menu_btn = None
-        for btn in SessionClient.callbacks:
+        for btn in plugin_instance.client.callbacks:
             if btn._content_id == content_id:
                 menu_btn = btn
-                callback_fn = btn._pressed_callback
-        if not callback_fn:
+                break
+        if not menu_btn:
             logger.warning(f"No callback registered for button {content_id}")
             return
         # Call the callback
-        if inspect.iscoroutinefunction(callback_fn):
+        callback_fn = btn._pressed_callback
+        is_async_fn = inspect.iscoroutinefunction(callback_fn)
+        is_async_partial = isinstance(callback_fn, functools.partial) and \
+            inspect.iscoroutinefunction(callback_fn.func)
+
+        if is_async_fn or is_async_partial:
             await callback_fn(menu_btn)
         else:
             callback_fn(menu_btn)

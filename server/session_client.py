@@ -7,11 +7,15 @@ from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
 from server import utils
+from collections import defaultdict
+
+
+callbacks = defaultdict(dict)  # {content_id: {hook_type: callback_fn}}
 
 
 class SessionClient:
     """Provides API for connecting to a Nanome session."""
-    callbacks = dict()  # {content_id: {hook_type: callback_fn}}
+    # callbacks = dict()  # {content_id: {hook_type: callback_fn}}
     _menus = dict()  # {menu_index: menu}
 
     def __init__(self, plugin_id, session_id, version_table):
@@ -21,6 +25,11 @@ class SessionClient:
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
         self.reader = self.writer = None        
+
+    @property
+    def callbacks(self):
+        global callbacks
+        return callbacks
 
     async def connect_stdin_stdout(self):
         """Wrap stdin and stdout in StreamReader and StreamWriter interface.
@@ -314,11 +323,8 @@ class SessionClient:
         self.writer.write(pack)
         return request_id
 
-    @classmethod
-    def register_btn_pressed_callback(cls, btn: ui.Button, callback_fn):
+    def register_btn_pressed_callback(self, btn: ui.Button, callback_fn):
         # hook_ui_callback = Messages.hook_ui_callback
         ui_hook = 'button_press'  # Not acutally enumerated anywhere
-        if btn not in cls.callbacks:
-            cls.callbacks[btn] = dict()
-        cls.callbacks[btn][ui_hook] = callback_fn
+        self.callbacks[btn][ui_hook] = callback_fn
         btn._pressed_callback = callback_fn
