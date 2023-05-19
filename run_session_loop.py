@@ -7,10 +7,10 @@ import logging
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from server.session_client import SessionClient
+from nanome_sdk.session_client import SessionClient
 
 from nanome.api import control, ui
-from server import utils
+from nanome_sdk import utils
 
 # Make sure plugin folder is in path
 filepath = os.path.dirname(os.path.abspath(__file__))

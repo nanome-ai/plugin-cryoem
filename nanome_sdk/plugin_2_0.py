@@ -9,7 +9,7 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
-from server.utils import receive_bytes
+from nanome_sdk.utils import receive_bytes
 
 
 logging.basicConfig(level=logging.DEBUG)
