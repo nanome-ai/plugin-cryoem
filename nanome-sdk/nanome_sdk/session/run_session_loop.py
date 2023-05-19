@@ -31,18 +31,34 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
     await _start_session_loop(plugin_instance)
 
 
+async def read_bytes_from_reader(reader):
+    logger.debug("Waiting for input...")
+    try:
+        received_bytes = await reader.readexactly(Packet.packet_header_length)
+    except asyncio.IncompleteReadError:
+        return False
+    unpacked = Packet.header_unpack(received_bytes)
+    payload_length = unpacked[4]
+    received_bytes += await reader.readexactly(payload_length)
+    packet = server_utils.receive_bytes(received_bytes)
+    return packet
+
+
 async def _start_session_loop(plugin_instance):
     await plugin_instance.on_start()
     reader = plugin_instance.client.reader
     routing_tasks = []
     tasks = []
+    reader_task = asyncio.create_task(read_bytes_from_reader(reader))
     while True:
-        logger.debug("Waiting for input...")
-        received_bytes = await reader.readexactly(Packet.packet_header_length)
-        unpacked = Packet.header_unpack(received_bytes)
-        payload_length = unpacked[4]
-        received_bytes += await reader.readexactly(payload_length)
-        packet = server_utils.receive_bytes(received_bytes)
+        if reader_task.done():
+            packet = reader_task.result()
+            reader_task = asyncio.create_task(read_bytes_from_reader(reader))
+            if not packet:
+                continue
+        else:
+            await asyncio.sleep(0.1)
+            continue
         routing_task = asyncio.create_task(_route_incoming_payload(packet.payload, plugin_instance))
         routing_tasks.append(routing_task)
         for i in range(len(routing_tasks) - 1, -1, -1):
@@ -60,8 +76,9 @@ async def _route_incoming_payload(payload, plugin_instance):
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
         payload, plugin_instance.version_table)
     command = CommandMessageSerializer._commands[command_hash]
-    logger.debug(f"Routing Command: {command.name()}, Request ID {request_id}")
+    logger.debug(f"Session Received command: {command.name()}, Request ID {request_id}")
     if request_id in plugin_instance.request_futs:
+        # If this is a response to a request, set the future result
         try:
             fut = plugin_instance.request_futs[request_id]
         except KeyError:

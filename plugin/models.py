@@ -2,7 +2,6 @@ import asyncio
 import enum
 import gzip
 import logging
-import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
 import os
@@ -13,7 +12,6 @@ import time
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
-from matplotlib import cm
 from mmtbx.model.model import manager
 from scipy.spatial import KDTree
 from typing import List
@@ -300,6 +298,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        import matplotlib.pyplot as plt
         logging.getLogger('matplotlib').setLevel(logging.CRITICAL)
         Logs.debug("Generating histogram...")
         start_time = time.time()
@@ -488,6 +487,7 @@ class MapGroup:
 
     @staticmethod
     def color_by_bfactor(map_mesh: MapMesh, model_complex: structure.Complex):
+        from matplotlib import cm
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return

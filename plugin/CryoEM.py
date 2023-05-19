@@ -8,6 +8,9 @@ from .menu import MainMenu
 from .models import MapGroup
 from nanome_sdk.session import SessionClient
 
+import logging
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
 
 class CryoEM:
 

@@ -62,8 +62,8 @@ class Plugin_2_0:
         while True:
             if reader_task.done():
                 received_bytes = reader_task.result()
-                await self.route_bytes(received_bytes)
                 reader_task = asyncio.create_task(self.read_packet_from_nts(self.nts_reader))
+                await self.route_bytes(received_bytes)
                 await self.nts_writer.drain()
             else:
                 await asyncio.sleep(0.1)
@@ -179,12 +179,13 @@ class Plugin_2_0:
         """Poll a session process for packets, and forward them to NTS."""
         while True:
             # Load header, and then payload
+            self.logger.debug("Waiting for session data...")
             outgoing_bytes = await process.stdout.read(Packet.packet_header_length)
             if not outgoing_bytes:
                 logger.debug("No outgoing bytes. Ending polling task.")
                 break
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
-            outgoing_bytes += await process.stdout.read(payload_length)
+            outgoing_bytes += await process.stdout.readexactly(payload_length)
             logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
             self.nts_writer.write(outgoing_bytes)
             await self.nts_writer.drain()
