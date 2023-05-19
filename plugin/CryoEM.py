@@ -4,7 +4,6 @@ from pathlib import Path
 
 from nanome.util import Logs, enums
 from nanome.api import structure
-from . import __version__
 from .menu import MainMenu
 from .models import MapGroup
 from nanome_sdk.session import SessionClient
