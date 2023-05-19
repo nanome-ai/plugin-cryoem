@@ -141,6 +141,7 @@ class SessionClient:
 
     async def add_to_workspace(self, complex_list):
         message_type = Messages.add_to_workspace
+        self.logger.debug("Sending AddtoWorkspace command.")
         expects_response = True
         args = complex_list
         request_id = self._send_message(message_type, args, expects_response)
@@ -279,6 +280,18 @@ class SessionClient:
         message_type = Messages.load_file
         expects_response = True
         args = (files_list, True, True)
+        request_id = self._send_message(message_type, args, expects_response)
+        fut = self.request_futs[request_id]
+        await fut
+        result = fut.result()
+        del self.request_futs[request_id]
+        return result
+
+    async def shapes_upload_multiple(self, shape_list):
+        message_type = Messages.set_shape
+        expects_response = True
+        args = shape_list
+        self.logger.debug("Sending Shapes Upload Multiple.")
         request_id = self._send_message(message_type, args, expects_response)
         fut = self.request_futs[request_id]
         await fut

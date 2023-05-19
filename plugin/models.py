@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import gzip
 import logging
@@ -73,11 +74,11 @@ class MapMesh:
     def colors(self, value: Color):
         self.mesh.colors = value
 
-    def upload(self):
-        self.mesh.upload()
+    async def upload(self):
+        meshes = [self.mesh]
         if self.backface:
-            self.load_mesh_backface()
-            self.mesh_backface.upload()
+            meshes.append(self.mesh_inverted)
+        asyncio.create_task(self._plugin.client.shapes_upload_multiple(meshes))
 
     def load_mesh_backface(self):
         vertices = self.mesh.vertices
@@ -330,7 +331,7 @@ class MapGroup:
         if self.map_mesh.mesh is not None:
             self.map_mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
-            self.map_mesh.upload()
+            asyncio.create_task(self.map_mesh.upload())
 
     def create_map_model_manager(self):
         # Compute iso-surface with marching cubes algorithm
@@ -359,7 +360,7 @@ class MapGroup:
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     async def generate_full_mesh(self):
         self.extraction_type = EXTRACTION_TYPE.FULL_MAP
@@ -370,7 +371,7 @@ class MapGroup:
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
         self._set_hist_x_min_max()
 
     async def generate_mesh_around_selection(self):
@@ -397,7 +398,7 @@ class MapGroup:
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -411,7 +412,7 @@ class MapGroup:
             self.color_by_bfactor(map_mesh, comp)
         elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain(map_mesh, comp)
-        map_mesh.upload()
+        asyncio.create_task(map_mesh.upload())
         Logs.message("Mesh colored")
 
     @staticmethod
@@ -588,7 +589,7 @@ class MapGroup:
         self.map_mesh.color = Color.White()
         self.map_mesh.color.a = 75
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     async def redraw_mesh(self):
         if self.extraction_type == EXTRACTION_TYPE.FULL_MAP:

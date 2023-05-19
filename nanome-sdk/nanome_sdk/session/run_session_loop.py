@@ -34,6 +34,7 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
 async def _start_session_loop(plugin_instance):
     await plugin_instance.on_start()
     reader = plugin_instance.client.reader
+    routing_tasks = []
     tasks = []
     while True:
         logger.debug("Waiting for input...")
@@ -42,23 +43,32 @@ async def _start_session_loop(plugin_instance):
         payload_length = unpacked[4]
         received_bytes += await reader.readexactly(payload_length)
         packet = server_utils.receive_bytes(received_bytes)
-        task = await _route_incoming_payload(packet.payload, plugin_instance)
-        if task:
-            tasks.append(task)
+        routing_task = asyncio.create_task(_route_incoming_payload(packet.payload, plugin_instance))
+        routing_tasks.append(routing_task)
+        for i in range(len(routing_tasks) - 1, -1, -1):
+            routing_task = routing_tasks[i]
+            if routing_task.done():
+                result = routing_task.result()
+                if result and inspect.iscoroutine(result):
+                    tasks.append(result)
+                del routing_tasks[i]
         await asyncio.sleep(0.1)
 
 
 async def _route_incoming_payload(payload, plugin_instance):
-    logger.debug("Routing Payload")
     serializer = CommandMessageSerializer()
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
         payload, plugin_instance.version_table)
     command = CommandMessageSerializer._commands[command_hash]
-    logger.debug(f"Command: {command.name()}")
-    logger.debug(f"Request ID: {request_id}")
+    logger.debug(f"Routing Command: {command.name()}, Request ID {request_id}")
     if request_id in plugin_instance.request_futs:
-        fut = plugin_instance.request_futs[request_id]
-        fut.set_result(received_obj_list)
+        try:
+            fut = plugin_instance.request_futs[request_id]
+        except KeyError:
+            logger.warning(f"Could not find future for request_id {request_id}")
+            return
+        else:
+            fut.set_result(received_obj_list)
 
     if isinstance(command, control.messages.Run):
         logger.info("on_run_called")
