@@ -24,7 +24,7 @@ class SessionClient:
         self.session_id = session_id
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
-        self.reader = self.writer = None        
+        self.reader = self.writer = None
 
     async def connect_stdin_stdout(self):
         """Wrap stdin and stdout in StreamReader and StreamWriter interface.
