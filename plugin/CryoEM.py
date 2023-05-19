@@ -67,7 +67,7 @@ class CryoEM:
                 model_comp.position = map_complex.position
                 model_comp.rotation = map_complex.rotation
 
-        [created_comp] = await self.add_to_workspace([model_comp])
+        [created_comp] = await self.client.add_to_workspace([model_comp])
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
 
@@ -75,7 +75,7 @@ class CryoEM:
         comp = structure.Complex.io.from_pdb(path=pdb_filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(pdb_filepath).stem
-        await self.add_bonds([comp])
+        # await self.client.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
         return comp

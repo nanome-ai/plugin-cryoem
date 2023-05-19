@@ -47,26 +47,17 @@ class Plugin_2_0:
         finally:
             self.nts_writer.close()
 
-    async def read_packet_from_nts(self, reader):
-        self.logger.debug("Waiting for NTS Data...")
-        received_bytes = await reader.readexactly(Packet.packet_header_length)
-        unpacked = Packet.header_unpack(received_bytes)
-        payload_length = unpacked[4]
-        received_bytes += await reader.readexactly(payload_length)
-        self.logger.debug(f"Received Data from NTS. Payload length: {payload_length}")
-        return received_bytes
-
     async def poll_nts(self):
         """Poll NTS for packets, and forward them to the plugin server."""
-        reader_task = asyncio.create_task(self.read_packet_from_nts(self.nts_reader))
         while True:
-            if reader_task.done():
-                received_bytes = reader_task.result()
-                reader_task = asyncio.create_task(self.read_packet_from_nts(self.nts_reader))
-                await self.route_bytes(received_bytes)
-                await self.nts_writer.drain()
-            else:
-                await asyncio.sleep(0.1)
+            self.logger.debug("Waiting for NTS Data...")
+            received_bytes = await self.nts_reader.readexactly(Packet.packet_header_length)
+            unpacked = Packet.header_unpack(received_bytes)
+            payload_length = unpacked[4]
+            received_bytes += await self.nts_reader.readexactly(payload_length)
+            self.logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
+            await self.route_bytes(received_bytes)
+            await self.nts_writer.drain()
 
     async def connect_plugin(self, name, description):
         """Send a packet to NTS to register plugin."""
