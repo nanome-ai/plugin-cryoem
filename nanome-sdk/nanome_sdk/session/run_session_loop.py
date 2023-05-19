@@ -13,9 +13,9 @@ from nanome.api import control, ui
 from nanome_sdk.plugin_2_0 import utils as server_utils
 
 # Make sure plugin folder is in path
-plugin_path = os.getcwd()
-# filepath = os.path.dirname(os.path.abspath(__file__))
-# parent_dir = os.path.join(filepath, "..")
+# Bold assumption that plugin is always in `plugin` folder
+# in working directory
+plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
 from plugin import plugin_class
 
