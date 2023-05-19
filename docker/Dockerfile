@@ -6,6 +6,7 @@ WORKDIR /app
 ARG CACHEBUST
 
 COPY environment.yml .
+# COPY nanome-sdk nanome-sdk
 RUN conda env update
 
 COPY nanome-sdk nanome-sdk
