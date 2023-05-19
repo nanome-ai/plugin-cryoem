@@ -17,7 +17,7 @@ from nanome_sdk.plugin_2_0 import utils as server_utils
 # in working directory
 plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
-from plugin import plugin_class
+from plugin import plugin_class  # noqa: E402
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(name="SessionInstance")
