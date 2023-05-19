@@ -10,7 +10,7 @@ from nanome.api.serializers import CommandMessageSerializer
 from nanome_sdk.session.session_client import SessionClient
 
 from nanome.api import control, ui
-from nanome_sdk.plugin import utils as server_utils
+from nanome_sdk.plugin_2_0 import utils as server_utils
 
 # Make sure plugin folder is in path
 plugin_path = os.getcwd()
