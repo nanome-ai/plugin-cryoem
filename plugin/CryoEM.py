@@ -2,12 +2,12 @@ import os
 import tempfile
 from pathlib import Path
 
-from nanome.util import Logs, enums, async_callback
+from nanome.util import Logs, enums
 from nanome.api import structure
 from . import __version__
 from .menu import MainMenu
 from .models import MapGroup
-from nanome_sdk.client.session_client import SessionClient
+from nanome_sdk.session import SessionClient
 
 
 class CryoEM:

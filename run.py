@@ -1,7 +1,7 @@
 import asyncio
 import os
 from plugin import CryoEM
-from nanome_sdk.server import Plugin_2_0
+from nanome_sdk.plugin import Plugin_2_0
 
 
 def main():
