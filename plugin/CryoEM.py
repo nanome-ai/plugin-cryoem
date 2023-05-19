@@ -7,7 +7,7 @@ from nanome.api import structure
 from . import __version__
 from .menu import MainMenu
 from .models import MapGroup
-from nanome_sdk.session_client import SessionClient
+from nanome_sdk.client.session_client import SessionClient
 
 
 class CryoEM:

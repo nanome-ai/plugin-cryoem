@@ -7,10 +7,10 @@ import logging
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from nanome_sdk.session_client import SessionClient
+from nanome_sdk.client.session_client import SessionClient
 
 from nanome.api import control, ui
-from nanome_sdk import utils
+from nanome_sdk.server import utils as server_utils
 
 # Make sure plugin folder is in path
 filepath = os.path.dirname(os.path.abspath(__file__))
@@ -40,7 +40,7 @@ async def _start_session_loop(plugin_instance):
         unpacked = Packet.header_unpack(received_bytes)
         payload_length = unpacked[4]
         received_bytes += await reader.readexactly(payload_length)
-        packet = utils.receive_bytes(received_bytes)
+        packet = server_utils.receive_bytes(received_bytes)
         task = await _route_incoming_payload(packet.payload, plugin_instance)
         if task:
             tasks.append(task)

@@ -2,8 +2,6 @@ import enum
 import logging
 import random
 
-from nanome._internal.network import Packet, Data
-
 
 class PacketTypes(enum.IntEnum):
     plugin_list = 0
@@ -26,20 +24,6 @@ PACKET_SIZE = 4096
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-
-def receive_bytes(received_bytes):
-    # Parse received bytes into Packet instance
-    data = Data()
-    data.received_data(received_bytes)
-    packet = Packet()
-    got_header = packet.get_header(data)
-    got_payload = packet.get_payload(data)
-    if not got_header:
-        logger.warning("Could not get packet header")
-    if not got_payload:
-        logger.warning("Could not get packet payload")
-    return packet
 
 
 def get_env_data_as_dict(path: str) -> dict:

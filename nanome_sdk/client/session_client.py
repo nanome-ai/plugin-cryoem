@@ -6,7 +6,7 @@ from nanome.api.serializers import CommandMessageSerializer
 from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
-from nanome_sdk import utils
+from nanome_sdk.client import utils
 from collections import defaultdict
 
 

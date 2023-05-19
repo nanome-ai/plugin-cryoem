@@ -9,8 +9,10 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
-from nanome_sdk.utils import receive_bytes
+from nanome_sdk.server.utils import receive_bytes
 
+
+__all__ = ["Plugin_2_0"]
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
