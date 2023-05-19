@@ -336,3 +336,9 @@ class SessionClient:
         ui_hook = 'button_press'  # Not acutally enumerated anywhere
         cls.callbacks[btn][ui_hook] = callback_fn
         btn._pressed_callback = callback_fn
+
+    @classmethod
+    def register_sld_changed_callback(cls, sld: ui.Slider, callback_fn):
+        ui_hook = 'sld_changed'  # Not acutally enumerated anywhere
+        cls.callbacks[sld][ui_hook] = callback_fn
+        sld._changed_callback = callback_fn

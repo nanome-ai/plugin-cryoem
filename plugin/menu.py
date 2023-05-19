@@ -313,7 +313,7 @@ class EditMeshMenu:
         self.btn_redraw_map.disable_on_press = True
         self._plugin.client.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
-        self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
+        self._plugin.client.register_sld_changed_callback(self.sld_isovalue, self.update_isovalue_lbl)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)

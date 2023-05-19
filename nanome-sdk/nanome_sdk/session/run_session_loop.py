@@ -75,6 +75,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     serializer = CommandMessageSerializer()
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
         payload, plugin_instance.version_table)
+    ui_callbacks = [ui.messages.ButtonCallback, ui.messages.SliderCallback]
     command = CommandMessageSerializer._commands[command_hash]
     logger.debug(f"Session Received command: {command.name()}, Request ID {request_id}")
     if request_id in plugin_instance.request_futs:
@@ -91,28 +92,31 @@ async def _route_incoming_payload(payload, plugin_instance):
         logger.info("on_run_called")
         task = asyncio.create_task(plugin_instance.on_run())
         return task
-    elif isinstance(command, ui.messages.ButtonCallback):
-        logger.info("Button Clicked.")
+    elif type(command) in ui_callbacks:
+        logger.info("UI Content Clicked.")
         # See if we have a registered callback for this button
         content_id, _ = received_obj_list
-        menu_btn = None
-        for btn in plugin_instance.client.callbacks:
-            if btn._content_id == content_id:
-                menu_btn = btn
+        menu_content = None
+        for content in plugin_instance.client.callbacks:
+            if content._content_id == content_id:
+                menu_content = content
                 break
-        if not menu_btn:
+        if not menu_content:
             logger.warning(f"No callback registered for button {content_id}")
             return
         # Call the callback
-        callback_fn = btn._pressed_callback
+        if type(command) == ui.messages.ButtonCallback:
+            callback_fn = menu_content._pressed_callback
+        elif type(command) == ui.messages.SliderCallback:
+            callback_fn = menu_content._changed_callback
         is_async_fn = inspect.iscoroutinefunction(callback_fn)
         is_async_partial = isinstance(callback_fn, functools.partial) and \
             inspect.iscoroutinefunction(callback_fn.func)
 
         if is_async_fn or is_async_partial:
-            await callback_fn(menu_btn)
+            await callback_fn(menu_content)
         else:
-            callback_fn(menu_btn)
+            callback_fn(menu_content)
 
 
 if __name__ == "__main__":
