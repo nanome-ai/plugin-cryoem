@@ -1,3 +1,4 @@
+import asyncio
 import nanome
 import os
 import requests
@@ -5,7 +6,7 @@ import time
 import urllib
 from functools import partial
 from nanome.api import ui
-from nanome.util import async_callback, enums, Logs
+from nanome.util import enums, Logs
 
 from .models import MapGroup
 from .utils import EMDBMetadataParser
@@ -388,10 +389,8 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
             self._plugin.client.update_node(self.ln_img_histogram)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
+            self.histogram_task = asyncio.create_task(self.generate_histogram(map_group))
+
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
             self._plugin.client.update_node(self.ln_img_histogram)
@@ -479,7 +478,7 @@ class EditMeshMenu:
     def temp_dir(self):
         return self._plugin.temp_dir.name
 
-    def generate_histogram_thread(self, map_group):
+    async def generate_histogram(self, map_group):
         map_group.generate_histogram(self.temp_dir)
         self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.sld_isovalue.min_value = map_group.hist_x_min
