@@ -10,6 +10,7 @@ from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
 from nanome_sdk.plugin.utils import receive_bytes
+from nanome_sdk.session import run_session_loop
 
 
 __all__ = ["Plugin_2_0"]
@@ -141,8 +142,9 @@ class Plugin_2_0:
             'NANOME_VERSION_TABLE': json.dumps(version_table),
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
+        session_loop_py = run_session_loop.__file__
         session_process = await asyncio.create_subprocess_exec(
-            sys.executable, 'run_session_loop.py', str(plugin_id), str(session_id), plugin_class_filepath,
+            sys.executable, session_loop_py, str(plugin_id), str(session_id), plugin_class_filepath,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             cwd=os.getcwd(),

@@ -13,9 +13,10 @@ from nanome.api import control, ui
 from nanome_sdk.plugin import utils as server_utils
 
 # Make sure plugin folder is in path
-filepath = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.join(filepath, "..")
-sys.path.append(parent_dir)
+plugin_path = os.getcwd()
+# filepath = os.path.dirname(os.path.abspath(__file__))
+# parent_dir = os.path.join(filepath, "..")
+sys.path.append(plugin_path)
 from plugin import plugin_class
 
 logging.basicConfig(level=logging.DEBUG)
