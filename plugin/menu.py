@@ -41,8 +41,9 @@ class MainMenu:
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
         client = self._plugin.client
+        ui_manager = self._plugin.ui_manager
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        client.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
+        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
@@ -50,8 +51,8 @@ class MainMenu:
         self.btn_embl_submit.disable_on_press = True
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
-        client.register_btn_pressed_callback(self.btn_rcsb_submit, self.on_rcsb_submit)
-        client.register_btn_pressed_callback(self.btn_embl_submit, self.on_emdb_submit)
+        ui_manager.register_btn_pressed_callback(self.btn_rcsb_submit, self.on_rcsb_submit)
+        ui_manager.register_btn_pressed_callback(self.btn_embl_submit, self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
@@ -62,7 +63,7 @@ class MainMenu:
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
-        client.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
+        ui_manager.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
     def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
@@ -92,28 +93,28 @@ class MainMenu:
 
             btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
             btn_add_to_map.toggle_on_press = True
-            self._plugin.client.register_btn_pressed_callback(
+            self._plugin.ui_manager.register_btn_pressed_callback(
                 btn_add_to_map, self.select_mapgroup)
             btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
             ln_group_details = ln.find_node('ln_group_details')
             edit_mesh_btn: ui.Button = ln_group_details.get_content()
-            self._plugin.client.register_btn_pressed_callback(
+            self._plugin.ui_manager.register_btn_pressed_callback(
                 edit_mesh_btn, partial(self.open_edit_mesh_menu, map_group))
-            self._plugin.client.register_btn_pressed_callback(
+            self._plugin.ui_manager.register_btn_pressed_callback(
                 edit_mesh_btn,
                 partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
-            self._plugin.client.register_btn_pressed_callback(
+            self._plugin.ui_manager.register_btn_pressed_callback(
                 btn_delete,
                 partial(self.delete_group, map_group))
 
             btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
             btn_toggle.icon.value.set_all(
                 VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-            self._plugin.client.register_btn_pressed_callback(
+            self._plugin.ui_manager.register_btn_pressed_callback(
                 btn_toggle,
                 partial(self.toggle_group, map_group))
 
@@ -305,15 +306,17 @@ class EditMeshMenu:
         self._plugin = plugin_instance
         self._menu.index = 20
 
+        ui_manager = self._plugin.ui_manager
+
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
         self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
-        self._plugin.client.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
+        ui_manager.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
-        self._plugin.client.register_sld_changed_callback(self.sld_isovalue, self.update_isovalue_lbl)
+        ui_manager.register_sld_changed_callback(self.sld_isovalue, self.update_isovalue_lbl)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
         self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
@@ -336,17 +339,17 @@ class EditMeshMenu:
 
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
         self.btn_show_full_map.disable_on_press = True
-        self._plugin.client.register_btn_pressed_callback(
+        ui_manager.register_btn_pressed_callback(
             self.btn_show_full_map, self.show_full_map)
 
         self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
         self.btn_box_around_model.disable_on_press = True
-        self._plugin.client.register_btn_pressed_callback(
+        ui_manager.register_btn_pressed_callback(
             self.btn_box_around_model, self.box_map_around_model)
 
         self.btn_box_around_selection: ui.Button = root.find_node('btn_box_around_selection').get_content()
         self.btn_box_around_selection.disable_on_press = True
-        self._plugin.client.register_btn_pressed_callback(
+        ui_manager.register_btn_pressed_callback(
             self.btn_box_around_selection, self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):

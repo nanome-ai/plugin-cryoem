@@ -8,7 +8,7 @@ import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
 from nanome_sdk.session.session_client import SessionClient
-
+from nanome_sdk.session.ui_manager import UIManager
 from nanome.api import control, ui
 from nanome_sdk.plugin_2_0 import utils as server_utils
 
@@ -62,6 +62,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     ui_callbacks = [ui.messages.ButtonCallback, ui.messages.SliderCallback]
     command = CommandMessageSerializer._commands[command_hash]
     logger.debug(f"Session Received command: {command.name()}, Request ID {request_id}")
+    ui_manager = plugin_instance.ui_manager
     if request_id in plugin_instance.request_futs:
         # If this is a response to a request, set the future result
         try:
@@ -79,28 +80,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     elif type(command) in ui_callbacks:
         logger.info("UI Content Clicked.")
         # See if we have a registered callback for this button
-        content_id, _ = received_obj_list
-        menu_content = None
-        for content in plugin_instance.client.callbacks:
-            if content._content_id == content_id:
-                menu_content = content
-                break
-        if not menu_content:
-            logger.warning(f"No callback registered for button {content_id}")
-            return
-        # Call the callback
-        if type(command) == ui.messages.ButtonCallback:
-            callback_fn = menu_content._pressed_callback
-        elif type(command) == ui.messages.SliderCallback:
-            callback_fn = menu_content._changed_callback
-        is_async_fn = inspect.iscoroutinefunction(callback_fn)
-        is_async_partial = isinstance(callback_fn, functools.partial) and \
-            inspect.iscoroutinefunction(callback_fn.func)
-
-        if is_async_fn or is_async_partial:
-            await callback_fn(menu_content)
-        else:
-            callback_fn(menu_content)
+        await ui_manager.handle_ui_command(command, received_obj_list)
 
 
 if __name__ == "__main__":
@@ -115,6 +95,7 @@ if __name__ == "__main__":
     plugin_instance.session_id = session_id
     plugin_instance.version_table = version_table
     plugin_instance.client = SessionClient(plugin_id, session_id, version_table)
+    plugin_instance.ui_manager = UIManager()
     session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)

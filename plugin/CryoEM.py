@@ -17,6 +17,7 @@ class CryoEM:
     async def on_start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.client = SessionClient(self.plugin_id, self.session_id, self.version_table)
+        self.ui_manager = self.ui_manager
         self.menu = MainMenu(self)
         self.groups = []
         self.add_mapgroup()
