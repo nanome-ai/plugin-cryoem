@@ -52,6 +52,16 @@ class UIManager:
         content_id = dd._content_id
         self.callbacks[content_id][ui_hook] = callback_fn
 
+    def register_text_change_callback(self, textinput: ui.TextInput, callback_fn):
+        ui_hook = Commands.text_change
+        content_id = textinput._content_id
+        self.callbacks[content_id][ui_hook] = callback_fn
+
+    def register_text_submit_callback(self, textinput: ui.TextInput, callback_fn):
+        ui_hook = Commands.text_submit
+        content_id = textinput._content_id
+        self.callbacks[content_id][ui_hook] = callback_fn
+
     async def handle_ui_command(self, command, received_obj_list):
         content_id, val = received_obj_list
         menu_content = self.__find_content(content_id)
@@ -65,6 +75,9 @@ class UIManager:
         elif command in [Commands.slider_change, Commands.slider_release]:
             sld = menu_content
             sld.current_value = val
+        elif command in [Commands.text_change, Commands.text_submit]:
+            textinput = menu_content
+            textinput.input_text = val
         elif command == Commands.dropdown_item_click:
             dd = menu_content
             clicked_item_index = val
@@ -85,7 +98,7 @@ class UIManager:
             callback_fn(menu_content)
         else:
             # no callback registered
-            logger.warning(f"No callback registered for button {content_id}")
+            logger.debug(f"No callback registered for content {content_id}")
 
     def __find_content(self, content_id):
         content = None

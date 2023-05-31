@@ -77,6 +77,7 @@ async def _route_incoming_payload(payload, plugin_instance):
         ui.messages.ButtonCallback,
         ui.messages.SliderCallback,
         ui.messages.DropdownCallback,
+        ui.messages.TextInputCallback,
     ]
     # Handle Different types of messages.
     if isinstance(message, control.messages.Run):
