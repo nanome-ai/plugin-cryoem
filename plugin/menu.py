@@ -394,7 +394,6 @@ class EditMeshMenu:
 
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
-        ui_manager = self._plugin.ui_manager
         self._plugin.client.update_menu(self._menu)
 
     def set_isovalue_ui(self, map_group):
