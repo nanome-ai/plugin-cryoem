@@ -9,11 +9,11 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
-from nanome_sdk.plugin_2_0.utils import receive_bytes
+from nanome_sdk.plugin_server.utils import receive_bytes
 from nanome_sdk.session import run_session_loop_py
 
 
-__all__ = ["Plugin_2_0"]
+__all__ = ["PluginServer"]
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 KEEP_ALIVE_TIME_INTERVAL = 60.0
 
 
-class Plugin_2_0:
+class PluginServer:
 
     def __init__(self):
         self.plugin_id = None
-        self.logger = logging.getLogger(name="Plugin_2_0")
+        self.logger = logging.getLogger(name="PluginServer")
         self._sessions = {}
         self.plugin_class = None
         self.polling_tasks = {}
