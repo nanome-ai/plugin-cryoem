@@ -59,8 +59,8 @@ async def _route_incoming_payload(payload, plugin_instance):
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
         payload, plugin_instance.version_table)
     ui_callbacks = [ui.messages.ButtonCallback, ui.messages.SliderCallback]
-    command = CommandMessageSerializer._commands[command_hash]
-    logger.debug(f"Session Received command: {command.name()}, Request ID {request_id}")
+    message = CommandMessageSerializer._commands[command_hash]
+    logger.debug(f"Session Received command: {message.name()}, Request ID {request_id}")
     if request_id in plugin_instance.request_futs:
         # If this is a response to a request, set the future result
         try:
@@ -71,16 +71,18 @@ async def _route_incoming_payload(payload, plugin_instance):
         else:
             fut.set_result(received_obj_list)
 
-    if isinstance(command, control.messages.Run):
+    if isinstance(message, control.messages.Run):
         logger.info("on_run_called")
         task = asyncio.create_task(plugin_instance.on_run())
         return task
-    elif type(command) in ui_callbacks:
+    elif type(message) in ui_callbacks:
         logger.info("UI Content Clicked.")
         # See if we have a registered callback for this button
         ui_manager = plugin_instance.ui_manager
-        await ui_manager.handle_ui_command(command, received_obj_list)
-
+        ui_command = ui_manager.find_command(command_hash)
+        await ui_manager.handle_ui_command(ui_command, received_obj_list)
+    else:
+        logger.warning(f"Unknown command {message.name()}")
 
 if __name__ == "__main__":
     plugin_id = int(sys.argv[1])

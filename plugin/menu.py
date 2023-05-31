@@ -314,15 +314,11 @@ class EditMeshMenu:
         self.btn_redraw_map.disable_on_press = True
         ui_manager.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
-        ui_manager.register_sld_changed_callback(self.sld_isovalue, self.update_isovalue_lbl)
+        ui_manager.register_slider_change_callback(self.sld_isovalue, self.update_isovalue_lbl)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
-        self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
-        self.sld_opacity.register_released_callback(self.update_color)
-
-        self.sld_radius: ui.Slider = root.find_node('sld_radius').get_content()
-        self.sld_radius.register_changed_callback(self.sld_radius_update)
-        self.sld_radius.register_released_callback(self.redraw_map)
+        ui_manager.register_slider_change_callback(self.sld_opacity, self.update_opacity_lbl)
+        ui_manager.register_slider_released_callback(self.sld_opacity, self.update_color)
 
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
         self.lbl_opacity: ui.Label = root.find_node('lbl_opacity').get_content()
