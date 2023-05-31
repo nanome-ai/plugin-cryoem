@@ -9,7 +9,7 @@ from nanome._internal.enums import Messages
 from nanome_sdk.session import utils
 
 
-__all__ = ["SessionClient"]
+__all__ = ["SessionClient", "NanomePlugin"]
 
 
 class SessionClient:
@@ -335,3 +335,10 @@ class SessionClient:
         self.logger.debug(f'Sending Message: {message_type.name} Size: {len(pack)} bytes')
         self.writer.write(pack)
         return request_id
+
+
+class NanomePlugin:
+    client = None
+
+    def set_client(self, plugin_id, session_id, version_table):
+        self.client = SessionClient(plugin_id, session_id, version_table)

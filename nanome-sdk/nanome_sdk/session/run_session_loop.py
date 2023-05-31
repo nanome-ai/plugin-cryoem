@@ -6,8 +6,7 @@ import logging
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from nanome_sdk.session.session_client import SessionClient
-from nanome_sdk.session.ui_manager import UIManager
+from nanome_sdk.session.session_client import NanomePlugin
 from nanome.api import control, ui
 from nanome_sdk.plugin_2_0 import utils as server_utils
 
@@ -21,11 +20,14 @@ from plugin import plugin_class  # noqa: E402
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(name="SessionInstance")
 
-__all__ = ["start_session"]
-
 
 async def start_session(plugin_instance, plugin_id, session_id, version_table):
     logger.info("Starting Session!")
+    if not issubclass(plugin_instance.__class__, NanomePlugin):
+        logger.critical("Plugin must inherit from NanomePlugin")
+        exit(1)
+    plugin_instance.set_client(plugin_id, session_id, version_table)
+    await plugin_instance.client.connect_stdin_stdout()
     await plugin_instance.client.send_connect(plugin_id, session_id, version_table)
     await _start_session_loop(plugin_instance)
 
@@ -57,7 +59,7 @@ async def _start_session_loop(plugin_instance):
 async def _route_incoming_payload(payload, plugin_instance):
     serializer = CommandMessageSerializer()
     received_obj_list, command_hash, request_id = serializer.deserialize_command(
-        payload, plugin_instance.version_table)
+        payload, plugin_instance.client.version_table)
     message = CommandMessageSerializer._commands[command_hash]
     logger.debug(f"Session Received command: {message.name()}, Request ID {request_id}")
     if request_id in plugin_instance.request_futs:
@@ -90,6 +92,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     else:
         logger.warning(f"Unknown command {message.name()}")
 
+
 if __name__ == "__main__":
     plugin_id = int(sys.argv[1])
     session_id = int(sys.argv[2])
@@ -98,11 +101,6 @@ if __name__ == "__main__":
     logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
     logger.info(f'Plugin Class {plugin_class.__name__}')
     plugin_instance = plugin_class()
-    plugin_instance.plugin_id = plugin_id
-    plugin_instance.session_id = session_id
-    plugin_instance.version_table = version_table
-    plugin_instance.client = SessionClient(plugin_id, session_id, version_table)
-    plugin_instance.ui_manager = UIManager()
     session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)
