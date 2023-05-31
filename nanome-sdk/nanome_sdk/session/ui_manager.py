@@ -10,6 +10,8 @@ from nanome._internal.enums import Commands
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["UIManager"]
+
 
 class UIManager:
 

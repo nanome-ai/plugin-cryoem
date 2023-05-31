@@ -6,7 +6,7 @@ from nanome.util import Logs, enums
 from nanome.api import structure
 from .menu import MainMenu
 from .models import MapGroup
-from nanome_sdk.session import SessionClient
+from nanome_sdk.session import SessionClient, UIManager
 
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -17,7 +17,7 @@ class CryoEM:
     async def on_start(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.client = SessionClient(self.plugin_id, self.session_id, self.version_table)
-        self.ui_manager = self.ui_manager
+        self.ui_manager = UIManager()
         self.menu = MainMenu(self)
         self.groups = []
         self.add_mapgroup()
