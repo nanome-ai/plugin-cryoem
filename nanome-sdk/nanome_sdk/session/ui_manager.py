@@ -1,10 +1,10 @@
-
+import asyncio
 import functools
 import inspect
 import logging
-import enum
 
 from nanome.api import ui
+from nanome.api._hashes import Hashes
 from collections import defaultdict
 from nanome._internal.enums import Commands
 
@@ -16,6 +16,7 @@ class UIManager:
     def __init__(self):
         self.callbacks = defaultdict(dict)
         self._menus = []
+        self.__hash_cache = {}
 
     def __new__(cls):
         # Create Singleton object
@@ -63,7 +64,8 @@ class UIManager:
             inspect.iscoroutinefunction(callback_fn.func)
 
         if is_async_fn or is_async_partial:
-            await callback_fn(menu_content)
+            # await callback_fn(menu_content)
+            asyncio.create_task(callback_fn(menu_content))
         elif callback_fn:
             callback_fn(menu_content)
         else:
@@ -78,20 +80,15 @@ class UIManager:
                 break
         return content
 
-    @staticmethod
-    def find_command(command_hash):
-        from nanome.api._hashes import Hashes
-        from nanome.api.ui import registered_commands
-        cmds = [tup[0] for tup in registered_commands]
+    def find_command(self, command_hash):
+        if command_hash in self.__hash_cache:
+            return self.__hash_cache[command_hash]
+        # Look up hash in registered commands, and save to cache
+        cmds = [tup[0] for tup in ui.registered_commands]
         command = None
         for cmd in cmds:
             if Hashes.hash_command(cmd.name) == command_hash:
                 command = cmd
+                self.__hash_cache[command_hash] = command
                 break
         return command
-    # def __find_content(self, content_id):
-    #     all_content = itertools.chain(*[menu.get_all_content() for menu in self._menus])
-    #     content = next((
-    #         cntnt for cntnt in all_content
-    #         if cntnt._content_id == content_id), None)
-    #     return content
