@@ -1,6 +1,5 @@
 import os
 import asyncio
-import functools
 import inspect
 import json
 import logging
@@ -62,7 +61,6 @@ async def _route_incoming_payload(payload, plugin_instance):
     ui_callbacks = [ui.messages.ButtonCallback, ui.messages.SliderCallback]
     command = CommandMessageSerializer._commands[command_hash]
     logger.debug(f"Session Received command: {command.name()}, Request ID {request_id}")
-    ui_manager = plugin_instance.ui_manager
     if request_id in plugin_instance.request_futs:
         # If this is a response to a request, set the future result
         try:
@@ -80,6 +78,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     elif type(command) in ui_callbacks:
         logger.info("UI Content Clicked.")
         # See if we have a registered callback for this button
+        ui_manager = plugin_instance.ui_manager
         await ui_manager.handle_ui_command(command, received_obj_list)
 
 

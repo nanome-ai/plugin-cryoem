@@ -7,16 +7,13 @@ from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
 from nanome_sdk.session import utils
-from collections import defaultdict
+
 
 __all__ = ["SessionClient"]
 
 
 class SessionClient:
     """Provides API for connecting to a Nanome session."""
-    # callbacks = dict()  # {content_id: {hook_type: callback_fn}}
-    _menus = dict()  # {menu_index: menu}
-    callbacks = defaultdict(dict)  # {content_id: {hook_type: callback_fn}}
 
     def __init__(self, plugin_id, session_id, version_table):
         self.version_table = version_table
@@ -25,6 +22,12 @@ class SessionClient:
         self.logger = logging.getLogger(name=f"SessionClient {session_id}")
         self.request_futs = {}
         self.reader = self.writer = None
+
+    def __new__(cls, *args, **kwargs):
+        # Create Singleton object
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(SessionClient, cls).__new__(cls)
+        return cls.instance
 
     async def connect_stdin_stdout(self):
         """Wrap stdin and stdout in StreamReader and StreamWriter interface.
@@ -42,7 +45,6 @@ class SessionClient:
 
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
-        self._menus[menu.index] = menu
         message_type = Messages.menu_update
         expects_response = False
         args = [menu, shallow]

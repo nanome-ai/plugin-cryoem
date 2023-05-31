@@ -31,7 +31,8 @@ __all__ = ['MainMenu', 'EditMeshMenu']
 class MainMenu:
 
     def __init__(self, plugin_instance: nanome.PluginInstance):
-        self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
+        ui_manager = plugin_instance.ui_manager
+        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
         self._plugin = plugin_instance
 
         self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
@@ -40,7 +41,6 @@ class MainMenu:
         root: ui.LayoutNode = self._menu.root
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
-        client = self._plugin.client
         ui_manager = self._plugin.ui_manager
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
@@ -100,8 +100,6 @@ class MainMenu:
 
             ln_group_details = ln.find_node('ln_group_details')
             edit_mesh_btn: ui.Button = ln_group_details.get_content()
-            self._plugin.ui_manager.register_btn_pressed_callback(
-                edit_mesh_btn, partial(self.open_edit_mesh_menu, map_group))
             self._plugin.ui_manager.register_btn_pressed_callback(
                 edit_mesh_btn,
                 partial(self.open_edit_mesh_menu, map_group))
@@ -302,11 +300,11 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
-        self._menu.index = 20
 
         ui_manager = self._plugin.ui_manager
+        self._menu = ui_manager.create_new_menu(EDIT_MESH_MENU_PATH)
+        self._menu.index = 20
 
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
@@ -400,6 +398,7 @@ class EditMeshMenu:
 
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
+        ui_manager = self._plugin.ui_manager
         self._plugin.client.update_menu(self._menu)
 
     def set_isovalue_ui(self, map_group):

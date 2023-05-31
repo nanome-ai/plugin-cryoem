@@ -26,7 +26,6 @@ class CryoEM:
     def on_stop(self):
         self.temp_dir.cleanup()
 
-    # @async_callback
     async def on_run(self):
         self.menu.render(force_enable=True)
 
