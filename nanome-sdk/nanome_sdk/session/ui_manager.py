@@ -45,16 +45,29 @@ class UIManager:
         content_id = sld._content_id
         self.callbacks[content_id][ui_hook] = callback_fn
 
+    def register_dropdown_item_clicked_callback(self, dd: ui.Dropdown, callback_fn):
+        ui_hook = Commands.dropdown_item_click
+        content_id = dd._content_id
+        self.callbacks[content_id][ui_hook] = callback_fn
+
     async def handle_ui_command(self, command, received_obj_list):
         content_id, val = received_obj_list
         menu_content = self.__find_content(content_id)
         if not menu_content:
             logger.warning(f"No callback registered for button {content_id}")
             return
+
+        # Handle different command types
         if command == Commands.button_press:
             pass
         elif command in [Commands.slider_change, Commands.slider_release]:
-            menu_content.current_value = val
+            sld = menu_content
+            sld.current_value = val
+        elif command == Commands.dropdown_item_click:
+            dd = menu_content
+            clicked_item_index = val
+            for i in range(0, len(dd._items)):
+                dd._items[i]._selected = i == clicked_item_index
         else:
             logger.debug('huh?')
 
