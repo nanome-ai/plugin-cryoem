@@ -297,7 +297,11 @@ class SessionClient:
         await fut
         result = fut.result()
         del self.request_futs[request_id]
-        return result
+        # Make sure indices get set.
+        indices = result[0]
+        for shape, index in zip(shape_list, indices):
+            shape._index = index
+        return shape_list
 
     async def request_export(self, format, entities=None):
         message_type = Messages.export_files
