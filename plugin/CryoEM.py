@@ -21,7 +21,7 @@ class CryoEM(NanomePlugin):
         self.groups = []
         self.add_mapgroup()
 
-    def on_stop(self):
+    async def on_stop(self):
         self.temp_dir.cleanup()
 
     async def on_run(self):

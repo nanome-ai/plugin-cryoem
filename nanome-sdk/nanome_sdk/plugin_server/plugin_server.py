@@ -9,7 +9,7 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 
-from nanome_sdk.plugin_server.utils import receive_bytes
+from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk.session import run_session_loop_py
 
 
@@ -106,7 +106,7 @@ class PluginServer:
 
     async def route_bytes(self, received_bytes):
         serializer = CommandMessageSerializer()
-        packet = receive_bytes(received_bytes)
+        packet = convert_bytes_to_packet(received_bytes)
         session_id = packet.session_id
         packet_type = packet.packet_type
         if packet_type == PacketTypes.message_to_plugin:

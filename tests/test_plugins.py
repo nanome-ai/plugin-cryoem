@@ -48,7 +48,7 @@ class CryoEMPluginTestCase(unittest.TestCase):
 
     def tearDown(self):
         super().tearDown()
-        self.plugin.on_stop()
+        self.plugin.temp_dir.cleanup()
 
     def test_add_mapgroup(self):
         self.assertEqual(len(self.plugin.groups), 1)

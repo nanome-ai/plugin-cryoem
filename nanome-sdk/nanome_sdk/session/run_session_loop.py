@@ -8,7 +8,7 @@ from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.api import control, ui
 from nanome_sdk.session import NanomePlugin
-from nanome_sdk.plugin_server import utils as server_utils
+from nanome_sdk import utils
 
 # Make sure plugin folder is in path
 # Bold assumption that plugin is always in `plugin` folder
@@ -43,7 +43,7 @@ async def _start_session_loop(plugin_instance):
         unpacked = Packet.header_unpack(received_bytes)
         payload_length = unpacked[4]
         received_bytes += await reader.readexactly(payload_length)
-        packet = server_utils.receive_bytes(received_bytes)
+        packet = utils.convert_bytes_to_packet(received_bytes)
         routing_task = asyncio.create_task(_route_incoming_payload(packet.payload, plugin_instance))
         routing_tasks.append(routing_task)
         for i in range(len(routing_tasks) - 1, -1, -1):
