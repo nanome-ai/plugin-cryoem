@@ -15,3 +15,9 @@ class NanomePlugin:
     def set_client(self, plugin_id, session_id, version_table):
         """Used internally by the PluginServer."""
         self.client = SessionClient(plugin_id, session_id, version_table)
+
+    def on_start(self):
+        pass
+
+    def on_stop(self):
+        pass

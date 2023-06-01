@@ -14,7 +14,8 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 class CryoEM(NanomePlugin):
 
-    async def on_start(self):
+    def __init__(self):
+        super().__init__()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.groups = []
