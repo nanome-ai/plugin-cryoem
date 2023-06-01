@@ -71,7 +71,9 @@ class UIManager:
 
         # Handle different command types
         if command == Commands.button_press:
-            pass
+            btn = menu_content
+            if btn._toggle_on_press:
+                btn._selected = val
         elif command in [Commands.slider_change, Commands.slider_release]:
             sld = menu_content
             sld.current_value = val
@@ -81,8 +83,8 @@ class UIManager:
         elif command == Commands.dropdown_item_click:
             dd = menu_content
             clicked_item_index = val
-            for i in range(0, len(dd._items)):
-                dd._items[i]._selected = i == clicked_item_index
+            for i, item in enumerate(dd._items):
+                item._selected = i == clicked_item_index
         else:
             logger.debug('huh?')
 
