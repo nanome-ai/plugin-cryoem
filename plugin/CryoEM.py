@@ -25,7 +25,7 @@ class CryoEM(NanomePlugin):
         self.temp_dir.cleanup()
 
     async def on_run(self):
-        self.menu.render(force_enable=True)
+        await self.menu.render(force_enable=True)
 
     def add_mapgroup(self):
         group_num = 1
@@ -103,7 +103,7 @@ class CryoEM(NanomePlugin):
         await mapgroup.generate_full_mesh()
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
-        self.menu.render(selected_mapgroup=mapgroup)
+        await self.menu.render(selected_mapgroup=mapgroup)
 
     async def delete_mapgroup(self, map_group: MapGroup):
         map_comp = map_group.map_mesh.complex
@@ -125,7 +125,7 @@ class CryoEM(NanomePlugin):
             os.remove(map_group.map_gz_file)
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
-        self.menu.render(selected_mapgroup=mapgroup)
+        await self.menu.render(selected_mapgroup=mapgroup)
 
     @staticmethod
     def remove_hydrogens(comp):

@@ -66,7 +66,7 @@ class MainMenu:
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
         ui_manager.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
-    def render(self, force_enable=False, selected_mapgroup=None):
+    async def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
             self._menu.enabled = True
 
@@ -84,7 +84,7 @@ class MainMenu:
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
-        self.render()
+        asyncio.create_task(self.render())
 
     def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
