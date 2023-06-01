@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import nanome
 import os
 import requests
@@ -199,7 +200,7 @@ class MainMenu:
             self._plugin.send_notification(enums.NotificationTypes.error, msg)
         else:
             # Download map data
-            map_file = self.download_mapgz_from_emdbid(embid_id, metadata_parser)
+            map_file = await self.download_mapgz_from_emdbid(embid_id, metadata_parser)
             isovalue = metadata_parser.isovalue
             # Update message to say generating mesh
             self._plugin.client.update_content(btn)
@@ -244,7 +245,7 @@ class MainMenu:
         response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
-    def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+    async def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
@@ -255,26 +256,31 @@ class MainMenu:
         loading_bar = self.lb_embl_download.get_content()
 
         file_size = metadata_parser.map_filesize
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            chunk_size = 8192
-            downloaded_chunks = 0
-            with open(file_path, "wb") as f:
-                start_time = time.time()
-                data_check = start_time
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    downloaded_chunks += chunk_size
-                    f.write(chunk)
-                    now = time.time()
-                    if now - data_check > 5:
-                        kb_downloaded = downloaded_chunks / 1000
-                        Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
-                        loading_bar.percentage = kb_downloaded / file_size
-                        self.btn_embl_submit.text.value.unusable = \
-                            f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
-                        self.btn_embl_submit.unusable = True
-                        self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
-                        data_check = now
+        chunk_size = 8192
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                with open(file_path, 'wb') as file:
+                    start_time = time.time()
+                    data_check = start_time
+                    downloaded_chunks = 0
+                    while True:
+                        chunk = await response.content.read(chunk_size)
+                        if not chunk:
+                            break
+                        downloaded_chunks += len(chunk)
+                        file.write(chunk)
+                        now = time.time()
+                        # Update UI with download progress
+                        ui_update_interval = 3
+                        if now - data_check > ui_update_interval:
+                            kb_downloaded = downloaded_chunks / 1000
+                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
+                            loading_bar.percentage = kb_downloaded / file_size
+                            self.btn_embl_submit.text.value.unusable = \
+                                f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                            self.btn_embl_submit.unusable = True
+                            self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
+                            data_check = now
         loading_bar.percentage = 0
         self.lb_embl_download.enabled = False
         self._plugin.client.update_node(self.lb_embl_download)
