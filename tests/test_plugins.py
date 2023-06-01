@@ -42,6 +42,10 @@ class CryoEMPluginTestCase(unittest.TestCase):
         # Make temp copy of mapfile, because a test will delete it.
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
+        shapes_mock = asyncio.Future()
+        shapes_mock.set_result([MagicMock()])
+        self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
+
     def tearDown(self):
         super().tearDown()
         self.plugin.on_stop()
@@ -63,7 +67,7 @@ class CryoEMPluginTestCase(unittest.TestCase):
 
     def test_add_pdb_to_group(self):
         async def validate_add_pdb_to_group():
-            self.plugin.menu.render()
+            await self.plugin.menu.render()
             selected_mapgroup_name = self.plugin.menu.get_selected_mapgroup()
             selected_mapgroup = self.plugin.get_group(selected_mapgroup_name)
 
@@ -88,17 +92,13 @@ class CryoEMPluginTestCase(unittest.TestCase):
 
     def test_add_mapgz_to_group(self):
         async def validate_add_mapgz_to_group():
-            self.plugin.menu.render()
+            await self.plugin.menu.render()
             selected_mapgroup_name = self.plugin.menu.get_selected_mapgroup()
             selected_mapgroup = self.plugin.get_group(selected_mapgroup_name)
 
             add_to_workspace_fut = asyncio.Future()
             add_to_workspace_fut.set_result([structure.Complex()])
             self.plugin.client.add_to_workspace = MagicMock(return_value=add_to_workspace_fut)
-
-            none_mock = asyncio.Future()
-            none_mock.set_result([MagicMock()])
-            self.plugin.client.shapes_upload_multiple = MagicMock(return_value=none_mock)
 
             self.assertTrue(selected_mapgroup.map_complex is None)
             self.assertTrue(selected_mapgroup is not None)

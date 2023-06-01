@@ -39,9 +39,9 @@ class EditMeshMenuTestCase(unittest.TestCase):
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-        none_mock = asyncio.Future()
-        none_mock.set_result([MagicMock()])
-        self.plugin.client.shapes_upload_multiple = MagicMock(return_value=none_mock)
+        shapes_mock = asyncio.Future()
+        shapes_mock.set_result([MagicMock()])
+        self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
     def tearDown(self):
         super().tearDown()
