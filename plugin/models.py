@@ -41,8 +41,8 @@ class MapMesh:
         self._plugin = plugin
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
-        self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = False
+        self.mesh_backface: shapes.Mesh = shapes.Mesh()
+        self.backface = True
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
@@ -64,7 +64,6 @@ class MapMesh:
     @color.setter
     def color(self, value: Color):
         self.mesh.color = value
-        self.mesh_inverted.color = value
 
     @property
     def colors(self):
@@ -73,20 +72,22 @@ class MapMesh:
     @colors.setter
     def colors(self, value: Color):
         self.mesh.colors = value
-        self.mesh_inverted.colors = value
 
     def upload(self):
         self.mesh.upload()
         if self.backface:
-            self.mesh_inverted.upload()
+            self.load_mesh_backface()
+            self.mesh_backface.upload()
 
-    def load_backface_mesh(self):
+    def load_mesh_backface(self):
         vertices = self.mesh.vertices
         normals = self.mesh.normals
         triangles = np.reshape(self.mesh.triangles, (int(len(self.mesh.triangles) / 3), 3))
-        self.mesh_inverted.vertices = vertices
-        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
-        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+        self.mesh_backface.anchors = self.mesh.anchors
+        self.mesh_backface.colors = self.mesh.colors
+        self.mesh_backface.vertices = vertices
+        self.mesh_backface.normals = np.array([-n for n in normals]).flatten()
+        self.mesh_backface.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
 
     async def load(self, map_manager: map_manager, isovalue, opacity, selected_residues=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -103,14 +104,10 @@ class MapMesh:
         new_mesh._index = self.mesh.index
         self.mesh = new_mesh
 
-        if self.backface:
-            self.load_backface_mesh()
-
         Logs.message("Mesh generated")
         Logs.debug(f"{len(self.mesh.vertices) // 3} vertices")
         opacity_a = int(opacity * 255)
         self.mesh.color = Color(255, 255, 255, opacity_a)
-        self.mesh_inverted.color = Color(255, 255, 255, opacity_a)
 
         if self.complex.index == -1:
             # Create complex to attach mesh to.
@@ -120,8 +117,6 @@ class MapMesh:
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
-            if self.backface:
-                self.mesh_inverted.anchors[0] = anchor
         else:
             new_comp = self.create_map_complex(self.map_manager, self.map_gz_file)
             comp_index = self.complex.index
@@ -439,7 +434,7 @@ class MapGroup:
             if i >= 0 and i < len(atom_positions):
                 colors = np.append(colors, cpk_colors(atoms[i]))
             else:
-                colors = np.append(colors, [255, 255, 255, 50])
+                colors = np.append(colors, [255, 255, 255, 0])
         map_mesh.colors = colors
 
     @staticmethod
