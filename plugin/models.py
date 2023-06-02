@@ -41,7 +41,7 @@ class MapMesh:
         self._plugin = plugin
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
-        self.mesh_inverted: shapes.Mesh = shapes.Mesh()
+        self.mesh_backface: shapes.Mesh = shapes.Mesh()
         self.backface = True
         self.map_manager: map_manager = None
         if map_gz_file:
@@ -76,18 +76,18 @@ class MapMesh:
     def upload(self):
         self.mesh.upload()
         if self.backface:
-            self.load_backface_mesh()
-            self.mesh_inverted.upload()
+            self.load_mesh_backface()
+            self.mesh_backface.upload()
 
-    def load_backface_mesh(self):
+    def load_mesh_backface(self):
         vertices = self.mesh.vertices
         normals = self.mesh.normals
         triangles = np.reshape(self.mesh.triangles, (int(len(self.mesh.triangles) / 3), 3))
-        self.mesh_inverted.anchors = self.mesh.anchors
-        self.mesh_inverted.colors = self.mesh.colors
-        self.mesh_inverted.vertices = vertices
-        self.mesh_inverted.normals = np.array([-n for n in normals]).flatten()
-        self.mesh_inverted.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
+        self.mesh_backface.anchors = self.mesh.anchors
+        self.mesh_backface.colors = self.mesh.colors
+        self.mesh_backface.vertices = vertices
+        self.mesh_backface.normals = np.array([-n for n in normals]).flatten()
+        self.mesh_backface.triangles = np.array([[t[1], t[0], t[2]] for t in triangles]).flatten()
 
     async def load(self, map_manager: map_manager, isovalue, opacity, selected_residues=None):
         """Create complex, Generate Mesh, and attach mesh to complex."""
@@ -434,7 +434,7 @@ class MapGroup:
             if i >= 0 and i < len(atom_positions):
                 colors = np.append(colors, cpk_colors(atoms[i]))
             else:
-                colors = np.append(colors, [255, 255, 255, 50])
+                colors = np.append(colors, [255, 255, 255, 0])
         map_mesh.colors = colors
 
     @staticmethod
