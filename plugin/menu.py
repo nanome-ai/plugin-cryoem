@@ -364,22 +364,23 @@ class EditMeshMenu:
         if map_group.has_map():
             self.sld_isovalue.min_value = map_group.hist_x_min
             self.sld_isovalue.max_value = map_group.hist_x_max
-            self._plugin.update_content(self.sld_isovalue)
-
+            self.sld_isovalue.current_value = map_group.isovalue
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
-            self._plugin.update_node(self.ln_img_histogram)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
         if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-            self._plugin.update_node(self.ln_img_histogram)
-
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
         self._plugin.update_menu(self._menu)
+        if map_group.has_map() and not map_group.png_tempfile:
+            # Generate histogram and add to menu.
+            map_group.generate_histogram(self.temp_dir)
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+            self.sld_isovalue.min_value = map_group.hist_x_min
+            self.sld_isovalue.max_value = map_group.hist_x_max
+            self._plugin.update_node(self.ln_img_histogram)
+            self._plugin.update_content(self.sld_isovalue)
+            self._plugin.update_node(self.ln_img_histogram)
 
     def set_isovalue_ui(self, isovalue: float):
         self.sld_isovalue.current_value = isovalue
