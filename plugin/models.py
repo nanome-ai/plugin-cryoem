@@ -599,3 +599,10 @@ class MapGroup:
             await self.generate_mesh_around_selection()
         elif self.extraction_type == EXTRACTION_TYPE.MODEL:
             await self.generate_mesh_around_model()
+
+    def has_small_histogram_range(self):
+        """Return true if the histogram range is small.
+
+        The ui slider doesn't work correctly if the min and max values are too small.
+        """
+        return self.hist_x_max < 1 or self.hist_x_min > -1
