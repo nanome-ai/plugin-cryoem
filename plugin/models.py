@@ -42,7 +42,7 @@ class MapMesh:
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_inverted: shapes.Mesh = shapes.Mesh()
-        self.backface = False
+        self.backface = True
         self.map_manager: map_manager = None
         if map_gz_file:
             self.map_manager = self.load_map_file(map_gz_file)
