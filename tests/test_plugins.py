@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 from plugin.CryoEM import CryoEM
 from plugin.models import MapGroup
 
+from distutils.spawn import find_executable
+
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
 
