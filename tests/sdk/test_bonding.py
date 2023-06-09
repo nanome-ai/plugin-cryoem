@@ -2,7 +2,6 @@ import nanome
 import sys
 import unittest
 from nanome_sdk.session.bonding import Bonding, NANOBABEL_PATH, OBABEL_PATH
-from nanome._internal.process import _Bonding
 from nanome.api import structure
 import os
 
@@ -34,11 +33,8 @@ class BondingTestCase(unittest.TestCase):
         self.assertEqual(bond_count, 0)
 
         complex_list = [comp]
-        callback = None
-        fast_mode = False
-        plugin = MagicMock()
-        bonding = _Bonding(plugin, complex_list, callback, fast_mode)
-        bonding._start()
+        bonding = Bonding()
+        bonding.start(complex_list)
 
         # Looks like nanobabel and openbabel return different bond counts :pika-shock:
         expected_bond_count = 2132 if NANOBABEL_PATH else 2134
@@ -57,11 +53,8 @@ class BondingTestCase(unittest.TestCase):
         self.assertEqual(bond_count, 0)
 
         complex_list = [comp]
-        callback = None
-        fast_mode = False
-        plugin = MagicMock()
-        bonding = _Bonding(plugin, complex_list, callback, fast_mode)
-        bonding._start()
+        bonding = Bonding()
+        bonding.start(complex_list)
         # Make sure conformer count hasn't changed
         mol = next(comp.molecules)
         self.assertEqual(mol._conformer_count, expected_conformer_count)
@@ -103,11 +96,8 @@ class BondingTestCase(unittest.TestCase):
         self.assertEqual(pdb2_bond_count, 0)
 
         complex_list = [pdb1_comp, pdb2_comp]
-        callback = None
-        fast_mode = False
-        plugin = MagicMock()
-        bonding = _Bonding(plugin, complex_list, callback, fast_mode)
-        bonding._start()
+        bonding = Bonding()
+        bonding.start(complex_list)
         # Make sure conformer count hasn't changed
         pdb1_mol = next(pdb1_comp.molecules)
         self.assertEqual(pdb1_mol._conformer_count, pdb1_expected_conformer_count)
