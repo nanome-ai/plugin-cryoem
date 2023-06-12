@@ -73,7 +73,7 @@ class CryoEM(NanomePlugin):
         comp = structure.Complex.io.from_pdb(path=pdb_filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(pdb_filepath).stem
-        # await self.client.add_bonds([comp])
+        await self.client.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
         return comp

@@ -73,9 +73,9 @@ class CryoEMPluginTestCase(unittest.TestCase):
             selected_mapgroup_name = self.plugin.menu.get_selected_mapgroup()
             selected_mapgroup = self.plugin.get_group(selected_mapgroup_name)
 
-            # add_bonds_fut = asyncio.Future()
-            # add_bonds_fut.set_result(None)
-            # self.plugin.client.add_bonds = MagicMock(return_value=add_bonds_fut)
+            add_bonds_fut = asyncio.Future()
+            add_bonds_fut.set_result(None)
+            self.plugin.client.add_bonds = MagicMock(return_value=add_bonds_fut)
 
             add_to_workspace_fut = asyncio.Future()
             add_to_workspace_fut.set_result([structure.Complex()])

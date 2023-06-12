@@ -1,4 +1,3 @@
-import copy
 import logging
 import subprocess
 import tempfile
@@ -20,7 +19,7 @@ class Bonding:
         """Start the bonding process."""
         for input_comp in complex_list:
             # is_conformer = len(next(input_comp.atoms).in_conformer) > 1
-            input_comp.convert_to_frames()
+            # input_comp.convert_to_frames()
             input_file = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
             output_file = tempfile.NamedTemporaryFile(suffix='.mol', delete=False)
             input_comp.io.to_pdb(input_file.name)

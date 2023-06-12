@@ -7,6 +7,7 @@ from nanome.util import enums
 from nanome._internal.network.packet import Packet
 from nanome._internal.enums import Messages
 from nanome_sdk import utils
+from nanome_sdk.session.bonding import Bonding
 
 
 __all__ = ["SessionClient"]
@@ -319,6 +320,9 @@ class SessionClient:
         expects_response = False
         args = (color_scheme, target, only_carbons)
         self._send_message(message_type, args, expects_response)
+
+    def add_bonds(self, comp_list):
+        Bonding.start(comp_list)
 
     def _send_message(self, message_type, args, expects_response=False):
         request_id = utils.random_request_id()

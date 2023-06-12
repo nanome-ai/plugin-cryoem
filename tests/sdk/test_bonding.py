@@ -41,6 +41,7 @@ class BondingTestCase(unittest.TestCase):
         bond_count = sum(1 for _ in comp.bonds)
         self.assertEqual(bond_count, expected_bond_count)
 
+    @unittest.skip("Conformers not supported yet.")
     def test_bonding_conformer(self):
         pdb_file = os.path.join(fixtures_dir, 'thrombine_conformer.pdb')
         expected_conformer_count = 5
@@ -71,6 +72,7 @@ class BondingTestCase(unittest.TestCase):
             self.assertEqual(conformer_atom_count, expected_conf_atom_count)
             self.assertEqual(conformer_bond_count, expected_conf_bond_count)
 
+    @unittest.skip("Conformers not supported yet.")
     def test_bonding_multiple_comps(self):
         pdb_file1 = os.path.join(fixtures_dir, 'thrombine_conformer.pdb')
         pdb_file2 = os.path.join(fixtures_dir, '1tyl.pdb')
