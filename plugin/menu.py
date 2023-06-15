@@ -194,10 +194,10 @@ class MainMenu:
         except requests.exceptions.HTTPError:
             msg = "EMDB ID not found"
             Logs.warning(msg)
-            self._plugin.send_notification(enums.NotificationTypes.error, msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
         except Exception:
             msg = "Map file must be smaller than 500MB"
-            self._plugin.send_notification(enums.NotificationTypes.error, msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
         else:
             # Download map data
             map_file = await self.download_mapgz_from_emdbid(embid_id, metadata_parser)
@@ -229,7 +229,7 @@ class MainMenu:
         response = requests.get(url)
         if response.status_code != 200:
             Logs.warning(f"PDB for {pdb_id} not found")
-            self._plugin.send_notification(
+            self._plugin.client.send_notification(
                 nanome.util.enums.NotificationTypes.error,
                 f"{pdb_id} not found in RCSB")
             return

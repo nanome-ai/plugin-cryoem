@@ -1,9 +1,10 @@
 import logging
-import os
 import subprocess
 import tempfile
 from nanome.api.structure import Bond, Complex
 from nanome.util import Logs
+from distutils.spawn import find_executable
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ class Bonding:
 
     @classmethod
     def start_bonding_process(cls, input_filepath: str, output_filepath: str):
-        NANOBABEL_PATH = os.environ.get('NANOBABEL_PATH')
-        OBABEL_PATH = os.environ.get('OBABEL_PATH')
+        NANOBABEL_PATH = find_executable('nanobabel')
+        OBABEL_PATH = find_executable('obabel')
         Logs.debug(f'OBABEL_PATH={OBABEL_PATH}')
 
         cmd = []
