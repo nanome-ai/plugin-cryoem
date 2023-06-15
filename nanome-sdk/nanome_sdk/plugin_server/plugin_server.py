@@ -4,11 +4,11 @@ import logging
 import os
 import ssl
 import sys
+from distutils.spawn import find_executable
 
 from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
-
 from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk.session import run_session_loop_py
 
@@ -140,8 +140,12 @@ class PluginServer:
         plugin_id = packet.plugin_id
         session_id = packet.session_id
         self.logger.info(f"Starting process for Session {session_id}")
+        obabel_path = find_executable("obabel")
+        nanobabel_path = find_executable("nanobabel")
         env = {
             'NANOME_VERSION_TABLE': json.dumps(version_table),
+            'OBABEL_PATH': obabel_path,
+            'NANOBABEL_PATH': nanobabel_path
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(

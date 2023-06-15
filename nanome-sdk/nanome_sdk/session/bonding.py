@@ -1,15 +1,11 @@
 import logging
+import os
 import subprocess
 import tempfile
-from distutils.spawn import find_executable
 from nanome.api.structure import Bond, Complex
-
+from nanome.util import Logs
 
 logger = logging.getLogger(__name__)
-
-
-NANOBABEL_PATH = find_executable('nanobabel')
-OBABEL_PATH = find_executable('obabel')
 
 
 class Bonding:
@@ -33,13 +29,20 @@ class Bonding:
 
     @classmethod
     def start_bonding_process(cls, input_filepath: str, output_filepath: str):
+        NANOBABEL_PATH = os.environ.get('NANOBABEL_PATH')
+        OBABEL_PATH = os.environ.get('OBABEL_PATH')
+        Logs.debug(f'OBABEL_PATH={OBABEL_PATH}')
+
         cmd = []
-        if NANOBABEL_PATH:
-            cmd = [NANOBABEL_PATH, 'bonding', '-i', input_filepath, '-o', output_filepath]
-        elif OBABEL_PATH:
+        if OBABEL_PATH:
             cmd = [OBABEL_PATH, '-ipdb', input_filepath, '-osdf', '-O' + output_filepath]
-        proc = subprocess.Popen(cmd)
-        return proc
+        elif NANOBABEL_PATH:
+            cmd = [NANOBABEL_PATH, 'bonding', '-i', input_filepath, '-o', output_filepath]
+        if cmd:
+            proc = subprocess.Popen(cmd)
+            return proc
+        else:
+            raise Exception("Bonding program not found.")
 
     @staticmethod
     def _match_and_bond(unbonded_mol, bonded_mol):
