@@ -373,7 +373,8 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             # Generate histogram and add to menu.
             map_group.generate_histogram(self.temp_dir)
-        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self.set_isovalue_slider_min_max(map_group)
         self._plugin.update_node(self.ln_img_histogram)
 
