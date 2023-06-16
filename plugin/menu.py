@@ -142,7 +142,7 @@ class MainMenu:
             return
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
-        await group_menu.render(map_group)
+        group_menu.render(map_group)
 
     # @async_callback
     async def delete_group(self, map_group, btn):

@@ -75,13 +75,13 @@ class MapMesh:
     async def upload(self):
         meshes = [self.mesh]
         if self.backface:
-            meshes.append(self.mesh_inverted)
+            meshes.append(self.mesh_backface)
         if self.mesh.index == -1:
             # Make sure indices get set
             uploaded_meshes = await self._plugin.client.shapes_upload_multiple(meshes)
             self.mesh = uploaded_meshes[0]
             if self.backface:
-                self.mesh_inverted = uploaded_meshes[1]
+                self.mesh_backface = uploaded_meshes[1]
         else:
             asyncio.create_task(self._plugin.client.shapes_upload_multiple(meshes))
 
