@@ -6,7 +6,6 @@ import urllib
 from functools import partial
 from nanome.api import ui
 from nanome.util import async_callback, enums, Logs
-from threading import Thread
 
 from .models import MapGroup
 from .utils import EMDBMetadataParser
@@ -282,6 +281,9 @@ class MainMenu:
 
 class EditMeshMenu:
 
+    # used to scale the isovalue slider when values are too small for slider to work with
+    isovalue_scaling_factor = 100
+
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
         self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
@@ -330,7 +332,7 @@ class EditMeshMenu:
         self.btn_box_around_selection.register_pressed_callback(self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 2)})'
+        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 3)})'
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
@@ -358,44 +360,35 @@ class EditMeshMenu:
         if map_group.metadata:
             resolution = map_group.metadata.resolution
             self.lbl_resolution.text_value = f'{resolution} A' if resolution else ''
-        self.set_isovalue_ui(self.map_group.isovalue)
+        self.set_isovalue_ui(self.map_group)
         self.set_opacity_ui(self.map_group.opacity)
 
         if map_group.has_map():
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
-            self._plugin.update_content(self.sld_isovalue)
-
+            self.set_isovalue_slider_min_max(map_group)
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
-            self._plugin.update_node(self.ln_img_histogram)
-            thread = Thread(
-                target=self.generate_histogram_thread,
-                args=[map_group])
-            thread.start()
-        if map_group.png_tempfile:
-            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-            self._plugin.update_node(self.ln_img_histogram)
-
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
         self._plugin.update_menu(self._menu)
+        if map_group.has_map() and not map_group.png_tempfile:
+            # Generate histogram and add to menu.
+            map_group.generate_histogram(self.temp_dir)
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self.set_isovalue_slider_min_max(map_group)
+        self._plugin.update_node(self.ln_img_histogram)
 
-    def set_isovalue_ui(self, isovalue: float):
-        self.sld_isovalue.current_value = isovalue
+    def set_isovalue_ui(self, map_group):
+        self.set_isovalue_slider_min_max(map_group)
         self.update_isovalue_lbl(self.sld_isovalue)
 
     def set_opacity_ui(self, opacity: float):
         self.sld_opacity.current_value = opacity
         self.update_opacity_lbl(self.sld_opacity)
 
-    def set_radius_ui(self, radius: float):
-        self.sld_radius.current_value = radius
-        self.sld_radius_update(self.sld_radius)
-
     def update_isovalue_lbl(self, sld):
-        slider_value = sld.current_value
-        self.lbl_isovalue.text_value = f'{round(slider_value, 2)} A'
+        slider_value = self.get_isovalue_from_slider()
+        self.lbl_isovalue.text_value = f'{round(slider_value, 3)} A'
         self._plugin.update_content(self.lbl_isovalue, sld)
 
         # /!\ calculation is sensitive to menu and image dimensions
@@ -404,7 +397,8 @@ class EditMeshMenu:
         if self.map_group.has_histogram():
             x_min = self.map_group.hist_x_min
             x_max = self.map_group.hist_x_max
-            x = (sld.current_value - x_min) / (x_max - x_min)
+            current_value = self.get_isovalue_from_slider()
+            x = (current_value - x_min) / (x_max - x_min)
             left = (100 + x * 620) / 800
             self.ln_isovalue_line.set_padding(left=left)
             self._plugin.update_node(self.ln_isovalue_line)
@@ -444,7 +438,7 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_map(self, btn=None):
-        self.map_group.isovalue = self.isovalue
+        self.map_group.isovalue = self.get_isovalue_from_slider()
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
@@ -470,10 +464,6 @@ class EditMeshMenu:
         self.sld_isovalue.max_value = map_group.hist_x_max
         self._plugin.update_node(self.ln_img_histogram)
         self._plugin.update_content(self.sld_isovalue)
-
-    @property
-    def isovalue(self):
-        return self.sld_isovalue.current_value
 
     @property
     def opacity(self):
@@ -513,3 +503,21 @@ class EditMeshMenu:
             Logs.message(f"Deleting {len(strucs)} group objects.")
             self.map_group.remove_group_objects(strucs)
             self.render(self.map_group)
+
+    def set_isovalue_slider_min_max(self, map_group):
+        min_value = map_group.hist_x_min
+        max_value = map_group.hist_x_max
+        current_value = map_group.isovalue
+        if map_group.has_small_histogram_range():
+            min_value = min_value * self.isovalue_scaling_factor
+            max_value = max_value * self.isovalue_scaling_factor
+            current_value = current_value * self.isovalue_scaling_factor
+        self.sld_isovalue.min_value = min_value
+        self.sld_isovalue.max_value = max_value
+        self.sld_isovalue.current_value = current_value
+
+    def get_isovalue_from_slider(self):
+        isovalue = self.sld_isovalue.current_value
+        if self.map_group.has_small_histogram_range():
+            isovalue = isovalue / self.isovalue_scaling_factor
+        return isovalue
