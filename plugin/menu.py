@@ -281,6 +281,7 @@ class MainMenu:
 
 class EditMeshMenu:
 
+    # used to scale the isovalue slider when values are too small for slider to work with
     isovalue_scaling_factor = 100
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
@@ -436,7 +437,7 @@ class EditMeshMenu:
 
     @async_callback
     async def redraw_map(self, btn=None):
-        self.map_group.isovalue = self.isovalue
+        self.map_group.isovalue = self.get_isovalue_from_slider()
         self.map_group.opacity = self.opacity
         self.map_group.color_scheme = self.color_scheme
         if self.map_group.has_map():
@@ -462,10 +463,6 @@ class EditMeshMenu:
         self.sld_isovalue.max_value = map_group.hist_x_max
         self._plugin.update_node(self.ln_img_histogram)
         self._plugin.update_content(self.sld_isovalue)
-
-    @property
-    def isovalue(self):
-        return self.sld_isovalue.current_value
 
     @property
     def opacity(self):
