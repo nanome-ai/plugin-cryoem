@@ -27,8 +27,9 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
         logger.critical("Plugin must inherit from NanomePlugin")
         exit(1)
     plugin_instance.set_client(plugin_id, session_id, version_table)
-    await plugin_instance.client.connect_stdin_stdout()
-    await plugin_instance.client.send_connect(plugin_id, session_id, version_table)
+    client = plugin_instance.client
+    client.reader, client.writer = await utils.connect_stdin_stdout()
+    await client.send_connect(plugin_id, session_id, version_table)
     await _start_session_loop(plugin_instance)
 
 

@@ -30,20 +30,6 @@ class SessionClient:
             cls.instance = super(SessionClient, cls).__new__(cls)
         return cls.instance
 
-    async def connect_stdin_stdout(self):
-        """Wrap stdin and stdout in StreamReader and StreamWriter interface.
-
-        allows async reading and writing.
-        """
-        loop = asyncio.get_event_loop()
-        reader = asyncio.StreamReader(limit=2**32)
-        protocol = asyncio.StreamReaderProtocol(reader)
-        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-        w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
-        writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
-        self.reader = reader
-        self.writer = writer
-
     def update_menu(self, menu, shallow=False):
         self.logger.debug("Sending Update Menu.")
         message_type = Messages.menu_update
@@ -63,7 +49,7 @@ class SessionClient:
         return result
 
     async def send_connect(self, plugin_id, session_id, version_table):
-        await self.connect_stdin_stdout()
+        self.reader, self.writer = await utils.connect_stdin_stdout()
         self.logger.debug("Sending Connect")
         serializer = CommandMessageSerializer()
         message_type = Messages.connect

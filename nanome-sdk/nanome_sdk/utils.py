@@ -1,6 +1,8 @@
+import asyncio
 import enum
 import logging
 import random
+import sys
 from nanome._internal.network import Packet, Data
 
 
@@ -40,3 +42,17 @@ def convert_bytes_to_packet(received_bytes):
     if not got_payload:
         logger.warning("Could not get packet payload")
     return packet
+
+
+async def connect_stdin_stdout():
+    """Wrap stdin and stdout in StreamReader and StreamWriter interface.
+
+    allows async reading and writing.
+    """
+    loop = asyncio.get_event_loop()
+    reader = asyncio.StreamReader(limit=2**32)
+    protocol = asyncio.StreamReaderProtocol(reader)
+    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+    w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
+    writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
+    return reader, writer
