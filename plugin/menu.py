@@ -1,6 +1,8 @@
 import nanome
 import os
+import pathlib
 import requests
+import tempfile
 import time
 import urllib
 from functools import partial
@@ -56,6 +58,8 @@ class MainMenu:
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
         self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
+        self.ti_filepath: ui.TextInput = root.find_node('ln_ti_filepath').get_content()
+        self.btn_upload_file: ui.Button = root.find_node('ln_btn_upload_file').get_content()
 
     def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
@@ -67,7 +71,24 @@ class MainMenu:
             selected_mapgroup = groups[0]
 
         self.render_map_groups(groups, selected_mapgroup)
+
+        self.ti_filepath.input_text = 'C:\\Users\\miker\\Downloads\\emd_8216.map.gz'
+        self.btn_upload_file.register_pressed_callback(self.on_upload_file_btn_pressed)
         self._plugin.update_menu(self._menu)
+
+    @async_callback
+    async def on_upload_file_btn_pressed(self, btn):
+        # Get file from Nanome session machine and load it into a temp file
+        Logs.message('Uploading file from Nanome session machine')
+        source_path = self.ti_filepath.input_text
+        suffix = ''.join(pathlib.Path(source_path).suffixes)
+
+        map_file = tempfile.NamedTemporaryFile(suffix=suffix, dir=self.temp_dir, delete=False)
+        map_path = map_file.name
+        await self._plugin.files.get(source_path, map_path)
+        isovalue = 0.2
+        await self._plugin.add_mapgz_to_group(map_path, isovalue)
+        Logs.message(f'File {source_path} uploaded to {map_path}')
 
     @property
     def temp_dir(self):

@@ -136,11 +136,17 @@ class CryoEM(nanome.AsyncPluginInstance):
 
 
 def main():
+    name = "Cryo-EM"
+    description = "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces"
+    category = "other"
+    has_advanced = False
+    permissions = [enums.Permissions.local_files_access]
     plugin = nanome.Plugin(
-        "Cryo-EM",
-        "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces",
-        "other",
-        False,
+        name,
+        description,
+        category,
+        has_advanced,
+        permissions=permissions,
         version=__version__
     )
     plugin.set_plugin_class(CryoEM)
