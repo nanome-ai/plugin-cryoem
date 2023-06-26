@@ -11,7 +11,7 @@ from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk import default_logging_config_ini
-from nanome_sdk.logs import configure_remote_logging
+# from nanome_sdk.logs import configure_remote_logging
 from nanome_sdk.session import run_session_loop_py
 
 
@@ -35,20 +35,29 @@ class PluginServer:
 
     async def run(self, nts_host, nts_port, plugin_name, description, plugin_class):
         self.plugin_class = plugin_class
+        queue_listener = None
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             self.nts_reader, self.nts_writer = await asyncio.open_connection(nts_host, nts_port, ssl=ssl_context)
             await self.connect_plugin(plugin_name, description)
 
+            # queue_listener = configure_remote_logging(
+            #     self.nts_writer,
+            #     plugin_id=self.plugin_id,
+            #     plugin_name=plugin_name,
+            #     plugin_class=self.plugin_class.__name__
+            # )
+
             # Start keep-alive task
             self.keep_alive_task = asyncio.create_task(self.keep_alive(self.plugin_id))
             self.poll_nts_task = asyncio.create_task(self.poll_nts())
             await self.poll_nts_task
-        except Exception as e:
-            logger.error(e)
+        except asyncio.IncompleteReadError as e:
             raise e
         finally:
             self.nts_writer.close()
+            if queue_listener:
+                queue_listener.stop()
 
     async def poll_nts(self):
         """Poll NTS for packets, and forward them to the plugin server."""
@@ -94,12 +103,6 @@ class PluginServer:
         unpacked = Packet.header_unpack(header)
         self.plugin_id = unpacked[3]
         logger.info(f"Plugin id: {self.plugin_id}")
-        configure_remote_logging(
-            self.nts_writer,
-            plugin_id=self.plugin_id,
-            plugin_name=name,
-            plugin_class=self.plugin_class.__name__
-        )
 
     async def keep_alive(self, plugin_id):
         """Long running task to send keep alive packets to NTS."""

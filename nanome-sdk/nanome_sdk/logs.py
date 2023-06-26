@@ -1,6 +1,7 @@
 import json
 import asyncio
 import logging
+import logging.handlers
 import graypy
 
 from nanome._internal.network.packet import Packet
@@ -28,7 +29,7 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
         self.org_id = None
         self.account_id = None
         self.account_name = None
-        self._presenter_task = asyncio.create_task(self.set_presenter_info())
+        # self._presenter_task = asyncio.create_task(self.set_presenter_info())
 
     def handle(self, record):
         # Add extra fields to the record.
@@ -63,5 +64,9 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
 def configure_remote_logging(nts_writer, **kwargs):
     """Configure logging handler to send logs to main process."""
     logger = logging.getLogger()
-    pipe_handler = NTSLoggingHandler(nts_writer, **kwargs)
-    logger.addHandler(pipe_handler)
+    log_queue = asyncio.Queue()
+    queue_handler = logging.handlers.QueueHandler(log_queue)
+    nts_log_handler = NTSLoggingHandler(nts_writer, **kwargs)
+    listener = logging.handlers.QueueListener(log_queue, nts_log_handler)
+    logger.addHandler(queue_handler)
+    return listener
