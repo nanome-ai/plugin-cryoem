@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import logging.config
 import os
 import ssl
 import sys
@@ -8,13 +9,20 @@ import sys
 from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
+from nanome_sdk import default_logging_config_ini
 from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk.session import run_session_loop_py
 
 
 __all__ = ["PluginServer"]
 
-logging.basicConfig(level=logging.DEBUG)
+
+logging.config.fileConfig(default_logging_config_ini)
+# root_logger = logging.getLogger()
+# root_logger.setLevel(logging.DEBUG)
+# handler = logging.StreamHandler()
+
+
 logger = logging.getLogger(__name__)
 
 KEEP_ALIVE_TIME_INTERVAL = 60.0
@@ -104,6 +112,7 @@ class PluginServer:
             await self.nts_writer.drain()
 
     async def route_bytes(self, received_bytes):
+        """Route bytes from NTS to the appropriate session."""
         serializer = CommandMessageSerializer()
         packet = convert_bytes_to_packet(received_bytes)
         session_id = packet.session_id
@@ -171,7 +180,7 @@ class PluginServer:
         while True:
             # Load header, and then payload
             self.logger.debug("Waiting for session data...")
-            outgoing_bytes = await process.stdout.read(Packet.packet_header_length)
+            outgoing_bytes = await process.stdout.readexactly(Packet.packet_header_length)
             if not outgoing_bytes:
                 logger.debug("No outgoing bytes. Ending polling task.")
                 break

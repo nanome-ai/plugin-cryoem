@@ -12,8 +12,7 @@ from nanome.util import enums, Logs
 from .models import MapGroup
 from .utils import EMDBMetadataParser
 
-import logging 
-logging.basicConfig(level=logging.DEBUG)
+import logging
 logger = logging.getLogger(__name__)
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')

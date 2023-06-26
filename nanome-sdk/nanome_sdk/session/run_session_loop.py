@@ -3,12 +3,14 @@ import asyncio
 import inspect
 import json
 import logging
+import logging.config
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.api import control, ui
 from nanome_sdk.session import NanomePlugin
 from nanome_sdk import utils
+from nanome_sdk.logs import configure_remote_logging
 
 # Make sure plugin folder is in path
 # Bold assumption that plugin is always in `plugin` folder
@@ -17,8 +19,9 @@ plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
 from plugin import plugin_class  # noqa: E402
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(name="SessionInstance")
+# logging.basicConfig(level=logging.DEBUG)
+# logging.config.fileConfig(default_logging_config_ini)
+logger = logging.getLogger(__name__)
 
 
 async def start_session(plugin_instance, plugin_id, session_id, version_table):
@@ -30,6 +33,7 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
     client = plugin_instance.client
     client.reader, client.writer = await utils.connect_stdin_stdout()
     await client.send_connect(plugin_id, session_id, version_table)
+    configure_remote_logging(client.writer)
     await _start_session_loop(plugin_instance)
 
 
