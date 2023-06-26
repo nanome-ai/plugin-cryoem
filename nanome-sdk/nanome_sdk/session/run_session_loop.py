@@ -24,7 +24,7 @@ from plugin import plugin_class  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
-async def start_session(plugin_instance, plugin_id, session_id, version_table):
+async def start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table):
     logger.info("Starting Session!")
     if not issubclass(plugin_instance.__class__, NanomePlugin):
         logger.critical("Plugin must inherit from NanomePlugin")
@@ -33,7 +33,7 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
     client = plugin_instance.client
     client.reader, client.writer = await utils.connect_stdin_stdout()
     await client.send_connect(plugin_id, session_id, version_table)
-    configure_session_logging(client.writer, session_id)
+    await configure_session_logging(client.writer, session_id, plugin_id, plugin_name, plugin_instance)
     await _start_session_loop(plugin_instance)
 
 
@@ -95,18 +95,17 @@ async def _route_incoming_payload(payload, plugin_instance):
         ui_manager = plugin_instance.ui_manager
         ui_command = ui_manager.find_command(command_hash)
         await ui_manager.handle_ui_command(ui_command, received_obj_list)
-    else:
-        logger.warning(f"Unknown command {message.name()}")
 
 
 if __name__ == "__main__":
     plugin_id = int(sys.argv[1])
     session_id = int(sys.argv[2])
-    plugin_class_filepath = sys.argv[3]
+    plugin_name = sys.argv[3]
+    plugin_class_filepath = sys.argv[4]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
     logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
     logger.info(f'Plugin Class {plugin_class.__name__}')
     plugin_instance = plugin_class()
-    session_coro = start_session(plugin_instance, plugin_id, session_id, version_table)
+    session_coro = start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)

@@ -39,10 +39,11 @@ class PluginServer:
 
     async def run(self, nts_host, nts_port, plugin_name, description, plugin_class):
         self.plugin_class = plugin_class
+        self.plugin_name = os.environ.get("PLUGIN_NAME") or plugin_name
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             self.nts_reader, self.nts_writer = await asyncio.open_connection(nts_host, nts_port, ssl=ssl_context)
-            await self.connect_plugin(plugin_name, description)
+            await self.connect_plugin(self.plugin_name, description)
 
             # Start keep-alive task
             self.keep_alive_task = asyncio.create_task(self.keep_alive(self.plugin_id))
@@ -70,7 +71,6 @@ class PluginServer:
         """Send a packet to NTS to register plugin."""
         environ = os.environ
         key = environ["NTS_KEY"]
-        name = environ['PLUGIN_NAME']
         category = ""
         tags = []
         has_advanced = False
@@ -153,7 +153,7 @@ class PluginServer:
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(
-            sys.executable, run_session_loop_py, str(plugin_id), str(session_id), plugin_class_filepath,
+            sys.executable, run_session_loop_py, str(plugin_id), str(session_id), self.plugin_name, plugin_class_filepath,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             cwd=os.getcwd(),
@@ -186,11 +186,15 @@ class PluginServer:
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
             outgoing_bytes += await process.stdout.readexactly(payload_length)
             logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
-            await self.check_for_log_message(outgoing_bytes)
+            asyncio.create_task(self.check_for_log_message(outgoing_bytes))
             self.nts_writer.write(outgoing_bytes)
             await self.nts_writer.drain()
 
     async def check_for_log_message(self, bytestream):
+        """If the packet is a log message, use loggers in current process to handle it.
+
+        This provides a way of rendering logs from session processes, without sending them directly to stdout.
+        """
         packet = convert_bytes_to_packet(bytestream)
         if packet.packet_type == PacketTypes.live_logs:
             # Create a log record using values from gelf dict
