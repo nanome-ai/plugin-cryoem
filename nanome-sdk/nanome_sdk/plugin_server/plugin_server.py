@@ -193,11 +193,13 @@ class PluginServer:
     async def check_for_log_message(self, bytestream):
         packet = convert_bytes_to_packet(bytestream)
         if packet.packet_type == PacketTypes.live_logs:
-            gelf_dict = json.loads(packet.payload.decode("utf-8"))
             # Create a log record using values from gelf dict
+            gelf_dict = json.loads(packet.payload.decode("utf-8"))
+            # Multiply gelf level by 10 to get python logging level
+            level = gelf_dict.get("level") * 10
             logrecord_args = {
                 "name": gelf_dict.get("host"),  # or map to some other field if appropriate
-                "level": gelf_dict.get("level"),
+                "level": level,
                 "pathname": gelf_dict.get("file"),
                 "lineno": gelf_dict.get("line"),
                 "msg": gelf_dict.get("short_message"),
@@ -205,7 +207,7 @@ class PluginServer:
                 "exc_info": None,  # not provided in GELF
             }
             logrecord = logging.LogRecord(**logrecord_args)
-            logrecord.processName = gelf_dict.get("process_name")
+            logrecord.processName = gelf_dict.get("_process_name")
             self.logger.handle(logrecord)
             # new_packet.write_string(pickled_record)
             # logger.info(f"Log message: {packet.payload}")

@@ -143,7 +143,6 @@ class MainMenu:
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
-    # @async_callback
     async def delete_group(self, map_group, btn):
         Logs.message(f'Deleting group {map_group.group_name}')
         await self._plugin.delete_mapgroup(map_group)
@@ -156,7 +155,6 @@ class MainMenu:
         self._plugin.client.update_content(btn)
         self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
-    # @async_callback
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
@@ -176,7 +174,6 @@ class MainMenu:
         self.btn_embl_submit.text.value.unusable = "Downloading..."
         self._plugin.client.update_content(self.btn_embl_submit, btn)
 
-    # @async_callback
     async def on_emdb_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMDB query: {embid_id}")
@@ -435,31 +432,26 @@ class EditMeshMenu:
         self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
         self._plugin.client.update_content(self.lbl_radius, sld)
 
-    # @async_callback
     async def show_full_map(self, btn):
         Logs.message("Showing full map...")
         await self.map_group.generate_full_mesh()
         self._plugin.client.update_content(btn)
 
-    # @async_callback
     async def box_map_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
         await self.map_group.generate_mesh_around_selection()
         self._plugin.client.update_content(btn)
 
-    # @async_callback
     async def box_map_around_model(self, btn):
         Logs.message("Extracting map around model...")
         await self.map_group.generate_mesh_around_model()
         self._plugin.client.update_content(btn)
 
-    # @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
 
-    # @async_callback
     async def redraw_map(self, btn=None):
         self.map_group.isovalue = self.get_isovalue_from_slider()
         self.map_group.opacity = self.opacity
@@ -467,7 +459,6 @@ class EditMeshMenu:
         if self.map_group.has_map():
             await self.map_group.redraw_mesh()
 
-    # @async_callback
     async def redraw_new_isovalue(self, btn):
         rendered_isovalue = self.sld_isovalue.current_value
         await self.redraw_map(btn)
@@ -507,7 +498,6 @@ class EditMeshMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    # @async_callback
     async def set_color_scheme(self, *args):
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
         self._plugin.client.update_content(self.dd_color_scheme)

@@ -24,7 +24,7 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
         # Appending random string to process name makes tracking unique sessions easier
         random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
         self.process_name = "Session-{}-{}".format(session_id, random_str)
-        
+
         # Server Fields
         # self.plugin_id = plugin_id
         # self.plugin_name = plugin_name
@@ -39,7 +39,6 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
     def handle(self, record):
         # Add extra fields to the record.
         record.__dict__.update({
-            'process_name': self.process_name,
             # 'plugin_name': self.plugin_name,
             # 'plugin_class': self.plugin_name,
             # 'plugin_id': self.plugin_id,
@@ -47,6 +46,7 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
             # 'source_type': 'Plugin',
             # 'version': self._plugin.version
         })
+        record.processName = self.process_name
         return super(NTSLoggingHandler, self).handle(record)
 
     def emit(self, record):
@@ -71,6 +71,4 @@ def configure_session_logging(nts_writer, session_id):
     """Configure logging handler to send logs to main process."""
     logger = logging.getLogger()
     nts_handler = NTSLoggingHandler(nts_writer, session_id)
-    # fmt_string = '%(asctime)s : %(processName)s : %(levelname)s : %(module)s : %(message)s'
-    # nts_handler.setFormatter(logging.Formatter(fmt_string))
     logger.addHandler(nts_handler)
