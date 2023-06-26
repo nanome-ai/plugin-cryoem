@@ -10,7 +10,7 @@ from nanome.api.serializers import CommandMessageSerializer
 from nanome.api import control, ui
 from nanome_sdk.session import NanomePlugin
 from nanome_sdk import utils
-from nanome_sdk.logs import configure_remote_logging
+from nanome_sdk.logs import configure_session_logging
 
 # Make sure plugin folder is in path
 # Bold assumption that plugin is always in `plugin` folder
@@ -33,7 +33,7 @@ async def start_session(plugin_instance, plugin_id, session_id, version_table):
     client = plugin_instance.client
     client.reader, client.writer = await utils.connect_stdin_stdout()
     await client.send_connect(plugin_id, session_id, version_table)
-    configure_remote_logging(client.writer)
+    configure_session_logging(client.writer, session_id)
     await _start_session_loop(plugin_instance)
 
 

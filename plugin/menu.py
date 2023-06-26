@@ -136,7 +136,7 @@ class MainMenu:
     async def open_edit_mesh_menu(self, map_group, btn=None):
         if not map_group.has_map():
             msg = "Please add Map from EMDB before opening menu"
-            self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
+            await self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
             Logs.warning('Tried to open menu before adding map.')
             return
         Logs.message('Loading group details menu')

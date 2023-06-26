@@ -118,7 +118,6 @@ class PluginServer:
         session_id = packet.session_id
         packet_type = packet.packet_type
         if packet_type == PacketTypes.message_to_plugin:
-            self.logger.info("Received message to plugin")
             # If session id does not exist, start a new session process
             if session_id not in self._sessions:
                 received_version_table, _, _ = serializer.deserialize_command(packet.payload, None)
@@ -187,5 +186,26 @@ class PluginServer:
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
             outgoing_bytes += await process.stdout.readexactly(payload_length)
             logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
+            await self.check_for_log_message(outgoing_bytes)
             self.nts_writer.write(outgoing_bytes)
             await self.nts_writer.drain()
+
+    async def check_for_log_message(self, bytestream):
+        packet = convert_bytes_to_packet(bytestream)
+        if packet.packet_type == PacketTypes.live_logs:
+            gelf_dict = json.loads(packet.payload.decode("utf-8"))
+            # Create a log record using values from gelf dict
+            logrecord_args = {
+                "name": gelf_dict.get("host"),  # or map to some other field if appropriate
+                "level": gelf_dict.get("level"),
+                "pathname": gelf_dict.get("file"),
+                "lineno": gelf_dict.get("line"),
+                "msg": gelf_dict.get("short_message"),
+                "args": (),  # not provided in GELF
+                "exc_info": None,  # not provided in GELF
+            }
+            logrecord = logging.LogRecord(**logrecord_args)
+            logrecord.processName = gelf_dict.get("process_name")
+            self.logger.handle(logrecord)
+            # new_packet.write_string(pickled_record)
+            # logger.info(f"Log message: {packet.payload}")

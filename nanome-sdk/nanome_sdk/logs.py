@@ -1,13 +1,14 @@
 import json
 import asyncio
-import logging
 import graypy
+import logging
+import random
+import string
 
 from nanome._internal.network.packet import Packet
-from nanome_sdk.session import SessionClient
-from tblib import pickling_support
 
-pickling_support.install()
+# from tblib import pickling_support
+# pickling_support.install()
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +16,15 @@ logger = logging.getLogger(__name__)
 class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
     """Forward Log messages to NTS."""
 
-    def __init__(self, nts_writer):
+    def __init__(self, nts_writer, session_id):
         super(NTSLoggingHandler, self).__init__()
         self.writer = nts_writer
+        self.session_id = session_id
+
+        # Appending random string to process name makes tracking unique sessions easier
+        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        self.process_name = "Session-{}-{}".format(session_id, random_str)
+        
         # Server Fields
         # self.plugin_id = plugin_id
         # self.plugin_name = plugin_name
@@ -32,6 +39,7 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
     def handle(self, record):
         # Add extra fields to the record.
         record.__dict__.update({
+            'process_name': self.process_name,
             # 'plugin_name': self.plugin_name,
             # 'plugin_class': self.plugin_name,
             # 'plugin_id': self.plugin_id,
@@ -59,10 +67,10 @@ class NTSLoggingHandler(graypy.handler.BaseGELFHandler):
         logger.info("Presenter info set.")
 
 
-def configure_remote_logging(nts_writer):
+def configure_session_logging(nts_writer, session_id):
     """Configure logging handler to send logs to main process."""
     logger = logging.getLogger()
-    nts_handler = NTSLoggingHandler(nts_writer)
-    fmt_string = '%(asctime)s : %(processName)s : %(levelname)s : %(module)s : %(message)s'
-    nts_handler.setFormatter(logging.Formatter(fmt_string))
+    nts_handler = NTSLoggingHandler(nts_writer, session_id)
+    # fmt_string = '%(asctime)s : %(processName)s : %(levelname)s : %(module)s : %(message)s'
+    # nts_handler.setFormatter(logging.Formatter(fmt_string))
     logger.addHandler(nts_handler)
