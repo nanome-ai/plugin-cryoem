@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import logging.config
 import os
 import ssl
 import sys
@@ -9,12 +10,15 @@ from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
 from nanome_sdk.utils import convert_bytes_to_packet
+from nanome_sdk import default_logging_config_ini
+from nanome_sdk.logs import configure_remote_logging
 from nanome_sdk.session import run_session_loop_py
 
 
 __all__ = ["PluginServer"]
 
-logging.basicConfig(level=logging.DEBUG)
+
+logging.config.fileConfig(default_logging_config_ini)
 logger = logging.getLogger(__name__)
 
 KEEP_ALIVE_TIME_INTERVAL = 60.0
@@ -90,6 +94,12 @@ class PluginServer:
         unpacked = Packet.header_unpack(header)
         self.plugin_id = unpacked[3]
         logger.info(f"Plugin id: {self.plugin_id}")
+        configure_remote_logging(
+            self.nts_writer,
+            plugin_id=self.plugin_id,
+            plugin_name=name,
+            plugin_class=self.plugin_class.__name__
+        )
 
     async def keep_alive(self, plugin_id):
         """Long running task to send keep alive packets to NTS."""

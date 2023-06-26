@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sys
 from nanome.api import ui
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.util import enums
