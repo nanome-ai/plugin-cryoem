@@ -45,7 +45,7 @@ class CryoEMPluginTestCase(unittest.TestCase):
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
         shapes_mock = asyncio.Future()
-        shapes_mock.set_result([MagicMock()])
+        shapes_mock.set_result([MagicMock(), MagicMock()])
         self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
     def tearDown(self):

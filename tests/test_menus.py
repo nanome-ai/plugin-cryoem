@@ -40,7 +40,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
         self.plugin.client.add_to_workspace.return_value = fut
 
         shapes_mock = asyncio.Future()
-        shapes_mock.set_result([MagicMock()])
+        shapes_mock.set_result([MagicMock(), MagicMock()])
         self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
     def tearDown(self):
@@ -57,7 +57,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
     def test_render_no_map(self):
 
         async def validate_render_no_map():
-            await self.menu.render(self.map_group)
+            self.menu.render(self.map_group)
             self.assertTrue(self.map_group.group_name in self.menu._menu.title)
             self.assertEqual(len(self.menu.lst_files.items), 0)
             self.assertEqual(self.menu.sld_isovalue.current_value, self.map_group.isovalue)
@@ -69,7 +69,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
             await self.map_group.add_map_gz(self.map_file)
             await self.map_group.generate_full_mesh()
             self.assertTrue(self.map_group.has_map())
-            await self.menu.render(self.map_group)
+            self.menu.render(self.map_group)
             self.assertEqual(len(self.menu.lst_files.items), 1)
             self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
             self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
@@ -81,7 +81,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
             await self.map_group.generate_full_mesh()
             original_hist_x_min = self.map_group.hist_x_min
             original_hist_x_max = self.map_group.hist_x_max
-            await self.menu.generate_histogram(self.map_group)
+            self.menu.render(self.map_group)
             self.assertNotEqual(self.map_group.hist_x_min, original_hist_x_min)
             self.assertNotEqual(self.map_group.hist_x_max, original_hist_x_max)
             self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
