@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 async def start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table):
+    plugin_instance.set_client(plugin_id, session_id, version_table)
+    client = plugin_instance.client
+    client.reader, client.writer = await utils.connect_stdin_stdout()
+    await configure_session_logging(client.writer, plugin_id, plugin_name, session_id, plugin_instance)
     logger.info(f"Starting Session {session_id}")
     if not issubclass(plugin_instance.__class__, NanomePlugin):
         logger.critical("Plugin must inherit from NanomePlugin")
         exit(1)
-    plugin_instance.set_client(plugin_id, session_id, version_table)
-    client = plugin_instance.client
-    client.reader, client.writer = await utils.connect_stdin_stdout()
     await client.send_connect(plugin_id, session_id, version_table)
-    await configure_session_logging(client.writer, plugin_id, plugin_name, session_id, plugin_instance)
     await _start_session_loop(plugin_instance)
 
 

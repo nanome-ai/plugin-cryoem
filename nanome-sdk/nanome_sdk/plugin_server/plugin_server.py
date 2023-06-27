@@ -39,7 +39,7 @@ class PluginServer:
             self.nts_reader, self.nts_writer = await asyncio.open_connection(nts_host, nts_port, ssl=ssl_context)
             self.plugin_id = await self.connect_plugin(self.plugin_name, description)
             configure_main_process_logging(self.nts_writer, self.plugin_id, self.plugin_name)
-            logger.info(f"Plugin id: {self.plugin_id}")
+            logger.info(f"Plugin Connected. ID: {self.plugin_id}")
             self.keep_alive_task = asyncio.create_task(self.keep_alive(self.plugin_id))
             self.poll_nts_task = asyncio.create_task(self.poll_nts())
             await self.poll_nts_task

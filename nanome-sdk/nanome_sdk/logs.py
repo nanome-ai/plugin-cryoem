@@ -80,7 +80,7 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         self.org_name = presenter_info.org_name
         self.account_id = presenter_info.account_id
         self.account_name = presenter_info.account_name
-        logger.info("Presenter info set.")
+        logger.debug("Presenter info set.")
 
 
 def configure_main_process_logging(nts_writer, plugin_id, plugin_name):
