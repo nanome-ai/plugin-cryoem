@@ -43,7 +43,6 @@ async def _start_session_loop(plugin_instance):
     routing_tasks = []
     tasks = []
     while True:
-        logger.debug("Waiting for input...")
         received_bytes = await reader.readexactly(Packet.packet_header_length)
         unpacked = Packet.header_unpack(received_bytes)
         payload_length = unpacked[4]

@@ -52,7 +52,6 @@ class PluginServer:
     async def poll_nts(self):
         """Poll NTS for packets, and forward them to the plugin server."""
         while True:
-            logger.debug("Waiting for NTS Data...")
             received_bytes = await self.nts_reader.readexactly(Packet.packet_header_length)
             unpacked = Packet.header_unpack(received_bytes)
             payload_length = unpacked[4]
@@ -173,7 +172,6 @@ class PluginServer:
         """Poll a session process for packets, and forward them to NTS."""
         while True:
             # Load header, and then payload
-            logger.debug("Waiting for session data...")
             outgoing_bytes = await process.stdout.readexactly(Packet.packet_header_length)
             if not outgoing_bytes:
                 logger.debug("No outgoing bytes. Ending polling task.")
