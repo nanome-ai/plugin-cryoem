@@ -70,7 +70,6 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         packet.set(0, Packet.packet_type_live_logs, 0)
         packet.write_string(json.dumps(gelf_dict))
         self.writer.write(packet.pack())
-        asyncio.create_task(self.writer.drain())
 
     async def set_presenter_info(self):
         """Get presenter info from plugin instance and store on handler."""
