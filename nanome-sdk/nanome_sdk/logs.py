@@ -107,6 +107,5 @@ async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_
     level = logging.DEBUG if verbose else logging.INFO
     logger.setLevel(level)
     session_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name, session_id, plugin_instance)
-    # session_handler.addFilter(RemoteLoggingFilter())
     logger.addHandler(session_handler)
     asyncio.create_task(session_handler.set_presenter_info())

@@ -59,7 +59,7 @@ class PluginServer:
             received_bytes += await self.nts_reader.readexactly(payload_length)
             logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
             await self.route_bytes(received_bytes)
-            await self.nts_writer.drain()
+            # await self.nts_writer.drain()
 
     async def connect_plugin(self, name, description):
         """Send a packet to NTS to register plugin."""
@@ -88,7 +88,7 @@ class PluginServer:
         self.nts_writer.write(pack)
         await self.nts_writer.drain()
         # Wait for response containing plugin_id
-        header = await self.nts_reader.read(Packet.packet_header_length)
+        header = await self.nts_reader.readexactly(Packet.packet_header_length)
         unpacked = Packet.header_unpack(header)
         plugin_id = unpacked[3]
         return plugin_id
@@ -153,17 +153,15 @@ class PluginServer:
             stdout=asyncio.subprocess.PIPE,
             cwd=os.getcwd(),
             env=env)
-        connect_data = await session_process.stdout.read(Packet.packet_header_length)
+        connect_data = await session_process.stdout.readexactly(Packet.packet_header_length)
         try:
             unpacked = Packet.header_unpack(connect_data)
         except Exception:
             logger.error("Failed to unpack header")
             return
         payload_length = unpacked[4]
-        logger.debug(f"Packet payload length: {payload_length}")
 
-        connect_data += await session_process.stdout.read(payload_length)
-
+        connect_data += await session_process.stdout.readexactly(payload_length)
         logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
         self.nts_writer.write(connect_data)
         self._sessions[session_id] = session_process
@@ -212,4 +210,4 @@ class PluginServer:
             session_logger.handle(logrecord)
             if PLUGIN_REMOTE_LOGGING:
                 self.nts_writer.write(packet.pack())
-                await self.nts_writer.drain()
+                # await self.nts_writer.drain()

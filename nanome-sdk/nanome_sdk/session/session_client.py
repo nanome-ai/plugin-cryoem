@@ -19,7 +19,7 @@ class SessionClient:
         self.version_table = version_table
         self.plugin_id = plugin_id
         self.session_id = session_id
-        self.logger = logging.getLogger(name=f"SessionClient {session_id}")
+        self.logger = logging.getLogger(__name__)
         self.request_futs = {}
         self.reader = self.writer = None
 
@@ -48,8 +48,8 @@ class SessionClient:
         return result
 
     async def send_connect(self, plugin_id, session_id, version_table):
+        """Let NTS know session is connected and ready to party."""
         self.reader, self.writer = await utils.connect_stdin_stdout()
-        self.logger.debug("Sending Connect")
         serializer = CommandMessageSerializer()
         message_type = Messages.connect
         request_id = utils.random_request_id()
@@ -62,7 +62,7 @@ class SessionClient:
         packet.write(message)
         pack = packet.pack()
         self.writer.write(pack)
-        self.logger.debug(f'Connect Size: {len(pack)} bytes')
+        self.logger.debug(f'Session {session_id} Connected')
 
     async def request_workspace(self):
         message_type = Messages.workspace_request
