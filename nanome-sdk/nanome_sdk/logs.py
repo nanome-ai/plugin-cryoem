@@ -1,10 +1,12 @@
-import json
 import asyncio
+import json
 import graypy
 import logging
+import os
 import random
 import string
 
+from nanome.util.config import str2bool
 from nanome._internal.network.packet import Packet
 
 # from tblib import pickling_support
@@ -16,10 +18,9 @@ logger = logging.getLogger(__name__)
 class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
     """Forward Log messages from session to NTS stream."""
 
-    def __init__(self, nts_writer, session_id, plugin_id, plugin_name, plugin_instance):
-        super(SessionLoggingHandler, self).__init__()
+    def __init__(self, nts_writer, plugin_id, plugin_name, session_id=None, plugin_instance=None):
+        super(SessionLoggingHandler, self).__init__(level_names=True)
         self.writer = nts_writer
-        self.session_id = session_id
 
         # Appending random string to process name makes tracking unique sessions easier
         random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
@@ -28,6 +29,7 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         # Server Fields
         self.plugin_id = plugin_id
         self.plugin_name = plugin_name
+        self.session_id = session_id
         self.plugin_instance = plugin_instance
 
         # Session Fields, set by set_presenter_info
@@ -71,10 +73,13 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         logger.info("Presenter info set.")
 
 
-async def configure_session_logging(nts_writer, session_id, plugin_id, plugin_name, plugin_instance):
+
+async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_id, plugin_instance):
     """Configure logging handler to send logs to main process."""
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    verbose = str2bool(os.environ.get("PLUGIN_VERBOSE"))
+    level = logging.DEBUG if verbose else logging.INFO
+    logger.setLevel(level)
     nts_handler = SessionLoggingHandler(nts_writer, session_id, plugin_id, plugin_name, plugin_instance)
     asyncio.create_task(nts_handler.set_presenter_info())
     logger.addHandler(nts_handler)

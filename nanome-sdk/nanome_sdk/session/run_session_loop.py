@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table):
-    logger.info("Starting Session!")
+    logger.info(f"Starting Session {session_id}")
     if not issubclass(plugin_instance.__class__, NanomePlugin):
         logger.critical("Plugin must inherit from NanomePlugin")
         exit(1)
@@ -86,11 +86,11 @@ async def _route_incoming_payload(payload, plugin_instance):
     ]
     # Handle Different types of messages.
     if isinstance(message, control.messages.Run):
-        logger.info("on_run_called")
+        logger.debug("on_run_called")
         task = asyncio.create_task(plugin_instance.on_run())
         return task
     elif type(message) in ui_messages:
-        logger.info("UI Content Clicked.")
+        logger.debug("UI Content Clicked.")
         # See if we have a registered callback for this button
         ui_manager = plugin_instance.ui_manager
         ui_command = ui_manager.find_command(command_hash)
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     plugin_class_filepath = sys.argv[4]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
     logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
-    logger.info(f'Plugin Class {plugin_class.__name__}')
+    logger.debug(f'Plugin Class {plugin_class.__name__}')
     plugin_instance = plugin_class()
     session_coro = start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()

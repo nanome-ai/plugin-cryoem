@@ -43,7 +43,7 @@ class PluginServer:
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             self.nts_reader, self.nts_writer = await asyncio.open_connection(nts_host, nts_port, ssl=ssl_context)
-            await self.connect_plugin(self.plugin_name, description)
+            self.plugin_id = await self.connect_plugin(self.plugin_name, description)
 
             # Start keep-alive task
             self.keep_alive_task = asyncio.create_task(self.keep_alive(self.plugin_id))
@@ -96,8 +96,9 @@ class PluginServer:
         # Wait for response containing plugin_id
         header = await self.nts_reader.read(Packet.packet_header_length)
         unpacked = Packet.header_unpack(header)
-        self.plugin_id = unpacked[3]
-        logger.info(f"Plugin id: {self.plugin_id}")
+        plugin_id = unpacked[3]
+        logger.info(f"Plugin id: {plugin_id}")
+        return plugin_id
 
     async def keep_alive(self, plugin_id):
         """Long running task to send keep alive packets to NTS."""
@@ -149,6 +150,7 @@ class PluginServer:
         self.logger.info(f"Starting process for Session {session_id}")
         env = {
             'NANOME_VERSION_TABLE': json.dumps(version_table),
+            'PLUGIN_VERBOSE': os.environ.get('PLUGIN_VERBOSE', 'False'),
             'PATH': os.environ.get('PATH', ''),
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
@@ -200,7 +202,7 @@ class PluginServer:
             # Create a log record using values from gelf dict
             gelf_dict = json.loads(packet.payload.decode("utf-8"))
             # Multiply gelf level by 10 to get python logging level
-            level = gelf_dict.get("level") * 10
+            level = logging._nameToLevel[gelf_dict.get("level_name")]
             logrecord_args = {
                 "name": gelf_dict.get("host"),  # or map to some other field if appropriate
                 "level": level,
