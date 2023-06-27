@@ -381,22 +381,18 @@ class EditMeshMenu:
         self.set_opacity_ui(self.map_group.opacity)
 
         if map_group.has_map():
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
-            self._plugin.client.update_content(self.sld_isovalue)
-
+            self.set_isovalue_slider_min_max(map_group)
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
-            self._plugin.client.update_node(self.ln_img_histogram)
-            self.histogram_task = asyncio.create_task(self.generate_histogram(map_group))
-
-        if map_group.png_tempfile:
-            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-            self._plugin.client.update_node(self.ln_img_histogram)
 
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
         self._plugin.client.update_menu(self._menu)
+        if map_group.has_map() and not map_group.png_tempfile:
+            # Generate histogram and add to menu.
+            map_group.generate_histogram(self.temp_dir)
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+            self._plugin.client.update_node(self.ln_img_histogram)
 
     def set_isovalue_ui(self, map_group):
         self.set_isovalue_slider_min_max(map_group)
@@ -471,14 +467,6 @@ class EditMeshMenu:
     def temp_dir(self):
         return self._plugin.temp_dir.name
 
-    async def generate_histogram(self, map_group):
-        map_group.generate_histogram(self.temp_dir)
-        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
-        self._plugin.client.update_node(self.ln_img_histogram)
-        self._plugin.client.update_content(self.sld_isovalue)
-
     @property
     def opacity(self):
         return self.sld_opacity.current_value
@@ -502,20 +490,6 @@ class EditMeshMenu:
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
         self._plugin.client.update_content(self.dd_color_scheme)
         await self.map_group.update_color(self.color_scheme, self.opacity)
-
-    def delete_group_objects(self, btn: ui.Button):
-        Logs.message("Delete group objects button clicked.")
-        strucs = []
-        for item in self.lst_files.items:
-            item_btn = item.get_content()
-            if item_btn.selected:
-                item_comp = getattr(item_btn, 'comp', None)
-                if item_comp:
-                    strucs.append(item_comp)
-        if strucs:
-            Logs.message(f"Deleting {len(strucs)} group objects.")
-            self.map_group.remove_group_objects(strucs)
-            self.render(self.map_group)
 
     def set_isovalue_slider_min_max(self, map_group):
         min_value = map_group.hist_x_min
