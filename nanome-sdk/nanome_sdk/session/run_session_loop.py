@@ -19,8 +19,7 @@ plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
 from plugin import plugin_class  # noqa: E402
 
-# logging.basicConfig(level=logging.DEBUG)
-# logging.config.fileConfig(default_logging_config_ini)
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,11 +28,11 @@ async def start_session(plugin_instance, plugin_name, plugin_id, session_id, ver
     client = plugin_instance.client
     client.reader, client.writer = await utils.connect_stdin_stdout()
     await configure_session_logging(client.writer, plugin_id, plugin_name, session_id, plugin_instance)
-    logger.info(f"Starting Session {session_id}")
     if not issubclass(plugin_instance.__class__, NanomePlugin):
         logger.critical("Plugin must inherit from NanomePlugin")
         exit(1)
     await client.send_connect(plugin_id, session_id, version_table)
+    logger.info(f"Starting Session {session_id}")
     await _start_session_loop(plugin_instance)
 
 
@@ -102,8 +101,6 @@ if __name__ == "__main__":
     plugin_name = sys.argv[3]
     plugin_class_filepath = sys.argv[4]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
-    logger.info(f"Running Session Loop! Plugin {plugin_id}, Session {session_id}")
-    logger.debug(f'Plugin Class {plugin_class.__name__}')
     plugin_instance = plugin_class()
     session_coro = start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()

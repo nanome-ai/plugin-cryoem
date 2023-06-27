@@ -70,7 +70,7 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         packet.set(0, Packet.packet_type_live_logs, 0)
         packet.write_string(json.dumps(gelf_dict))
         self.writer.write(packet.pack())
-        self._emit_task = asyncio.create_task(self.writer.drain())
+        asyncio.create_task(self.writer.drain())
 
     async def set_presenter_info(self):
         """Get presenter info from plugin instance and store on handler."""
@@ -88,12 +88,16 @@ def configure_main_process_logging(nts_writer, plugin_id, plugin_name):
     default_logging_config_ini = os.path.join(os.path.dirname(__file__), 'logging_config.ini')
     logging.config.fileConfig(default_logging_config_ini, disable_existing_loggers=False)
     logger = logging.getLogger()
+
+    session_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name)
+    session_handler.addFilter(RemoteLoggingFilter())
+
     verbose = str2bool(os.environ.get("PLUGIN_VERBOSE"))
     level = logging.DEBUG if verbose else logging.INFO
     logger.setLevel(level)
-    session_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name)
-    session_handler.addFilter(RemoteLoggingFilter())
     logger.addHandler(session_handler)
+    session_logger = logging.getLogger("sessions")
+    session_logger.setLevel(level)
 
 
 async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_id, plugin_instance):
@@ -102,6 +106,7 @@ async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_
     verbose = str2bool(os.environ.get("PLUGIN_VERBOSE"))
     level = logging.DEBUG if verbose else logging.INFO
     logger.setLevel(level)
-    nts_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name, session_id, plugin_instance)
-    asyncio.create_task(nts_handler.set_presenter_info())
-    logger.addHandler(nts_handler)
+    session_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name, session_id, plugin_instance)
+    # session_handler.addFilter(RemoteLoggingFilter())
+    logger.addHandler(session_handler)
+    asyncio.create_task(session_handler.set_presenter_info())

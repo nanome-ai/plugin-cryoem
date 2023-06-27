@@ -12,7 +12,7 @@ from nanome.api.serializers import CommandMessageSerializer
 from nanome_sdk.logs import configure_main_process_logging
 from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk.session import run_session_loop_py
-
+from nanome.util.config import str2bool
 
 __all__ = ["PluginServer"]
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 KEEP_ALIVE_TIME_INTERVAL = 60.0
+PLUGIN_REMOTE_LOGGING = str2bool(os.environ.get('PLUGIN_REMOTE_LOGGING'))
 
 
 class PluginServer:
@@ -186,14 +187,13 @@ class PluginServer:
             else:
                 logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
                 self.nts_writer.write(outgoing_bytes)
-                await self.nts_writer.drain()
 
     async def handle_session_log_packet(self, packet):
         """If the packet is a log message, use loggers in current process to handle it.
 
         This provides a way of rendering logs from session processes, without sending them directly to stdout.
         """
-        logger = logging.getLogger("sessions")
+        session_logger = logging.getLogger("sessions")
         if packet.packet_type == PacketTypes.live_logs:
             # Create a log record using values from gelf dict
             gelf_dict = json.loads(packet.payload.decode("utf-8"))
@@ -209,6 +209,7 @@ class PluginServer:
             }
             logrecord = logging.LogRecord(**logrecord_args)
             logrecord.processName = gelf_dict.get("_process_name")
-            logger.handle(logrecord)
-            self.nts_writer.write(packet.pack())
-            await self.nts_writer.drain()
+            session_logger.handle(logrecord)
+            if PLUGIN_REMOTE_LOGGING:
+                self.nts_writer.write(packet.pack())
+                await self.nts_writer.drain()
