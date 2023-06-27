@@ -392,8 +392,7 @@ class EditMeshMenu:
             # Generate histogram and add to menu.
             map_group.generate_histogram(self.temp_dir)
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-            self.sld_isovalue.min_value = map_group.hist_x_min
-            self.sld_isovalue.max_value = map_group.hist_x_max
+            self.set_isovalue_slider_min_max(map_group)
             self._plugin.client.update_node(self.ln_img_histogram)
             self._plugin.client.update_content(self.sld_isovalue)
 
