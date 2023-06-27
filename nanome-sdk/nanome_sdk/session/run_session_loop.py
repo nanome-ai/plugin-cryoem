@@ -33,7 +33,7 @@ async def start_session(plugin_instance, plugin_name, plugin_id, session_id, ver
     client = plugin_instance.client
     client.reader, client.writer = await utils.connect_stdin_stdout()
     await client.send_connect(plugin_id, session_id, version_table)
-    await configure_session_logging(client.writer, session_id, plugin_id, plugin_name, plugin_instance)
+    await configure_session_logging(client.writer, plugin_id, plugin_name, session_id, plugin_instance)
     await _start_session_loop(plugin_instance)
 
 

@@ -9,7 +9,7 @@ import sys
 from nanome._internal.network.packet import Packet, PacketTypes
 from nanome._internal.serializer_fields import TypeSerializer
 from nanome.api.serializers import CommandMessageSerializer
-from nanome_sdk import default_logging_config_ini
+from nanome_sdk.logs import configure_main_process_logging
 from nanome_sdk.utils import convert_bytes_to_packet
 from nanome_sdk.session import run_session_loop_py
 
@@ -17,13 +17,8 @@ from nanome_sdk.session import run_session_loop_py
 __all__ = ["PluginServer"]
 
 
-logging.config.fileConfig(default_logging_config_ini)
-# root_logger = logging.getLogger()
-# root_logger.setLevel(logging.DEBUG)
-# handler = logging.StreamHandler()
-
-
 logger = logging.getLogger(__name__)
+
 
 KEEP_ALIVE_TIME_INTERVAL = 60.0
 
@@ -32,7 +27,6 @@ class PluginServer:
 
     def __init__(self):
         self.plugin_id = None
-        self.logger = logging.getLogger(name="PluginServer")
         self._sessions = {}
         self.plugin_class = None
         self.polling_tasks = {}
@@ -44,8 +38,8 @@ class PluginServer:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             self.nts_reader, self.nts_writer = await asyncio.open_connection(nts_host, nts_port, ssl=ssl_context)
             self.plugin_id = await self.connect_plugin(self.plugin_name, description)
-
-            # Start keep-alive task
+            configure_main_process_logging(self.nts_writer, self.plugin_id, self.plugin_name)
+            logger.info(f"Plugin id: {self.plugin_id}")
             self.keep_alive_task = asyncio.create_task(self.keep_alive(self.plugin_id))
             self.poll_nts_task = asyncio.create_task(self.poll_nts())
             await self.poll_nts_task
@@ -58,12 +52,12 @@ class PluginServer:
     async def poll_nts(self):
         """Poll NTS for packets, and forward them to the plugin server."""
         while True:
-            self.logger.debug("Waiting for NTS Data...")
+            logger.debug("Waiting for NTS Data...")
             received_bytes = await self.nts_reader.readexactly(Packet.packet_header_length)
             unpacked = Packet.header_unpack(received_bytes)
             payload_length = unpacked[4]
             received_bytes += await self.nts_reader.readexactly(payload_length)
-            self.logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
+            logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
             await self.route_bytes(received_bytes)
             await self.nts_writer.drain()
 
@@ -97,7 +91,6 @@ class PluginServer:
         header = await self.nts_reader.read(Packet.packet_header_length)
         unpacked = Packet.header_unpack(header)
         plugin_id = unpacked[3]
-        logger.info(f"Plugin id: {plugin_id}")
         return plugin_id
 
     async def keep_alive(self, plugin_id):
@@ -126,31 +119,31 @@ class PluginServer:
                 await self.start_session_process(version_table, packet, self.plugin_class)
             else:
                 process = self._sessions[session_id]
-                self.logger.debug(f"Writing line to session {session_id}: {len(received_bytes)} bytes")
+                logger.debug(f"Writing line to session {session_id}: {len(received_bytes)} bytes")
                 process.stdin.write(received_bytes)
                 await process.stdin.drain()
 
         elif packet_type == PacketTypes.client_disconnection:
-            self.logger.info(f"Disconnecting Session {session_id}.")
+            logger.info(f"Disconnecting Session {session_id}.")
             popen = self._sessions[session_id]
             popen.kill()
             del self._sessions[session_id]
 
         elif packet_type == PacketTypes.keep_alive:
             # Why is the plugin id returned as the session id?
-            session_id = packet.session_id
-            msg = f"Keep Alive Packet received. Plugin id: {session_id}"
-            self.logger.debug(msg)
+            plugin_id = packet.session_id
+            logger.debug(f"Keep Alive Packet received. Plugin id: {plugin_id}")
         elif packet_type == PacketTypes.plugin_list:
-            self.logger.info("Plugin list happening?")
+            logger.info("Plugin list happening?")
 
     async def start_session_process(self, version_table, packet, plugin_class):
         plugin_id = packet.plugin_id
         session_id = packet.session_id
-        self.logger.info(f"Starting process for Session {session_id}")
+        logger.info(f"Starting process for Session {session_id}")
         env = {
             'NANOME_VERSION_TABLE': json.dumps(version_table),
             'PLUGIN_VERBOSE': os.environ.get('PLUGIN_VERBOSE', 'False'),
+            'PLUGIN_REMOTE_LOGGING': os.environ.get('PLUGIN_REMOTE_LOGGING', 'False'),
             'PATH': os.environ.get('PATH', ''),
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
@@ -164,14 +157,14 @@ class PluginServer:
         try:
             unpacked = Packet.header_unpack(connect_data)
         except Exception:
-            self.logger.error("Failed to unpack header")
+            logger.error("Failed to unpack header")
             return
         payload_length = unpacked[4]
-        self.logger.debug(f"Packet payload length: {payload_length}")
+        logger.debug(f"Packet payload length: {payload_length}")
 
         connect_data += await session_process.stdout.read(payload_length)
 
-        self.logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
+        logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
         self.nts_writer.write(connect_data)
         self._sessions[session_id] = session_process
         self.polling_tasks[session_id] = asyncio.create_task(self.poll_session(session_process))
@@ -180,28 +173,32 @@ class PluginServer:
         """Poll a session process for packets, and forward them to NTS."""
         while True:
             # Load header, and then payload
-            self.logger.debug("Waiting for session data...")
+            logger.debug("Waiting for session data...")
             outgoing_bytes = await process.stdout.readexactly(Packet.packet_header_length)
             if not outgoing_bytes:
                 logger.debug("No outgoing bytes. Ending polling task.")
                 break
             _, _, _, _, payload_length = Packet.header_unpack(outgoing_bytes)
             outgoing_bytes += await process.stdout.readexactly(payload_length)
-            logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
-            asyncio.create_task(self.check_for_log_message(outgoing_bytes))
-            self.nts_writer.write(outgoing_bytes)
-            await self.nts_writer.drain()
 
-    async def check_for_log_message(self, bytestream):
+            # Pull out session logs, otherwise forward bytes to NTS
+            packet = convert_bytes_to_packet(outgoing_bytes)
+            if packet.packet_type == PacketTypes.live_logs:
+                asyncio.create_task(self.handle_session_log_packet(packet))
+            else:
+                logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
+                self.nts_writer.write(outgoing_bytes)
+                await self.nts_writer.drain()
+
+    async def handle_session_log_packet(self, packet):
         """If the packet is a log message, use loggers in current process to handle it.
 
         This provides a way of rendering logs from session processes, without sending them directly to stdout.
         """
-        packet = convert_bytes_to_packet(bytestream)
+        logger = logging.getLogger("sessions")
         if packet.packet_type == PacketTypes.live_logs:
             # Create a log record using values from gelf dict
             gelf_dict = json.loads(packet.payload.decode("utf-8"))
-            # Multiply gelf level by 10 to get python logging level
             level = logging._nameToLevel[gelf_dict.get("level_name")]
             logrecord_args = {
                 "name": gelf_dict.get("host"),  # or map to some other field if appropriate
@@ -214,4 +211,6 @@ class PluginServer:
             }
             logrecord = logging.LogRecord(**logrecord_args)
             logrecord.processName = gelf_dict.get("_process_name")
-            self.logger.handle(logrecord)
+            logger.handle(logrecord)
+            self.nts_writer.write(packet.pack())
+            await self.nts_writer.drain()

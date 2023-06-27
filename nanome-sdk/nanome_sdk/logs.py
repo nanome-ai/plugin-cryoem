@@ -15,22 +15,32 @@ from nanome._internal.network.packet import Packet
 logger = logging.getLogger(__name__)
 
 
+class RemoteLoggingFilter(logging.Filter):
+
+    def filter(self, record):
+        """Filter out log messages when remote logging is set to False."""
+        return str2bool(os.environ.get('PLUGIN_REMOTE_LOGGING'))
+
+
 class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
     """Forward Log messages from session to NTS stream."""
 
     def __init__(self, nts_writer, plugin_id, plugin_name, session_id=None, plugin_instance=None):
         super(SessionLoggingHandler, self).__init__(level_names=True)
         self.writer = nts_writer
-
-        # Appending random string to process name makes tracking unique sessions easier
-        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
-        self.process_name = "Session-{}-{}".format(session_id, random_str)
-
         # Server Fields
         self.plugin_id = plugin_id
         self.plugin_name = plugin_name
         self.session_id = session_id
         self.plugin_instance = plugin_instance
+
+        if session_id:
+            # Appending random string to process name makes tracking unique sessions easier
+            random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+            process_name = "Session-{}-{}".format(session_id, random_str)
+        else:
+            process_name = "MainProcess"
+        self.process_name = process_name
 
         # Session Fields, set by set_presenter_info
         self.org_name = None
@@ -73,6 +83,18 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
         logger.info("Presenter info set.")
 
 
+def configure_main_process_logging(nts_writer, plugin_id, plugin_name):
+    """Configure logging handler to send logs to NTS stream."""
+    default_logging_config_ini = os.path.join(os.path.dirname(__file__), 'logging_config.ini')
+    logging.config.fileConfig(default_logging_config_ini, disable_existing_loggers=False)
+    logger = logging.getLogger()
+    verbose = str2bool(os.environ.get("PLUGIN_VERBOSE"))
+    level = logging.DEBUG if verbose else logging.INFO
+    logger.setLevel(level)
+    session_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name)
+    session_handler.addFilter(RemoteLoggingFilter())
+    logger.addHandler(session_handler)
+
 
 async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_id, plugin_instance):
     """Configure logging handler to send logs to main process."""
@@ -80,6 +102,6 @@ async def configure_session_logging(nts_writer, plugin_id, plugin_name, session_
     verbose = str2bool(os.environ.get("PLUGIN_VERBOSE"))
     level = logging.DEBUG if verbose else logging.INFO
     logger.setLevel(level)
-    nts_handler = SessionLoggingHandler(nts_writer, session_id, plugin_id, plugin_name, plugin_instance)
+    nts_handler = SessionLoggingHandler(nts_writer, plugin_id, plugin_name, session_id, plugin_instance)
     asyncio.create_task(nts_handler.set_presenter_info())
     logger.addHandler(nts_handler)
