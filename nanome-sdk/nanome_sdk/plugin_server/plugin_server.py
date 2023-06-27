@@ -213,5 +213,3 @@ class PluginServer:
             logrecord = logging.LogRecord(**logrecord_args)
             logrecord.processName = gelf_dict.get("_process_name")
             self.logger.handle(logrecord)
-            # new_packet.write_string(pickled_record)
-            # logger.info(f"Log message: {packet.payload}")

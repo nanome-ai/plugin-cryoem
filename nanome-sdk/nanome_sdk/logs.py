@@ -74,6 +74,7 @@ class SessionLoggingHandler(graypy.handler.BaseGELFHandler):
 async def configure_session_logging(nts_writer, session_id, plugin_id, plugin_name, plugin_instance):
     """Configure logging handler to send logs to main process."""
     logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
     nts_handler = SessionLoggingHandler(nts_writer, session_id, plugin_id, plugin_name, plugin_instance)
     asyncio.create_task(nts_handler.set_presenter_info())
     logger.addHandler(nts_handler)
