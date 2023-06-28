@@ -41,7 +41,6 @@ class MainMenu:
         root: ui.LayoutNode = self._menu.root
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
 
-        ui_manager = self._plugin.ui_manager
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
         ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
