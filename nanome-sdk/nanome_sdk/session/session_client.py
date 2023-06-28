@@ -41,9 +41,7 @@ class SessionClient:
         expects_response = True
         args = None
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -69,9 +67,7 @@ class SessionClient:
         expects_response = True
         args = None
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -80,9 +76,7 @@ class SessionClient:
         expects_response = True
         args = id_list
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -103,9 +97,7 @@ class SessionClient:
         expects_response = True
         args = structures
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -132,9 +124,7 @@ class SessionClient:
         expects_response = True
         args = complex_list
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -150,9 +140,7 @@ class SessionClient:
             empty_complexes.append(empty)
         args = empty_complexes
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -179,9 +167,7 @@ class SessionClient:
         expects_response = True
         args = [index]
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -190,9 +176,7 @@ class SessionClient:
         expects_response = True
         args = file_list
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -201,9 +185,7 @@ class SessionClient:
         expects_response = True
         args = (stream_type, indices_list, enums.StreamDirection.writing)
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -212,9 +194,7 @@ class SessionClient:
         expects_response = True
         args = (stream_type, indices_list, enums.StreamDirection.reading)
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -223,9 +203,7 @@ class SessionClient:
         expects_response = True
         args = (comp, complex_to_align_index, volume, properties)
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -240,9 +218,7 @@ class SessionClient:
         expects_response = True
         args = None
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -251,9 +227,7 @@ class SessionClient:
         expects_response = True
         args = None
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -268,9 +242,7 @@ class SessionClient:
         expects_response = True
         args = (files_list, True, True)
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
@@ -279,9 +251,7 @@ class SessionClient:
         expects_response = True
         args = shape_list
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         # Make sure indices get set.
         indices = result[0]
@@ -294,9 +264,7 @@ class SessionClient:
         expects_response = True
         args = (format, entities)
         request_id = self._send_message(message_type, args, expects_response)
-        fut = self.request_futs[request_id]
-        await fut
-        result = fut.result()
+        result = await self.request_futs[request_id]
         del self.request_futs[request_id]
         return result
 
