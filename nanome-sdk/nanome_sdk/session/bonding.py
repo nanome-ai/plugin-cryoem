@@ -52,7 +52,7 @@ class Bonding:
         # so make mapping of atoms based on position
         bonded_serial_to_unbonded_atom = dict()
 
-        sort_key = lambda atm: str(atm.position.unpack())  # noqa: E731
+        def sort_key(atm): return str(atm.position.unpack())  # noqa: E731
         sorted_unbonded_atoms = sorted(list(unbonded_mol.atoms), key=sort_key)
         sorted_bonded_atoms = sorted(list(bonded_mol.atoms), key=sort_key)
         for unbonded_atom, bonded_atom in zip(sorted_unbonded_atoms, sorted_bonded_atoms):
