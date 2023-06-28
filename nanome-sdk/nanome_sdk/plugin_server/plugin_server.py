@@ -171,7 +171,12 @@ class PluginServer:
         """Poll a session process for packets, and forward them to NTS."""
         while True:
             # Load header, and then payload
-            outgoing_bytes = await process.stdout.readexactly(Packet.packet_header_length)
+            try:
+                outgoing_bytes = await process.stdout.readexactly(Packet.packet_header_length)
+            except asyncio.IncompleteReadError:
+                logger.debug("Incomplete read error. Ending session polling task.")
+                break
+
             if not outgoing_bytes:
                 logger.debug("No outgoing bytes. Ending polling task.")
                 break
