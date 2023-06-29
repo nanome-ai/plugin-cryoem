@@ -11,15 +11,15 @@ class VaultManager:
 
     # add data to vault at path/filename, where filename can contain a path
     def add_file(self, path, filename, data, key=None):
-        return self._command('upload', path, {'key': key}, {'files': (filename, data)})
+        return self.command('upload', path, {'key': key}, {'files': (filename, data)})
 
     # creates a path and returns True. returns False if path exists
     def create_path(self, path, key=None):
-        return self._command('create', path, {'key': key})
+        return self.command('create', path, {'key': key})
 
     # decrypts full contents of path, return False if key invalid
     def decrypt_folder(self, path, key):
-        return self._command('decrypt', path, {'key': key})
+        return self.command('decrypt', path, {'key': key})
 
     # get supported file extensions
     def get_extensions(self):
@@ -38,7 +38,7 @@ class VaultManager:
 
     # check if key is correct to decrypt
     def is_key_valid(self, path, key):
-        r = self._command('verify', path, {'key': key})
+        r = self.command('verify', path, {'key': key})
         return r.json()['success']
 
     # list files, folders, and locked folders in path
