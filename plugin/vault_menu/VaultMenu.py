@@ -8,7 +8,7 @@ from functools import partial
 import nanome
 from nanome.util import async_callback, Color
 from nanome.util.enums import ExportFormats
-from nanome_sdk.session import UIManager
+
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MENU_PATH = os.path.join(BASE_DIR, 'json', 'menu.json')
@@ -23,7 +23,7 @@ ORG_FOLDER = 'my org'
 class VaultMenu:
 
     def __init__(self, plugin_instance, vault_manager, org, account_id):
-        self.ui_manager = UIManager()
+        self.ui_manager = plugin_instance.ui_manager
         self.plugin_instance = plugin_instance
         self.session_client = plugin_instance.client
         self.address = vault_manager.server_url
@@ -729,5 +729,4 @@ class VaultMenu:
         tmp_dir = tempfile.TemporaryDirectory()
         map_gz_file = os.path.join(tmp_dir.name, filename)
         self.vault_manager.get_file(path, key, map_gz_file)
-        isovalue = 0.2
-        await self.plugin_instance.add_mapgz_to_group(map_gz_file, isovalue=isovalue)
+        await self.plugin_instance.add_mapgz_to_group(map_gz_file)

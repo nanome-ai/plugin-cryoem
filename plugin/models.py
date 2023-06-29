@@ -267,9 +267,8 @@ class MapGroup:
 
         self.__visible = True
         self.position = [0.0, 0.0, 0.0]
-        self.isovalue = 2.5
+        self.isovalue = None
         self.opacity = 0.65
-        self.radius = -1
         self.color_scheme = enums.ColorScheme.Element
 
         self._model: manager = None
@@ -374,6 +373,11 @@ class MapGroup:
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
+        if not self.isovalue:
+            # Best guess isovalue is the mean of the map
+            map_data = mmm.map_manager().map_data().as_1d()
+            self.isovalue = sum(map_data) / len(map_data)
+
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
