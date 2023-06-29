@@ -141,10 +141,8 @@ class PluginServer:
         session_id = packet.session_id
         logger.info(f"Starting process for Session {session_id}")
         env = {
+            **os.environ,
             'NANOME_VERSION_TABLE': json.dumps(version_table),
-            'PLUGIN_VERBOSE': os.environ.get('PLUGIN_VERBOSE', 'False'),
-            'PLUGIN_REMOTE_LOGGING': os.environ.get('PLUGIN_REMOTE_LOGGING', 'False'),
-            'PATH': os.environ.get('PATH', ''),
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(

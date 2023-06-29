@@ -6,6 +6,8 @@ from nanome.util import Logs, enums
 from nanome.api import structure
 from .menu import MainMenu
 from .models import MapGroup
+from .vault_manager import VaultManager
+
 from nanome_sdk import NanomePlugin
 
 import logging
@@ -20,6 +22,9 @@ class CryoEM(NanomePlugin):
         self.menu = MainMenu(self)
         self.groups = []
         self.add_mapgroup()
+        vault_url = os.environ.get("VAULT_URL")
+        vault_api_key = os.environ.get("VAULT_API_KEY")
+        self.vault_manager = VaultManager(vault_url, vault_api_key)
 
     async def on_stop(self):
         self.temp_dir.cleanup()
