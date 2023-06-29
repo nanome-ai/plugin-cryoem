@@ -7,6 +7,7 @@ from functools import partial
 import nanome
 from nanome.util import async_callback, Color
 from nanome.util.enums import ExportFormats
+from nanome_sdk.session import UIManager
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MENU_PATH = os.path.join(BASE_DIR, 'json', 'menu.json')
@@ -21,6 +22,7 @@ ORG_FOLDER = 'my org'
 class VaultMenu:
 
     def __init__(self, session_client, vault_manager, org, account_id):
+        self.ui_manager = UIManager()
         self.session_client = session_client
         self.address = vault_manager.server_url
         self.vault_manager = vault_manager
@@ -51,7 +53,8 @@ class VaultMenu:
         self.create_menu()
 
     def create_menu(self):
-        self.menu = nanome.ui.Menu.io.from_json(MENU_PATH)
+        self.menu = self.ui_manager.create_new_menu(MENU_PATH)
+        self.menu.index = 255  # arbitrary
         root = self.menu.root
 
         self.pfb_list_item = nanome.ui.LayoutNode.io.from_json(LIST_ITEM_PATH)
@@ -61,7 +64,7 @@ class VaultMenu:
             self.open_folder('..')
             self.toggle_upload(show=False)
         self.btn_up = root.find_node('GoUpButton').get_content()
-        self.btn_up.register_pressed_callback(go_up)
+        self.ui_manager.register_btn_pressed_callback(self.btn_up, go_up)
 
         self.btn_up.unusable = True
         self.btn_up.icon.active = True
@@ -74,13 +77,13 @@ class VaultMenu:
         self.ln_integration_controls = root.find_node('IntegrationControls')
 
         self.btn_actions = self.ln_main_controls.find_node('Actions').get_content()
-        self.btn_actions.register_pressed_callback(self.toggle_actions)
+        self.ui_manager.register_btn_pressed_callback(self.btn_actions, self.toggle_actions)
 
         self.btn_select = self.ln_main_controls.find_node('Select').get_content()
-        self.btn_select.register_pressed_callback(self.select_all)
+        self.ui_manager.register_btn_pressed_callback(self.btn_select, self.select_all)
 
         self.btn_load = self.ln_main_controls.find_node('Load').get_content()
-        self.btn_load.register_pressed_callback(self.load_files)
+        self.ui_manager.register_btn_pressed_callback(self.btn_load, self.load_files)
         self.btn_load.disable_on_press = True
 
         self.lbl_instr = root.find_node('InstructionLabel').get_content()
@@ -99,7 +102,7 @@ class VaultMenu:
 
         # actions components
         self.ln_actions_panel = root.find_node('ActionsPanel')
-        self.ln_actions_panel.get_content().register_pressed_callback(self.toggle_actions)
+        self.ui_manager.register_btn_pressed_callback(self.ln_actions_panel.get_content(), self.toggle_actions)
 
         self.ln_actions_list = self.ln_actions_panel.find_node('Actions')
         self.ln_actions_dialog = self.ln_actions_panel.find_node('ConfirmDialog')
@@ -109,14 +112,14 @@ class VaultMenu:
         inp_dialog_action = self.ln_actions_dialog.find_node('Input').get_content()
         inp_dialog_action.register_submitted_callback(self.on_action_confirm)
         btn_action_cancel = self.ln_actions_dialog.find_node('Cancel').get_content()
-        btn_action_cancel.register_pressed_callback(self.on_action_cancel)
+        self.ui_manager.register_btn_pressed_callback(btn_action_cancel, self.on_action_cancel)
         btn_action_confirm = self.ln_actions_dialog.find_node('Confirm').get_content()
-        btn_action_confirm.register_pressed_callback(self.on_action_confirm)
+        self.ui_manager.register_btn_pressed_callback(btn_action_confirm, self.on_action_confirm)
 
         # sort order
         for sort in ['Name', 'Size', 'Date Added']:
             btn = self.ln_actions_panel.find_node(sort).get_content()
-            btn.register_pressed_callback(self.change_sort)
+            self.ui_manager.register_btn_pressed_callback(btn, self.change_sort)
             btn.icon.value.set_all(UP_ICON_PATH)
             btn.icon.rotation.z = 180
 
@@ -134,22 +137,22 @@ class VaultMenu:
         self.inp_unlock.register_submitted_callback(self.open_locked_folder)
 
         self.btn_unlock_cancel = root.find_node('UnlockCancel').get_content()
-        self.btn_unlock_cancel.register_pressed_callback(self.cancel_open_locked)
+        self.ui_manager.register_btn_pressed_callback(self.btn_unlock_cancel, self.cancel_open_locked)
         self.btn_unlock_continue = root.find_node('UnlockContinue').get_content()
-        self.btn_unlock_continue.register_pressed_callback(self.open_locked_folder)
+        self.ui_manager.register_btn_pressed_callback(self.btn_unlock_continue, self.open_locked_folder)
 
         # upload components
         self.ln_upload = root.find_node('FileUpload')
 
         btn_workspace = root.find_node('UploadTypeWorkspace').get_content()
         btn_workspace.name = 'workspace'
-        btn_workspace.register_pressed_callback(self.select_upload_type)
+        self.ui_manager.register_btn_pressed_callback(btn_workspace, self.select_upload_type)
         btn_structure = root.find_node('UploadTypeStructure').get_content()
         btn_structure.name = 'structure'
-        btn_structure.register_pressed_callback(self.select_upload_type)
+        self.ui_manager.register_btn_pressed_callback(btn_structure, self.select_upload_type)
         btn_macro = root.find_node('UploadTypeMacro').get_content()
         btn_macro.name = 'macro'
-        btn_macro.register_pressed_callback(self.select_upload_type)
+        self.ui_manager.register_btn_pressed_callback(btn_macro, self.select_upload_type)
 
         self.ln_upload_message = root.find_node('UploadMessage')
         self.lbl_upload_message = self.ln_upload_message.get_content()
@@ -162,20 +165,20 @@ class VaultMenu:
         self.inp_workspace_name = root.find_node('UploadWorkspaceName').get_content()
         self.inp_workspace_name.register_submitted_callback(self.upload_workspace)
         btn_workspace_continue = root.find_node('UploadWorkspaceContinue').get_content()
-        btn_workspace_continue.register_pressed_callback(self.upload_workspace)
+        self.ui_manager.register_btn_pressed_callback(btn_workspace_continue, self.upload_workspace)
 
         self.ln_upload_complex_type = root.find_node('UploadComplexType')
         btn_pdb = root.find_node('PDB').get_content()
-        btn_pdb.register_pressed_callback(partial(self.upload_complex, 'pdb', ExportFormats.PDB))
+        self.ui_manager.register_btn_pressed_callback(btn_pdb, partial(self.upload_complex, 'pdb', ExportFormats.PDB))
         btn_sdf = root.find_node('SDF').get_content()
-        btn_sdf.register_pressed_callback(partial(self.upload_complex, 'sdf', ExportFormats.SDF))
+        self.ui_manager.register_btn_pressed_callback(btn_sdf, partial(self.upload_complex, 'sdf', ExportFormats.SDF))
         btn_mmcif = root.find_node('MMCIF').get_content()
-        btn_mmcif.register_pressed_callback(partial(self.upload_complex, 'cif', ExportFormats.MMCIF))
+        self.ui_manager.register_btn_pressed_callback(btn_mmcif, partial(self.upload_complex, 'cif', ExportFormats.MMCIF))
 
         self.ln_upload_confirm = root.find_node('UploadConfirm')
         self.lbl_upload_confirm = root.find_node('UploadConfirmLabel').get_content()
         btn_confirm = root.find_node('UploadConfirmButton').get_content()
-        btn_confirm.register_pressed_callback(self.confirm_upload)
+        self.ui_manager.register_btn_pressed_callback(btn_confirm, self.confirm_upload)
 
     def show_menu(self):
         self.lbl_instr.text_value = f'Visit {self.address} in browser to add files'
@@ -274,7 +277,7 @@ class VaultMenu:
             ln = nanome.ui.LayoutNode()
             btn = ln.add_new_button(action)
             btn.name = action
-            btn.register_pressed_callback(self.on_action_pressed)
+            self.ui_manager.register_btn_pressed_callback(btn, self.on_action_pressed)
             return ln
 
         self.lst_actions.items.clear()
@@ -356,7 +359,7 @@ class VaultMenu:
             btn.icon.position.x = 0.9
 
         cb = self.on_folder_pressed if is_folder else self.on_file_pressed
-        btn.register_pressed_callback(cb)
+        self.ui_manager.register_btn_pressed_callback(btn, cb)
 
         self.lst_files.items.append(new_item)
 
@@ -656,7 +659,7 @@ class VaultMenu:
             btn = item.find_node('ButtonNode').get_content()
             btn.text.value.set_all(macro.title)
             btn.macro = macro
-            btn.register_pressed_callback(select_macro)
+            self.ui_manager.register_btn_pressed_callback(btn, select_macro)
             self.lst_upload.items.append(item)
 
         if not macros:
@@ -680,7 +683,7 @@ class VaultMenu:
             btn = item.find_node('ButtonNode').get_content()
             btn.text.value.set_all(complex.full_name)
             btn.complex = complex
-            btn.register_pressed_callback(select_complex)
+            self.ui_manager.register_btn_pressed_callback(btn, select_complex)
             self.lst_upload.items.append(item)
 
         if not complexes:
