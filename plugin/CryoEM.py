@@ -7,6 +7,7 @@ from nanome.api import structure
 from .menu import MainMenu
 from .models import MapGroup
 from .vault_manager import VaultManager
+from .vault_menu import VaultMenu
 
 from nanome_sdk import NanomePlugin
 
@@ -22,15 +23,21 @@ class CryoEM(NanomePlugin):
         self.menu = MainMenu(self)
         self.groups = []
         self.add_mapgroup()
-        vault_url = os.environ.get("VAULT_URL")
-        vault_api_key = os.environ.get("VAULT_API_KEY")
-        self.vault_manager = VaultManager(vault_url, vault_api_key)
+        self.vault_url = os.environ.get("VAULT_URL")
+        self.vault_api_key = os.environ.get("VAULT_API_KEY")
 
     async def on_stop(self):
         self.temp_dir.cleanup()
 
     async def on_run(self):
         await self.menu.render(force_enable=True)
+        presenter_info = await self.client.request_presenter_info()
+        org = f'org-{presenter_info.org_id}'
+        user_id = presenter_info.account_id
+        self.vault_manager = VaultManager(self.vault_api_key, self.vault_url)
+        self.vault_menu = VaultMenu(self.client, self.vault_manager, org, user_id)
+        self.vault_menu.create_menu()
+        self.vault_menu.show_menu()
 
     def add_mapgroup(self):
         group_num = 1
