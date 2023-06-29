@@ -1,7 +1,8 @@
 import asyncio
 import os
-import urllib.parse
 import sys
+import tempfile
+import urllib.parse
 from functools import partial
 
 import nanome
@@ -21,9 +22,10 @@ ORG_FOLDER = 'my org'
 
 class VaultMenu:
 
-    def __init__(self, session_client, vault_manager, org, account_id):
+    def __init__(self, plugin_instance, vault_manager, org, account_id):
         self.ui_manager = UIManager()
-        self.session_client = session_client
+        self.plugin_instance = plugin_instance
+        self.session_client = plugin_instance.client
         self.address = vault_manager.server_url
         self.vault_manager = vault_manager
         self.path = '.'
@@ -427,7 +429,7 @@ class VaultMenu:
 
         load_requests = []
         for btn in self.selected_items:
-            load_requests.append(self.session_client.load_file(btn.item_name))
+            load_requests.append(self.load_file(btn.item_name))
             btn.selected = False
         await asyncio.gather(*load_requests)
 
@@ -720,3 +722,12 @@ class VaultMenu:
         self.session_client.save_file(self.upload_item, self.upload_name, self.upload_ext)
         self.toggle_upload(show=False)
         self.update()
+
+    async def load_file(self, filename):
+        path = os.path.join(self.path, filename)
+        key = self.folder_key
+        tmp_dir = tempfile.TemporaryDirectory()
+        map_gz_file = os.path.join(tmp_dir.name, filename)
+        self.vault_manager.get_file(path, key, map_gz_file)
+        isovalue = 0.2
+        await self.plugin_instance.add_mapgz_to_group(map_gz_file, isovalue=isovalue)

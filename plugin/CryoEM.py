@@ -35,7 +35,7 @@ class CryoEM(NanomePlugin):
         org = f'org-{presenter_info.org_id}'
         user_id = presenter_info.account_id
         self.vault_manager = VaultManager(self.vault_api_key, self.vault_url)
-        self.vault_menu = VaultMenu(self.client, self.vault_manager, org, user_id)
+        self.vault_menu = VaultMenu(self, self.vault_manager, org, user_id)
         self.vault_menu.create_menu()
         self.vault_menu.show_menu()
 
