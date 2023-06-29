@@ -250,9 +250,12 @@ class MainMenu:
         self._plugin.client.update_node(self.lb_embl_download)
         loading_bar = self.lb_embl_download.get_content()
 
-        file_size = metadata_parser.map_filesize
-        chunk_size = 8192
         async with aiohttp.ClientSession() as session:
+            # Get content size from head request
+            response = await session.head(url)
+            file_size = int(response.headers['Content-Length']) / 1000
+
+            chunk_size = 8192
             async with session.get(url) as response:
                 with open(file_path, 'wb') as file:
                     start_time = time.time()
