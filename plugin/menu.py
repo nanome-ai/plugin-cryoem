@@ -312,7 +312,6 @@ class EditMeshMenu:
 
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
-        self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
@@ -327,7 +326,6 @@ class EditMeshMenu:
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
         self.lbl_opacity: ui.Label = root.find_node('lbl_opacity').get_content()
         self.lbl_isovalue: ui.Label = root.find_node('lbl_isovalue').get_content()
-        self.lbl_radius: ui.Label = root.find_node('lbl_radius').get_content()
 
         self.ln_isovalue_line: ui.LayoutNode = root.find_node('ln_isovalue_line')
 
@@ -364,6 +362,7 @@ class EditMeshMenu:
         for comp in group_objs:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
+            btn.unusable = True
             btn.text.value.set_all(comp.full_name)
             btn.comp = comp
             btn.toggle_on_press = True
