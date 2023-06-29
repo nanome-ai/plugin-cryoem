@@ -1,3 +1,5 @@
+import asyncio
+import aiohttp
 import nanome
 import os
 import requests
@@ -5,10 +7,13 @@ import time
 import urllib
 from functools import partial
 from nanome.api import ui
-from nanome.util import async_callback, enums, Logs
+from nanome.util import enums, Logs
 
 from .models import MapGroup
 from .utils import EMDBMetadataParser
+
+import logging
+logger = logging.getLogger(__name__)
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
@@ -26,7 +31,8 @@ __all__ = ['MainMenu', 'EditMeshMenu']
 class MainMenu:
 
     def __init__(self, plugin_instance: nanome.PluginInstance):
-        self._menu = ui.Menu.io.from_json(MAIN_MENU_PATH)
+        ui_manager = plugin_instance.ui_manager
+        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
         self._plugin = plugin_instance
 
         self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
@@ -34,8 +40,9 @@ class MainMenu:
 
         root: ui.LayoutNode = self._menu.root
         self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+
         self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        self.btn_add_group.register_pressed_callback(self.add_mapgroup)
+        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
@@ -43,8 +50,8 @@ class MainMenu:
         self.btn_embl_submit.disable_on_press = True
         self.ti_rcsb_query: ui.TextInput = root.find_node('ti_rcsb_query').get_content()
         self.ti_embl_query: ui.TextInput = root.find_node('ti_embl_query').get_content()
-        self.btn_rcsb_submit.register_pressed_callback(self.on_rcsb_submit)
-        self.btn_embl_submit.register_pressed_callback(self.on_emdb_submit)
+        ui_manager.register_btn_pressed_callback(self.btn_rcsb_submit, self.on_rcsb_submit)
+        ui_manager.register_btn_pressed_callback(self.btn_embl_submit, self.on_emdb_submit)
         self.lb_embl_download: ui.LoadingBar = root.find_node('lb_embl_download')
         # For development only
         # rcsb, embl = ['4znn', '3001']  # 94.33 degree unit cell
@@ -55,9 +62,9 @@ class MainMenu:
         self.ti_rcsb_query.input_text = rcsb
         self.ti_embl_query.input_text = embl
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
-        self.btn_browse_emdb.register_pressed_callback(self.on_browse_emdb)
+        ui_manager.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
-    def render(self, force_enable=False, selected_mapgroup=None):
+    async def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
             self._menu.enabled = True
 
@@ -65,9 +72,8 @@ class MainMenu:
         # By default, select the first group
         if groups and not selected_mapgroup:
             selected_mapgroup = groups[0]
-
         self.render_map_groups(groups, selected_mapgroup)
-        self._plugin.update_menu(self._menu)
+        self._plugin.client.update_menu(self._menu)
 
     @property
     def temp_dir(self):
@@ -76,7 +82,7 @@ class MainMenu:
     def add_mapgroup(self, btn):
         Logs.message('Adding new map group')
         self._plugin.add_mapgroup()
-        self.render()
+        asyncio.create_task(self.render())
 
     def render_map_groups(self, mapgroups, selected_mapgroup=None):
         self.lst_groups.items.clear()
@@ -86,31 +92,38 @@ class MainMenu:
 
             btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
             btn_add_to_map.toggle_on_press = True
-            btn_add_to_map.register_pressed_callback(self.select_mapgroup)
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_add_to_map, self.select_mapgroup)
             btn_add_to_map.selected = map_group == selected_mapgroup
             lbl.text_value = map_group.group_name
 
             ln_group_details = ln.find_node('ln_group_details')
             edit_mesh_btn: ui.Button = ln_group_details.get_content()
-            edit_mesh_btn.register_pressed_callback(partial(self.open_edit_mesh_menu, map_group))
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                edit_mesh_btn,
+                partial(self.open_edit_mesh_menu, map_group))
 
             btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
-            btn_delete.register_pressed_callback(partial(self.delete_group, map_group))
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_delete,
+                partial(self.delete_group, map_group))
 
             btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
             btn_toggle.icon.value.set_all(
                 VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-            btn_toggle.register_pressed_callback(partial(self.toggle_group, map_group))
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_toggle,
+                partial(self.toggle_group, map_group))
 
             self.lst_groups.items.append(ln)
-        self._plugin.update_content(self.lst_groups)
+        self._plugin.client.update_content(self.lst_groups)
 
     def select_mapgroup(self, selected_btn: ui.Button):
         Logs.message('Selecting map group')
         for item in self.lst_groups.items:
             btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
             btn.selected = btn._content_id == selected_btn._content_id
-        self._plugin.update_content(self.lst_groups)
+        self._plugin.client.update_content(self.lst_groups)
 
     def get_selected_mapgroup(self):
         for item in self.lst_groups.items:
@@ -119,17 +132,16 @@ class MainMenu:
                 label = item.find_node('Label').get_content()
                 return label.text_value
 
-    def open_edit_mesh_menu(self, map_group, btn=None):
+    async def open_edit_mesh_menu(self, map_group, btn=None):
         if not map_group.has_map():
             msg = "Please add Map from EMDB before opening menu"
-            self._plugin.send_notification(enums.NotificationTypes.warning, msg)
+            await self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
             Logs.warning('Tried to open menu before adding map.')
             return
         Logs.message('Loading group details menu')
         group_menu = EditMeshMenu(map_group, self._plugin)
         group_menu.render(map_group)
 
-    @async_callback
     async def delete_group(self, map_group, btn):
         Logs.message(f'Deleting group {map_group.group_name}')
         await self._plugin.delete_mapgroup(map_group)
@@ -139,10 +151,9 @@ class MainMenu:
         map_group.visible = not map_group.visible
         btn.icon.value.set_all(
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-        self._plugin.update_content(btn)
-        self._plugin.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
+        self._plugin.client.update_content(btn)
+        self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
-    @async_callback
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
         Logs.debug(f"RCSB query: {pdb_id}")
@@ -150,7 +161,7 @@ class MainMenu:
         # Disable RCSB button
         self.btn_embl_submit.unusable = True
         self.btn_embl_submit.text.value.unusable = "Load"
-        self._plugin.update_content(self.btn_embl_submit)
+        self._plugin.client.update_content(self.btn_embl_submit)
 
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
@@ -160,9 +171,8 @@ class MainMenu:
         # Reenable embl search button
         self.btn_embl_submit.unusable = False
         self.btn_embl_submit.text.value.unusable = "Downloading..."
-        self._plugin.update_content(self.btn_embl_submit, btn)
+        self._plugin.client.update_content(self.btn_embl_submit, btn)
 
-    @async_callback
     async def on_emdb_submit(self, btn):
         embid_id = self.ti_embl_query.input_text
         Logs.debug(f"EMDB query: {embid_id}")
@@ -170,7 +180,7 @@ class MainMenu:
         # Disable RCSB button
         self.btn_rcsb_submit.unusable = True
         self.btn_rcsb_submit.text.value.unusable = "Load"
-        self._plugin.update_content(self.btn_rcsb_submit)
+        self._plugin.client.update_content(self.btn_rcsb_submit)
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
             # Validate file size is within limit.
@@ -179,19 +189,19 @@ class MainMenu:
         except requests.exceptions.HTTPError:
             msg = "EMDB ID not found"
             Logs.warning(msg)
-            self._plugin.send_notification(enums.NotificationTypes.error, msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
         except Exception:
             msg = "Map file must be smaller than 500MB"
-            self._plugin.send_notification(enums.NotificationTypes.error, msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
         else:
             # Download map data
-            map_file = self.download_mapgz_from_emdbid(embid_id, metadata_parser)
+            map_file = await self.download_mapgz_from_emdbid(embid_id, metadata_parser)
             isovalue = metadata_parser.isovalue
             # Update message to say generating mesh
-            self._plugin.update_content(btn)
+            self._plugin.client.update_content(btn)
             btn.text.value.unusable = "Generating..."
             btn.unusable = True
-            self._plugin.update_content(btn)
+            self._plugin.client.update_content(btn)
 
             await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
 
@@ -201,20 +211,20 @@ class MainMenu:
             else:
                 pdb_id = ""
             self.ti_rcsb_query.input_text = pdb_id
-            self._plugin.update_content(self.ti_rcsb_query)
+            self._plugin.client.update_content(self.ti_rcsb_query)
         # Reenable rcsb load button
         self.btn_rcsb_submit.unusable = False
         self.btn_rcsb_submit.text.value.unusable = "Downloading..."
         btn.text.value.unusable = "Downloading..."
         btn.unusable = False
-        self._plugin.update_content(self.btn_rcsb_submit, btn)
+        self._plugin.client.update_content(self.btn_rcsb_submit, btn)
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
         response = requests.get(url)
         if response.status_code != 200:
             Logs.warning(f"PDB for {pdb_id} not found")
-            self._plugin.send_notification(
+            self._plugin.client.send_notification(
                 nanome.util.enums.NotificationTypes.error,
                 f"{pdb_id} not found in RCSB")
             return
@@ -230,40 +240,45 @@ class MainMenu:
         response.raise_for_status()
         return EMDBMetadataParser(response.content)
 
-    def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+    async def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
         Logs.message("Downloading map data from EMDB:", emdbid)
         url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
         # Write the map to a .map file
         file_path = f'{self.temp_dir}/{emdbid}.map.gz'
         # Set up loading bar
         self.lb_embl_download.enabled = True
-        self._plugin.update_node(self.lb_embl_download)
+        self._plugin.client.update_node(self.lb_embl_download)
         loading_bar = self.lb_embl_download.get_content()
 
         file_size = metadata_parser.map_filesize
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            chunk_size = 8192
-            downloaded_chunks = 0
-            with open(file_path, "wb") as f:
-                start_time = time.time()
-                data_check = start_time
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    downloaded_chunks += chunk_size
-                    f.write(chunk)
-                    now = time.time()
-                    if now - data_check > 5:
-                        kb_downloaded = downloaded_chunks / 1000
-                        Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
-                        loading_bar.percentage = kb_downloaded / file_size
-                        self.btn_embl_submit.text.value.unusable = \
-                            f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
-                        self.btn_embl_submit.unusable = True
-                        self._plugin.update_content(loading_bar, self.btn_embl_submit)
-                        data_check = now
+        chunk_size = 8192
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                with open(file_path, 'wb') as file:
+                    start_time = time.time()
+                    data_check = start_time
+                    downloaded_chunks = 0
+                    while True:
+                        chunk = await response.content.read(chunk_size)
+                        if not chunk:
+                            break
+                        downloaded_chunks += len(chunk)
+                        file.write(chunk)
+                        now = time.time()
+                        # Update UI with download progress
+                        ui_update_interval = 3
+                        if now - data_check > ui_update_interval:
+                            kb_downloaded = downloaded_chunks / 1000
+                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
+                            loading_bar.percentage = kb_downloaded / file_size
+                            self.btn_embl_submit.text.value.unusable = \
+                                f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                            self.btn_embl_submit.unusable = True
+                            self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
+                            data_check = now
         loading_bar.percentage = 0
         self.lb_embl_download.enabled = False
-        self._plugin.update_node(self.lb_embl_download)
+        self._plugin.client.update_node(self.lb_embl_download)
         return file_path
 
     def on_browse_emdb(self, btn):
@@ -276,7 +291,7 @@ class MainMenu:
             'sort': 'release_date desc'
         })
         url = f"{base_search_url}/{query}?{query_params}"
-        self._plugin.open_url(url)
+        self._plugin.client.open_url(url)
 
 
 class EditMeshMenu:
@@ -286,8 +301,10 @@ class EditMeshMenu:
 
     def __init__(self, map_group, plugin_instance: nanome.PluginInstance):
         self.map_group = map_group
-        self._menu = ui.Menu.io.from_json(EDIT_MESH_MENU_PATH)
         self._plugin = plugin_instance
+
+        ui_manager = self._plugin.ui_manager
+        self._menu = ui_manager.create_new_menu(EDIT_MESH_MENU_PATH)
         self._menu.index = 20
 
         root: ui.LayoutNode = self._menu.root
@@ -296,17 +313,13 @@ class EditMeshMenu:
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
-        self.btn_redraw_map.register_pressed_callback(self.redraw_new_isovalue)
+        ui_manager.register_btn_pressed_callback(self.btn_redraw_map, self.redraw_new_isovalue)
         self.sld_isovalue: ui.Slider = root.find_node('sld_isovalue').get_content()
-        self.sld_isovalue.register_changed_callback(self.update_isovalue_lbl)
+        ui_manager.register_slider_change_callback(self.sld_isovalue, self.update_isovalue_lbl)
 
         self.sld_opacity: ui.Slider = root.find_node('sld_opacity').get_content()
-        self.sld_opacity.register_changed_callback(self.update_opacity_lbl)
-        self.sld_opacity.register_released_callback(self.update_color)
-
-        self.sld_radius: ui.Slider = root.find_node('sld_radius').get_content()
-        self.sld_radius.register_changed_callback(self.sld_radius_update)
-        self.sld_radius.register_released_callback(self.redraw_map)
+        ui_manager.register_slider_change_callback(self.sld_opacity, self.update_opacity_lbl)
+        ui_manager.register_slider_released_callback(self.sld_opacity, self.update_color)
 
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
         self.lbl_opacity: ui.Label = root.find_node('lbl_opacity').get_content()
@@ -317,19 +330,22 @@ class EditMeshMenu:
 
         self.ln_img_histogram: ui.LayoutNode = root.find_node('img_histogram')
         self.dd_color_scheme: ui.Dropdown = root.find_node('dd_color_scheme').get_content()
-        self.dd_color_scheme.register_item_clicked_callback(self.set_color_scheme)
+        ui_manager.register_dropdown_item_clicked_callback(self.dd_color_scheme, self.set_color_scheme)
 
         self.btn_show_full_map: ui.Button = root.find_node('btn_show_full_map').get_content()
         self.btn_show_full_map.disable_on_press = True
-        self.btn_show_full_map.register_pressed_callback(self.show_full_map)
+        ui_manager.register_btn_pressed_callback(
+            self.btn_show_full_map, self.show_full_map)
 
         self.btn_box_around_model: ui.Button = root.find_node('btn_box_around_model').get_content()
         self.btn_box_around_model.disable_on_press = True
-        self.btn_box_around_model.register_pressed_callback(self.box_map_around_model)
+        ui_manager.register_btn_pressed_callback(
+            self.btn_box_around_model, self.box_map_around_model)
 
         self.btn_box_around_selection: ui.Button = root.find_node('btn_box_around_selection').get_content()
         self.btn_box_around_selection.disable_on_press = True
-        self.btn_box_around_selection.register_pressed_callback(self.box_map_around_selection)
+        ui_manager.register_btn_pressed_callback(
+            self.btn_box_around_selection, self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
         self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 3)})'
@@ -367,16 +383,17 @@ class EditMeshMenu:
             self.set_isovalue_slider_min_max(map_group)
         if map_group.has_map() and not map_group.png_tempfile:
             self.ln_img_histogram.add_new_label('Loading Contour Histogram...')
+
         color_scheme_text = f"Color Scheme ({self.color_scheme.name})"
         self.dd_color_scheme.permanent_title = color_scheme_text
-        self._plugin.update_menu(self._menu)
+        self._plugin.client.update_menu(self._menu)
         if map_group.has_map() and not map_group.png_tempfile:
             # Generate histogram and add to menu.
             map_group.generate_histogram(self.temp_dir)
-        if map_group.png_tempfile:
             self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-        self.set_isovalue_slider_min_max(map_group)
-        self._plugin.update_node(self.ln_img_histogram)
+            self.set_isovalue_slider_min_max(map_group)
+            self._plugin.client.update_node(self.ln_img_histogram)
+            self._plugin.client.update_content(self.sld_isovalue)
 
     def set_isovalue_ui(self, map_group):
         self.set_isovalue_slider_min_max(map_group)
@@ -389,7 +406,7 @@ class EditMeshMenu:
     def update_isovalue_lbl(self, sld):
         slider_value = self.get_isovalue_from_slider()
         self.lbl_isovalue.text_value = f'{round(slider_value, 3)} A'
-        self._plugin.update_content(self.lbl_isovalue, sld)
+        self._plugin.client.update_content(self.lbl_isovalue, sld)
 
         # /!\ calculation is sensitive to menu and image dimensions
         # position histogram line based on isovalue
@@ -401,42 +418,37 @@ class EditMeshMenu:
             x = (current_value - x_min) / (x_max - x_min)
             left = (100 + x * 620) / 800
             self.ln_isovalue_line.set_padding(left=left)
-            self._plugin.update_node(self.ln_isovalue_line)
+            self._plugin.client.update_node(self.ln_isovalue_line)
 
     def update_opacity_lbl(self, sld):
         self.lbl_opacity.text_value = str(round(100 * sld.current_value))
-        self._plugin.update_content(self.lbl_opacity, sld)
+        self._plugin.client.update_content(self.lbl_opacity, sld)
 
     def sld_radius_update(self, sld):
         sld_current_val = sld.current_value
         self.lbl_radius.text_value = f'{round(sld_current_val, 2)} A'
-        self._plugin.update_content(self.lbl_radius, sld)
+        self._plugin.client.update_content(self.lbl_radius, sld)
 
-    @async_callback
     async def show_full_map(self, btn):
         Logs.message("Showing full map...")
         await self.map_group.generate_full_mesh()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
     async def box_map_around_selection(self, btn: ui.Button):
         Logs.message("Extracting map around selection...")
         await self.map_group.generate_mesh_around_selection()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
     async def box_map_around_model(self, btn):
         Logs.message("Extracting map around model...")
         await self.map_group.generate_mesh_around_model()
-        self._plugin.update_content(btn)
+        self._plugin.client.update_content(btn)
 
-    @async_callback
     async def update_color(self, *args):
         color_scheme = self.color_scheme
         opacity = self.opacity
         await self.map_group.update_color(color_scheme, opacity)
 
-    @async_callback
     async def redraw_map(self, btn=None):
         self.map_group.isovalue = self.get_isovalue_from_slider()
         self.map_group.opacity = self.opacity
@@ -444,26 +456,17 @@ class EditMeshMenu:
         if self.map_group.has_map():
             await self.map_group.redraw_mesh()
 
-    @async_callback
     async def redraw_new_isovalue(self, btn):
         rendered_isovalue = self.sld_isovalue.current_value
         await self.redraw_map(btn)
         # Set slider back to initial value, in case user
         # moved it while map was being redrawn
         self.sld_isovalue.current_value = rendered_isovalue
-        self._plugin.update_content(btn, self.sld_isovalue)
+        self._plugin.client.update_content(btn, self.sld_isovalue)
 
     @property
     def temp_dir(self):
         return self._plugin.temp_dir.name
-
-    def generate_histogram_thread(self, map_group):
-        map_group.generate_histogram(self.temp_dir)
-        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
-        self.sld_isovalue.min_value = map_group.hist_x_min
-        self.sld_isovalue.max_value = map_group.hist_x_max
-        self._plugin.update_node(self.ln_img_histogram)
-        self._plugin.update_content(self.sld_isovalue)
 
     @property
     def opacity(self):
@@ -484,25 +487,10 @@ class EditMeshMenu:
             color_scheme = enums.ColorScheme.Chain
         return color_scheme
 
-    @async_callback
     async def set_color_scheme(self, *args):
         self.dd_color_scheme.permanent_title = f"Color Scheme ({self.color_scheme.name})"
-        self._plugin.update_content(self.dd_color_scheme)
+        self._plugin.client.update_content(self.dd_color_scheme)
         await self.map_group.update_color(self.color_scheme, self.opacity)
-
-    def delete_group_objects(self, btn: ui.Button):
-        Logs.message("Delete group objects button clicked.")
-        strucs = []
-        for item in self.lst_files.items:
-            item_btn = item.get_content()
-            if item_btn.selected:
-                item_comp = getattr(item_btn, 'comp', None)
-                if item_comp:
-                    strucs.append(item_comp)
-        if strucs:
-            Logs.message(f"Deleting {len(strucs)} group objects.")
-            self.map_group.remove_group_objects(strucs)
-            self.render(self.map_group)
 
     def set_isovalue_slider_min_max(self, map_group):
         min_value = map_group.hist_x_min

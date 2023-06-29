@@ -2,28 +2,30 @@ import os
 import tempfile
 from pathlib import Path
 
-import nanome
-from nanome.util import Logs, enums, async_callback
+from nanome.util import Logs, enums
 from nanome.api import structure
-from . import __version__
 from .menu import MainMenu
 from .models import MapGroup
+from nanome_sdk import NanomePlugin
+
+import logging
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 
-class CryoEM(nanome.AsyncPluginInstance):
+class CryoEM(NanomePlugin):
 
-    def start(self):
+    def __init__(self):
+        super().__init__()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.menu = MainMenu(self)
         self.groups = []
         self.add_mapgroup()
 
-    def on_stop(self):
+    async def on_stop(self):
         self.temp_dir.cleanup()
 
-    @async_callback
     async def on_run(self):
-        self.menu.render(force_enable=True)
+        await self.menu.render(force_enable=True)
 
     def add_mapgroup(self):
         group_num = 1
@@ -63,7 +65,7 @@ class CryoEM(nanome.AsyncPluginInstance):
                 model_comp.position = map_complex.position
                 model_comp.rotation = map_complex.rotation
 
-        [created_comp] = await self.add_to_workspace([model_comp])
+        [created_comp] = await self.client.add_to_workspace([model_comp])
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
 
@@ -71,7 +73,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         comp = structure.Complex.io.from_pdb(path=pdb_filepath)
         # Get new complex, and associate to MapGroup
         comp.name = Path(pdb_filepath).stem
-        await self.add_bonds([comp])
+        self.client.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
         return comp
@@ -93,7 +95,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         await mapgroup.add_map_gz(map_gz_filepath)
         if mapgroup.model_complex:
             # Get latest position of model complex
-            [deep_comp] = await self.request_complexes([mapgroup.model_complex.index])
+            [deep_comp] = await self.client.request_complexes([mapgroup.model_complex.index])
             if not deep_comp:
                 Logs.warning("model complex was deleted.")
             else:
@@ -101,7 +103,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         await mapgroup.generate_full_mesh()
         # Rename Mapgroup after the new map
         mapgroup.group_name = Path(map_gz_filepath).stem
-        self.menu.render(selected_mapgroup=mapgroup)
+        await self.menu.render(selected_mapgroup=mapgroup)
 
     async def delete_mapgroup(self, map_group: MapGroup):
         map_comp = map_group.map_mesh.complex
@@ -112,7 +114,7 @@ class CryoEM(nanome.AsyncPluginInstance):
         if model_comp:
             comps_to_delete.append(model_comp)
         if comps_to_delete:
-            await self.remove_from_workspace(comps_to_delete)
+            await self.client.remove_from_workspace(comps_to_delete)
         try:
             self.groups.remove(map_group)
         except ValueError:
@@ -123,7 +125,7 @@ class CryoEM(nanome.AsyncPluginInstance):
             os.remove(map_group.map_gz_file)
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
-        self.menu.render(selected_mapgroup=mapgroup)
+        await self.menu.render(selected_mapgroup=mapgroup)
 
     @staticmethod
     def remove_hydrogens(comp):
@@ -134,18 +136,6 @@ class CryoEM(nanome.AsyncPluginInstance):
             for bond in atom.bonds:
                 residue.remove_bond(bond)
 
-
-def main():
-    plugin = nanome.Plugin(
-        "Cryo-EM",
-        "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces",
-        "other",
-        False,
-        version=__version__
-    )
-    plugin.set_plugin_class(CryoEM)
-    plugin.run()
-
-
-if __name__ == "__main__":
-    main()
+    @property
+    def request_futs(self):
+        return self.client.request_futs

@@ -1,6 +1,6 @@
 import asyncio
 import os
-import nanome
+from nanome_sdk.session import UIManager
 import tempfile
 import unittest
 
@@ -28,8 +28,8 @@ class EditMeshMenuTestCase(unittest.TestCase):
         super().setUp()
         self.plugin = MagicMock()
         self.plugin.temp_dir = tempfile.TemporaryDirectory()
-        nanome.PluginInstance._instance = MagicMock()
-        nanome._internal.network.PluginNetwork._instance = MagicMock()
+        self.plugin.client = MagicMock()
+        self.plugin.ui_manager = UIManager()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_group = models.MapGroup(self.plugin)
@@ -37,7 +37,11 @@ class EditMeshMenuTestCase(unittest.TestCase):
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
-        self.plugin.add_to_workspace.return_value = fut
+        self.plugin.client.add_to_workspace.return_value = fut
+
+        shapes_mock = asyncio.Future()
+        shapes_mock.set_result([MagicMock(), MagicMock()])
+        self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
     def tearDown(self):
         super().tearDown()
@@ -51,11 +55,14 @@ class EditMeshMenuTestCase(unittest.TestCase):
         self.plugin.temp_dir.cleanup()
 
     def test_render_no_map(self):
-        self.menu.render(self.map_group)
-        self.assertTrue(self.map_group.group_name in self.menu._menu.title)
-        self.assertEqual(len(self.menu.lst_files.items), 0)
-        self.assertEqual(self.menu.sld_isovalue.current_value, self.map_group.isovalue)
-        self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
+
+        async def validate_render_no_map():
+            self.menu.render(self.map_group)
+            self.assertTrue(self.map_group.group_name in self.menu._menu.title)
+            self.assertEqual(len(self.menu.lst_files.items), 0)
+            self.assertEqual(self.menu.sld_isovalue.current_value, self.map_group.isovalue)
+            self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
+        run_awaitable(validate_render_no_map)
 
     def test_render_with_map(self):
         async def validate_render_with_map():
@@ -68,16 +75,16 @@ class EditMeshMenuTestCase(unittest.TestCase):
             self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
         run_awaitable(validate_render_with_map)
 
-    def test_generate_histogram_thread(self):
-        async def validate_generate_histogram_thread():
+    def test_generate_histogram(self):
+        async def validate_generate_histogram():
             await self.map_group.add_map_gz(self.map_file)
             await self.map_group.generate_full_mesh()
             original_hist_x_min = self.map_group.hist_x_min
             original_hist_x_max = self.map_group.hist_x_max
-            self.menu.generate_histogram_thread(self.map_group)
+            self.menu.render(self.map_group)
             self.assertNotEqual(self.map_group.hist_x_min, original_hist_x_min)
             self.assertNotEqual(self.map_group.hist_x_max, original_hist_x_max)
             self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
             self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
             self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
-        run_awaitable(validate_generate_histogram_thread)
+        run_awaitable(validate_generate_histogram)

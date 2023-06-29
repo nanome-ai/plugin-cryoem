@@ -1,7 +1,7 @@
+import asyncio
 import enum
 import gzip
 import logging
-import matplotlib.pyplot as plt
 import mcubes
 import numpy as np
 import os
@@ -12,7 +12,6 @@ import time
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
-from matplotlib import cm
 from mmtbx.model.model import manager
 from scipy.spatial import KDTree
 from typing import List
@@ -73,11 +72,18 @@ class MapMesh:
     def colors(self, value: Color):
         self.mesh.colors = value
 
-    def upload(self):
-        self.mesh.upload()
+    async def upload(self):
+        meshes = [self.mesh]
         if self.backface:
-            self.load_mesh_backface()
-            self.mesh_backface.upload()
+            meshes.append(self.mesh_backface)
+        if self.mesh.index == -1:
+            # Make sure indices get set
+            uploaded_meshes = await self._plugin.client.shapes_upload_multiple(meshes)
+            self.mesh = uploaded_meshes[0]
+            if self.backface:
+                self.mesh_backface = uploaded_meshes[1]
+        else:
+            asyncio.create_task(self._plugin.client.shapes_upload_multiple(meshes))
 
     def load_mesh_backface(self):
         vertices = self.mesh.vertices
@@ -113,7 +119,7 @@ class MapMesh:
             # Create complex to attach mesh to.
             self.complex.boxed = True
             self.complex.locked = True
-            [self.complex] = await self._plugin.add_to_workspace([self.complex])
+            [self.complex] = await self._plugin.client.add_to_workspace([self.complex])
             anchor = self.mesh.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
@@ -122,7 +128,7 @@ class MapMesh:
             comp_index = self.complex.index
             new_comp.index = comp_index
             self.complex = new_comp
-            await self._plugin.update_structures_deep([self.complex])
+            await self._plugin.client.update_structures_deep([self.complex])
 
     @staticmethod
     def load_map_file(map_gz_file):
@@ -299,6 +305,7 @@ class MapGroup:
             self.color_by_scheme(self.map_mesh, self.color_scheme)
 
     def generate_histogram(self, temp_dir: str):
+        import matplotlib.pyplot as plt
         logging.getLogger('matplotlib').setLevel(logging.CRITICAL)
         Logs.debug("Generating histogram...")
         start_time = time.time()
@@ -330,7 +337,7 @@ class MapGroup:
         if self.map_mesh.mesh is not None:
             self.map_mesh.color = Color(255, 255, 255, int(opacity * 255))
             self.color_by_scheme(self.map_mesh, color_scheme)
-            self.map_mesh.upload()
+            asyncio.create_task(self.map_mesh.upload())
 
     def create_map_model_manager(self):
         # Compute iso-surface with marching cubes algorithm
@@ -339,10 +346,8 @@ class MapGroup:
         kwargs = {
             'ignore_symmetry_conflicts': True
         }
-        model = None
         if hasattr(self, '_model') and self._model:
-            model = self._model
-            kwargs['model'] = model
+            kwargs['model'] = self._model
         if hasattr(self, 'map_mesh'):
             kwargs['map_manager'] = self.map_mesh.map_manager
         mmm = map_model_manager(**kwargs)
@@ -361,7 +366,7 @@ class MapGroup:
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     async def generate_full_mesh(self):
         self.extraction_type = EXTRACTION_TYPE.FULL_MAP
@@ -372,7 +377,7 @@ class MapGroup:
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
         self._set_hist_x_min_max()
 
     async def generate_mesh_around_selection(self):
@@ -392,14 +397,14 @@ class MapGroup:
             ]
         if not selected_residues:
             Logs.warning("No residues selected on model")
-            self._plugin.send_notification(
+            self._plugin.client.send_notification(
                 enums.NotificationTypes.warning, "No residues selected on model.")
             return
 
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity, selected_residues)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     def color_by_scheme(self, map_mesh, scheme):
         Logs.message(f"Coloring Mesh with scheme {scheme.name}")
@@ -413,7 +418,7 @@ class MapGroup:
             self.color_by_bfactor(map_mesh, comp)
         elif scheme == enums.ColorScheme.Chain:
             self.color_by_chain(map_mesh, comp)
-        map_mesh.upload()
+        asyncio.create_task(map_mesh.upload())
         Logs.message("Mesh colored")
 
     @staticmethod
@@ -489,6 +494,7 @@ class MapGroup:
 
     @staticmethod
     def color_by_bfactor(map_mesh: MapMesh, model_complex: structure.Complex):
+        from matplotlib import cm
         verts = map_mesh.computed_vertices
         if len(verts) < 3:
             return
@@ -553,7 +559,7 @@ class MapGroup:
         if self.map_complex in comp_list:
             comps_to_delete.append(self.map_complex)
             self.map_mesh = MapMesh(self._plugin)
-        self._plugin.remove_from_workspace(comps_to_delete)
+        self._plugin.client.remove_from_workspace(comps_to_delete)
 
     def _set_hist_x_min_max(self):
         flat = list(self.map_mesh.map_manager.map_data().as_1d())
@@ -561,7 +567,7 @@ class MapGroup:
         self.hist_x_max = np.max(flat)
 
     async def refresh_model_complex(self):
-        [self.__model_complex] = await self._plugin.request_complexes([self.model_complex.index])
+        [self.__model_complex] = await self._plugin.client.request_complexes([self.model_complex.index])
 
     async def extract_around_selection(self):
         # Compute iso-surface with marching cubes algorithm
@@ -590,7 +596,7 @@ class MapGroup:
         self.map_mesh.color = Color.White()
         self.map_mesh.color.a = 75
         self.color_by_scheme(self.map_mesh, self.color_scheme)
-        self.map_mesh.mesh.upload()
+        asyncio.create_task(self.map_mesh.upload())
 
     async def redraw_mesh(self):
         if self.extraction_type == EXTRACTION_TYPE.FULL_MAP:

@@ -1,10 +1,9 @@
 import asyncio
 import os
-import nanome
 import tempfile
 import unittest
 
-from nanome.api import structure, PluginInstance
+from nanome.api import structure
 from unittest.mock import MagicMock, patch
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
@@ -29,11 +28,13 @@ class MapGroupTestCase(unittest.TestCase):
 
     def setUp(self):
         self.plugin = MagicMock()
-        PluginInstance._instance = self.plugin
-        nanome._internal.network.PluginNetwork._instance = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
         self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+
+        shapes_mock = asyncio.Future()
+        shapes_mock.set_result([MagicMock(), MagicMock()])
+        self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
     def test_add_pdb(self):
         self.map_group.add_pdb(self.pdb_file)
@@ -44,7 +45,7 @@ class MapGroupTestCase(unittest.TestCase):
             # Set future result for request_complexes mock
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
+            self.plugin.client.add_to_workspace.return_value = fut
             # run add_map_gz, and make sure map_manager is created on internal map_manager
             self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, type(None)))
             await self.map_group.add_map_gz(self.map_file)
@@ -57,7 +58,7 @@ class MapGroupTestCase(unittest.TestCase):
         async def validate_generate_full_mesh(self):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
+            self.plugin.client.add_to_workspace.return_value = fut
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             expected_vertices = 14735
@@ -73,7 +74,7 @@ class MapGroupTestCase(unittest.TestCase):
         async def validate_generate_histogram(self):
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
+            self.plugin.client.add_to_workspace.return_value = fut
 
             map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
             await self.map_group.add_map_gz(map_file)
@@ -100,13 +101,13 @@ class MapMeshTestCase(unittest.TestCase):
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
-        self.plugin.add_to_workspace.return_value = fut
+        self.plugin.client.add_to_workspace.return_value = fut
 
     def test_add_map_gz_file(self):
         # Set future result for request_complexes mock
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
-        self.plugin.add_to_workspace.return_value = fut
+        self.plugin.client.add_to_workspace.return_value = fut
         # run add_map_gz, and make sure map_manager is created on internal map_manager
         self.assertTrue(isinstance(self.map_mesh.map_manager, type(None)))
         self.map_mesh.add_map_gz_file(self.map_file)
@@ -124,7 +125,7 @@ class MapMeshTestCase(unittest.TestCase):
 
             fut = asyncio.Future()
             fut.set_result([structure.Complex()])
-            self.plugin.add_to_workspace.return_value = fut
+            self.plugin.client.add_to_workspace.return_value = fut
 
             self.map_mesh.add_map_gz_file(self.map_file)
 
@@ -153,7 +154,7 @@ class MapMeshTestCase(unittest.TestCase):
             model_comp = structure.Complex.io.from_pdb(path=self.pdb_file)
             fut = asyncio.Future()
             fut.set_result([model_comp])
-            self.plugin.request_complexes.return_value = fut
+            self.plugin.client.request_complexes.return_value = fut
 
             mesh = self.map_mesh.mesh
             self.assertEqual(len(mesh.vertices), 0)
