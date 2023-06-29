@@ -250,9 +250,12 @@ class MainMenu:
         self._plugin.client.update_node(self.lb_embl_download)
         loading_bar = self.lb_embl_download.get_content()
 
-        file_size = metadata_parser.map_filesize
-        chunk_size = 8192
         async with aiohttp.ClientSession() as session:
+            # Get content size from head request
+            response = await session.head(url)
+            file_size = int(response.headers['Content-Length']) / 1000
+
+            chunk_size = 8192
             async with session.get(url) as response:
                 with open(file_path, 'wb') as file:
                     start_time = time.time()
@@ -309,7 +312,6 @@ class EditMeshMenu:
 
         root: ui.LayoutNode = self._menu.root
         self.ln_edit_map: ui.LayoutNode = root.find_node('edit map')
-        self.ln_edit_viewport: ui.LayoutNode = root.find_node('edit viewport')
         self.lst_files: ui.UIList = root.find_node('lst_files').get_content()
         self.btn_redraw_map = root.find_node('ln_btn_redraw_map').get_content()
         self.btn_redraw_map.disable_on_press = True
@@ -324,7 +326,6 @@ class EditMeshMenu:
         self.lbl_resolution: ui.Label = root.find_node('lbl_resolution').get_content()
         self.lbl_opacity: ui.Label = root.find_node('lbl_opacity').get_content()
         self.lbl_isovalue: ui.Label = root.find_node('lbl_isovalue').get_content()
-        self.lbl_radius: ui.Label = root.find_node('lbl_radius').get_content()
 
         self.ln_isovalue_line: ui.LayoutNode = root.find_node('ln_isovalue_line')
 
@@ -361,6 +362,7 @@ class EditMeshMenu:
         for comp in group_objs:
             ln = ui.LayoutNode()
             btn = ln.add_new_button()
+            btn.unusable = True
             btn.text.value.set_all(comp.full_name)
             btn.comp = comp
             btn.toggle_on_press = True
@@ -390,10 +392,11 @@ class EditMeshMenu:
         if map_group.has_map() and not map_group.png_tempfile:
             # Generate histogram and add to menu.
             map_group.generate_histogram(self.temp_dir)
-            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
             self.set_isovalue_slider_min_max(map_group)
-            self._plugin.client.update_node(self.ln_img_histogram)
             self._plugin.client.update_content(self.sld_isovalue)
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        self._plugin.client.update_node(self.ln_img_histogram)
 
     def set_isovalue_ui(self, map_group):
         self.set_isovalue_slider_min_max(map_group)
