@@ -394,7 +394,8 @@ class EditMeshMenu:
             map_group.generate_histogram(self.temp_dir)
             self.set_isovalue_slider_min_max(map_group)
             self._plugin.client.update_content(self.sld_isovalue)
-        self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
+        if map_group.png_tempfile:
+            self.ln_img_histogram.add_new_image(map_group.png_tempfile.name)
         self._plugin.client.update_node(self.ln_img_histogram)
 
     def set_isovalue_ui(self, map_group):
