@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
+LOAD_FROM_EMDB_MENU_PATH = os.path.join(ASSETS_PATH, 'emdb_load_menu.json')
 EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
 GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
 DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
@@ -28,21 +29,16 @@ MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 __all__ = ['MainMenu', 'EditMeshMenu']
 
 
-class MainMenu:
+class LoadFromEmdbMenu:
 
     def __init__(self, plugin_instance: nanome.PluginInstance):
         ui_manager = plugin_instance.ui_manager
-        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
+        self._menu = ui_manager.create_new_menu(LOAD_FROM_EMDB_MENU_PATH)
+        self._menu.index = 120  # arbitrary
         self._plugin = plugin_instance
-
-        self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
-        self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
+        self.client = plugin_instance.client
 
         root: ui.LayoutNode = self._menu.root
-        self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
-
-        self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
@@ -64,6 +60,179 @@ class MainMenu:
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
         ui_manager.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
+    def render(self):
+        self._menu.enabled = True
+        self.client.update_menu(self._menu)
+
+    def on_browse_emdb(self, btn):
+        """Open the EMDB website in the user's browser"""
+        base_search_url = "www.ebi.ac.uk/emdb/search"
+        # query only low molecular weight maps, because download speeds are really bad.
+        query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
+        query_params = urllib.parse.urlencode({
+            'rows': 10,
+            'sort': 'release_date desc'
+        })
+        url = f"{base_search_url}/{query}?{query_params}"
+        self._plugin.client.open_url(url)
+
+    async def on_rcsb_submit(self, btn):
+        pdb_id = self.ti_rcsb_query.input_text
+        Logs.debug(f"RCSB query: {pdb_id}")
+
+        # Disable RCSB button
+        self.btn_embl_submit.unusable = True
+        self.btn_embl_submit.text.value.unusable = "Load"
+        self._plugin.client.update_content(self.btn_embl_submit)
+
+        pdb_path = self.download_pdb_from_rcsb(pdb_id)
+        if not pdb_path:
+            return
+        await self._plugin.add_pdb_to_group(pdb_path)
+
+        # Reenable embl search button
+        self.btn_embl_submit.unusable = False
+        self.btn_embl_submit.text.value.unusable = "Downloading..."
+        self._plugin.client.update_content(self.btn_embl_submit, btn)
+
+    async def on_emdb_submit(self, btn):
+        embid_id = self.ti_embl_query.input_text
+        Logs.debug(f"EMDB query: {embid_id}")
+
+        # Disable RCSB button
+        self.btn_rcsb_submit.unusable = True
+        self.btn_rcsb_submit.text.value.unusable = "Load"
+        self._plugin.client.update_content(self.btn_rcsb_submit)
+        try:
+            metadata_parser = self.download_metadata_from_emdbid(embid_id)
+            # Validate file size is within limit.
+            if metadata_parser.map_filesize > MAX_MAP_SIZE_KB:
+                raise Exception
+        except requests.exceptions.HTTPError:
+            msg = "EMDB ID not found"
+            Logs.warning(msg)
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
+        except Exception:
+            msg = "Map file must be smaller than 500MB"
+            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
+        else:
+            # Download map data
+            map_file = await self.download_mapgz_from_emdbid(embid_id, metadata_parser)
+            isovalue = metadata_parser.isovalue
+            # Update message to say generating mesh
+            self._plugin.client.update_content(btn)
+            btn.text.value.unusable = "Generating..."
+            btn.unusable = True
+            self._plugin.client.update_content(btn)
+
+            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+
+            # Populate rcsb text input with pdb from metadata
+            if metadata_parser.pdb_list:
+                pdb_id = metadata_parser.pdb_list[0]
+            else:
+                pdb_id = ""
+            self.ti_rcsb_query.input_text = pdb_id
+            self._plugin.client.update_content(self.ti_rcsb_query)
+        # Reenable rcsb load button
+        self.btn_rcsb_submit.unusable = False
+        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
+        btn.text.value.unusable = "Downloading..."
+        btn.unusable = False
+        self._plugin.client.update_content(self.btn_rcsb_submit, btn)
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
+    def download_pdb_from_rcsb(self, pdb_id):
+        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+        response = requests.get(url)
+        if response.status_code != 200:
+            Logs.warning(f"PDB for {pdb_id} not found")
+            self._plugin.client.send_notification(
+                nanome.util.enums.NotificationTypes.error,
+                f"{pdb_id} not found in RCSB")
+            return
+        file_path = f'{self.temp_dir}/{pdb_id}.pdb'
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        return file_path
+
+    def download_metadata_from_emdbid(self, emdbid):
+        Logs.debug("Downloading metadata for EMDBID:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
+        response = requests.get(url)
+        response.raise_for_status()
+        return EMDBMetadataParser(response.content)
+
+    async def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
+        Logs.message("Downloading map data from EMDB:", emdbid)
+        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
+        # Write the map to a .map file
+        file_path = f'{self.temp_dir}/{emdbid}.map.gz'
+        # Set up loading bar
+        self.lb_embl_download.enabled = True
+        self._plugin.client.update_node(self.lb_embl_download)
+        loading_bar = self.lb_embl_download.get_content()
+
+        async with aiohttp.ClientSession() as session:
+            # Get content size from head request
+            response = await session.head(url)
+            file_size = int(response.headers['Content-Length']) / 1000
+
+            chunk_size = 8192
+            async with session.get(url) as response:
+                with open(file_path, 'wb') as file:
+                    start_time = time.time()
+                    data_check = start_time
+                    downloaded_chunks = 0
+                    while True:
+                        chunk = await response.content.read(chunk_size)
+                        if not chunk:
+                            break
+                        downloaded_chunks += len(chunk)
+                        file.write(chunk)
+                        now = time.time()
+                        # Update UI with download progress
+                        ui_update_interval = 3
+                        if now - data_check > ui_update_interval:
+                            kb_downloaded = downloaded_chunks / 1000
+                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
+                            loading_bar.percentage = kb_downloaded / file_size
+                            self.btn_embl_submit.text.value.unusable = \
+                                f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                            self.btn_embl_submit.unusable = True
+                            self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
+                            data_check = now
+        loading_bar.percentage = 0
+        self.lb_embl_download.enabled = False
+        self._plugin.client.update_node(self.lb_embl_download)
+        return file_path
+
+
+class MainMenu:
+
+    def __init__(self, plugin_instance: nanome.PluginInstance):
+        ui_manager = plugin_instance.ui_manager
+        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
+        self._plugin = plugin_instance
+
+        self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
+        self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
+
+        root: ui.LayoutNode = self._menu.root
+        self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+
+        self.btn_add_group: ui.Button = root.find_node('ln_btn_add_group').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
+
+        self.btn_load_from_emdb: ui.Button = root.find_node('ln_btn_load_from_emdb').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_load_from_emdb, self.open_emdb_menu)
+
+        self.btn_load_from_vault: ui.Button = root.find_node('ln_btn_load_from_vault').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_load_from_vault, self.open_vault_menu)
+
     async def render(self, force_enable=False, selected_mapgroup=None):
         if force_enable:
             self._menu.enabled = True
@@ -74,6 +243,14 @@ class MainMenu:
             selected_mapgroup = groups[0]
         self.render_map_groups(groups, selected_mapgroup)
         self._plugin.client.update_menu(self._menu)
+
+    def open_emdb_menu(self, btn):
+        self.emdb_menu = LoadFromEmdbMenu(self._plugin)
+        self.emdb_menu.render()
+        pass
+
+    def open_vault_menu(self, btn):
+        self._plugin.vault_menu.show_menu()
 
     @property
     def temp_dir(self):
@@ -153,148 +330,6 @@ class MainMenu:
             VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
         self._plugin.client.update_content(btn)
         self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
-
-    async def on_rcsb_submit(self, btn):
-        pdb_id = self.ti_rcsb_query.input_text
-        Logs.debug(f"RCSB query: {pdb_id}")
-
-        # Disable RCSB button
-        self.btn_embl_submit.unusable = True
-        self.btn_embl_submit.text.value.unusable = "Load"
-        self._plugin.client.update_content(self.btn_embl_submit)
-
-        pdb_path = self.download_pdb_from_rcsb(pdb_id)
-        if not pdb_path:
-            return
-        await self._plugin.add_pdb_to_group(pdb_path)
-
-        # Reenable embl search button
-        self.btn_embl_submit.unusable = False
-        self.btn_embl_submit.text.value.unusable = "Downloading..."
-        self._plugin.client.update_content(self.btn_embl_submit, btn)
-
-    async def on_emdb_submit(self, btn):
-        embid_id = self.ti_embl_query.input_text
-        Logs.debug(f"EMDB query: {embid_id}")
-
-        # Disable RCSB button
-        self.btn_rcsb_submit.unusable = True
-        self.btn_rcsb_submit.text.value.unusable = "Load"
-        self._plugin.client.update_content(self.btn_rcsb_submit)
-        try:
-            metadata_parser = self.download_metadata_from_emdbid(embid_id)
-            # Validate file size is within limit.
-            if metadata_parser.map_filesize > MAX_MAP_SIZE_KB:
-                raise Exception
-        except requests.exceptions.HTTPError:
-            msg = "EMDB ID not found"
-            Logs.warning(msg)
-            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
-        except Exception:
-            msg = "Map file must be smaller than 500MB"
-            self._plugin.client.send_notification(enums.NotificationTypes.error, msg)
-        else:
-            # Download map data
-            map_file = await self.download_mapgz_from_emdbid(embid_id, metadata_parser)
-            isovalue = metadata_parser.isovalue
-            # Update message to say generating mesh
-            self._plugin.client.update_content(btn)
-            btn.text.value.unusable = "Generating..."
-            btn.unusable = True
-            self._plugin.client.update_content(btn)
-
-            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
-
-            # Populate rcsb text input with pdb from metadata
-            if metadata_parser.pdb_list:
-                pdb_id = metadata_parser.pdb_list[0]
-            else:
-                pdb_id = ""
-            self.ti_rcsb_query.input_text = pdb_id
-            self._plugin.client.update_content(self.ti_rcsb_query)
-        # Reenable rcsb load button
-        self.btn_rcsb_submit.unusable = False
-        self.btn_rcsb_submit.text.value.unusable = "Downloading..."
-        btn.text.value.unusable = "Downloading..."
-        btn.unusable = False
-        self._plugin.client.update_content(self.btn_rcsb_submit, btn)
-
-    def download_pdb_from_rcsb(self, pdb_id):
-        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-        response = requests.get(url)
-        if response.status_code != 200:
-            Logs.warning(f"PDB for {pdb_id} not found")
-            self._plugin.client.send_notification(
-                nanome.util.enums.NotificationTypes.error,
-                f"{pdb_id} not found in RCSB")
-            return
-        file_path = f'{self.temp_dir}/{pdb_id}.pdb'
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-        return file_path
-
-    def download_metadata_from_emdbid(self, emdbid):
-        Logs.debug("Downloading metadata for EMDBID:", emdbid)
-        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/header/emd-{emdbid}.xml"
-        response = requests.get(url)
-        response.raise_for_status()
-        return EMDBMetadataParser(response.content)
-
-    async def download_mapgz_from_emdbid(self, emdbid, metadata_parser: EMDBMetadataParser):
-        Logs.message("Downloading map data from EMDB:", emdbid)
-        url = f"https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdbid}/map/emd_{emdbid}.map.gz"
-        # Write the map to a .map file
-        file_path = f'{self.temp_dir}/{emdbid}.map.gz'
-        # Set up loading bar
-        self.lb_embl_download.enabled = True
-        self._plugin.client.update_node(self.lb_embl_download)
-        loading_bar = self.lb_embl_download.get_content()
-
-        async with aiohttp.ClientSession() as session:
-            # Get content size from head request
-            response = await session.head(url)
-            file_size = int(response.headers['Content-Length']) / 1000
-
-            chunk_size = 8192
-            async with session.get(url) as response:
-                with open(file_path, 'wb') as file:
-                    start_time = time.time()
-                    data_check = start_time
-                    downloaded_chunks = 0
-                    while True:
-                        chunk = await response.content.read(chunk_size)
-                        if not chunk:
-                            break
-                        downloaded_chunks += len(chunk)
-                        file.write(chunk)
-                        now = time.time()
-                        # Update UI with download progress
-                        ui_update_interval = 3
-                        if now - data_check > ui_update_interval:
-                            kb_downloaded = downloaded_chunks / 1000
-                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
-                            loading_bar.percentage = kb_downloaded / file_size
-                            self.btn_embl_submit.text.value.unusable = \
-                                f"Downloading... ({int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
-                            self.btn_embl_submit.unusable = True
-                            self._plugin.client.update_content(loading_bar, self.btn_embl_submit)
-                            data_check = now
-        loading_bar.percentage = 0
-        self.lb_embl_download.enabled = False
-        self._plugin.client.update_node(self.lb_embl_download)
-        return file_path
-
-    def on_browse_emdb(self, btn):
-        """Open the EMDB website in the user's browser"""
-        base_search_url = "www.ebi.ac.uk/emdb/search"
-        # query only low molecular weight maps, because download speeds are really bad.
-        query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
-        query_params = urllib.parse.urlencode({
-            'rows': 10,
-            'sort': 'release_date desc'
-        })
-        url = f"{base_search_url}/{query}?{query_params}"
-        self._plugin.client.open_url(url)
 
 
 class EditMeshMenu:

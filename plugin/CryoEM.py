@@ -37,7 +37,7 @@ class CryoEM(NanomePlugin):
         self.vault_manager = VaultManager(self.vault_api_key, self.vault_url)
         self.vault_menu = VaultMenu(self, self.vault_manager, org, user_id)
         self.vault_menu.create_menu()
-        self.vault_menu.show_menu()
+        # self.vault_menu.show_menu()
 
     def add_mapgroup(self):
         group_num = 1
