@@ -7,7 +7,9 @@ import unittest
 from nanome.api import structure, ui
 from unittest.mock import MagicMock
 
+import plugin
 from plugin import models, menu
+from plugin.utils import EMDBMetadataParser
 import threading
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -88,3 +90,48 @@ class EditMeshMenuTestCase(unittest.TestCase):
             self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
             self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
         run_awaitable(validate_generate_histogram)
+
+
+class LoadFromEmdbMenuTestCase(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.plugin = plugin.CryoEM()
+        self.plugin.client = MagicMock()
+        self.menu = menu.LoadFromEmdbMenu(self.plugin)
+        self.menu._menu.enabled = False
+
+    def test_render(self):
+        self.assertEqual(self.menu._menu.enabled, False)
+        self.menu.render()
+        self.assertEqual(self.menu._menu.enabled, True)
+
+    def test_on_browse_emdb(self):
+        btn = MagicMock()
+        open_url_mock = MagicMock()
+        self.plugin.client.open_url = open_url_mock
+        self.menu.on_browse_emdb(btn)
+        open_url_mock.assert_called_once()
+
+    async def test_on_emdb_submit(self):
+        self.menu.ti_embl_query.input_text = '8216'
+
+        metadata_file = os.path.join(fixtures_dir, 'metadata_8216.xml')
+        map_gz_file = os.path.join(fixtures_dir, 'emd_0931.map.gz')
+
+        with open(metadata_file, 'rb') as f:
+            parser = EMDBMetadataParser(f.read())
+
+        metadata_mock = MagicMock(return_value=parser)
+        self.menu.download_metadata_from_emdbid = metadata_mock
+
+        fut = asyncio.Future()
+        fut.set_result(map_gz_file)
+        mapgz_download_mock = MagicMock(return_value=fut)
+        self.menu.download_mapgz_from_emdbid = mapgz_download_mock
+
+        btn = MagicMock()
+        await self.menu.on_emdb_submit(btn)
+
+        # Make sure mocks were called.
+        metadata_mock.assert_called_once()
+        mapgz_download_mock.assert_called_once()

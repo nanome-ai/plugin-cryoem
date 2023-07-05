@@ -65,7 +65,7 @@ class CryoEM(NanomePlugin):
                 self.add_mapgroup()
                 mapgroup = self.groups[0]
             else:
-                self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+                self.client.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
                 return
         model_comp = await self.create_model_complex(filepath)
         if mapgroup:
@@ -98,7 +98,7 @@ class CryoEM(NanomePlugin):
                 self.add_mapgroup()
                 mapgroup = self.groups[0]
             else:
-                self.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
+                self.client.send_notification(enums.NotificationTypes.error, "Please select a MapGroup.")
                 return
         if isovalue:
             Logs.debug(f"Setting isovalue to {isovalue}")
