@@ -49,6 +49,7 @@ async def _start_session_loop(plugin_instance):
         packet = utils.convert_bytes_to_packet(received_bytes)
         routing_task = asyncio.create_task(_route_incoming_payload(packet.payload, plugin_instance))
         routing_tasks.append(routing_task)
+        # Clear completed tasks from memory
         for i in range(len(routing_tasks) - 1, -1, -1):
             routing_task = routing_tasks[i]
             if routing_task.done():
