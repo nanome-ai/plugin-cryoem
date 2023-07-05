@@ -56,7 +56,6 @@ async def _start_session_loop(plugin_instance):
                 if result and inspect.iscoroutine(result):
                     tasks.append(result)
                 del routing_tasks[i]
-        await asyncio.sleep(0.1)
 
 
 async def _route_incoming_payload(payload, plugin_instance):
