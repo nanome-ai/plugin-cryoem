@@ -373,7 +373,7 @@ class MapGroup:
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
-        if not self.isovalue:
+        if self.isovalue is None:
             # Best guess isovalue is the mean of the map
             map_data = mmm.map_manager().map_data().as_1d()
             self.isovalue = sum(map_data) / len(map_data)

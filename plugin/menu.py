@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+import math
 import nanome
 import os
 import requests
@@ -384,7 +385,8 @@ class EditMeshMenu:
             self.btn_box_around_selection, self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 3)})'
+        isovalue = map_group.isovalue or 0
+        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(isovalue, 3)})'
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
@@ -533,7 +535,14 @@ class EditMeshMenu:
     def set_isovalue_slider_min_max(self, map_group):
         min_value = map_group.hist_x_min
         max_value = map_group.hist_x_max
-        current_value = map_group.isovalue
+        # Handle weird slider edge cases where isovalue isn't set, or min/max are infinite
+        if map_group.isovalue is not None:
+            current_value = map_group.isovalue
+        elif not math.isinf(min_value) and not math.isinf(max_value):
+            current_value = (min_value + max_value) / 2
+        else:
+            current_value = 0
+        # Scale isovalue if histogram range is too small for UI slider to handle
         if map_group.has_small_histogram_range():
             min_value = min_value * self.isovalue_scaling_factor
             max_value = max_value * self.isovalue_scaling_factor
