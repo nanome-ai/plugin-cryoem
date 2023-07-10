@@ -720,7 +720,11 @@ class VaultMenu:
     async def load_file(self, filename):
         path = os.path.join(self.path, filename)
         key = self.folder_key
-        tmp_dir = tempfile.TemporaryDirectory()
-        map_gz_file = os.path.join(tmp_dir.name, filename)
-        self.vault_manager.get_file(path, key, map_gz_file)
-        await self.plugin_instance.add_mapgz_to_group(map_gz_file)
+        extension = filename.split('.')[-1]
+        if extension == 'gz':
+            extension = '.'.join(filename.split('.')[-2:])
+
+        suffix = f'.{extension}'
+        map_file = tempfile.NamedTemporaryFile(suffix=suffix)
+        self.vault_manager.get_file(path, key, map_file.name)
+        await self.plugin_instance.add_mapgz_to_group(map_file)

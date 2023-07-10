@@ -29,11 +29,11 @@ class VaultManager:
 
     # write decrypted file to out_put
     def get_file(self, path, key, out_path):
-        r = self.get(path, key)
-        if not r.ok:
+        response = self.get(path, key)
+        if not response.ok:
             return False
         with open(out_path, 'wb') as f:
-            f.write(r.content)
+            f.write(response.content)
         return True
 
     # check if key is correct to decrypt
