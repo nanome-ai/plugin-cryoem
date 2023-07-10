@@ -263,11 +263,8 @@ class VaultMenu:
         for folder in folders:
             self.add_item(folder, True)
 
-        include_extensions = ['.map', '.map.gz', '.ccp4']
         for file in files:
-            filename = file['name']
-            if any(filename.endswith(ext) for ext in include_extensions):
-                self.add_item(file, False)
+            self.add_item(file, False)
 
         self.session_client.update_content(self.lst_files)
 
