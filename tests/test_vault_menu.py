@@ -27,7 +27,7 @@ class VaultMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.root_list_items_mock = json.loads(
             '{"success": true, "locked_path": null, "locked": [], "folders": [{"name": "shared", "size": "", "size_text": "", "created": "", "created_text": ""}], "files": []}')
         self.shared_list_items_mock = json.loads(
-            '{"success": true, "locked_path": null, "locked": [], "folders": [], "files": [{"name": "emd_0931.map.gz", "size": 1227499, "size_text": "1.2MB", "created": "2023-06-30 15:59", "created_text": "10 days ago"}]}')
+            '{"success": true, "locked_path": null, "locked": [], "folders": [], "files": [{"name": "emd_30288.map.gz", "size": 1227499, "size_text": "1.2MB", "created": "2023-06-30 15:59", "created_text": "10 days ago"}]}')
 
     def test_show_menu(self):
         self.vault_manager.list_path = MagicMock(return_value=self.root_list_items_mock)
@@ -36,7 +36,7 @@ class VaultMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.vault_menu.menu.enabled)
 
     async def test_load_file(self):
-        filename = 'emd_0931.map.gz'
+        filename = 'emd_8216.map.gz'
         mock_file = os.path.join(fixtures_dir, filename)
 
         mock_response = MagicMock()

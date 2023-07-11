@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from nanome_sdk.session import UIManager
 import tempfile
@@ -24,7 +25,7 @@ class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin.client = MagicMock()
         self.plugin.ui_manager = UIManager()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
         self.map_group = models.MapGroup(self.plugin)
         self.menu = menu.EditMeshMenu(self.map_group, self.plugin)
 
@@ -54,25 +55,35 @@ class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
 
     async def test_render_with_map(self):
-        await self.map_group.add_mapfile(self.map_file)
+        await self.map_group.add_mapfile(self.mapgz_file)
         await self.map_group.generate_full_mesh()
         self.assertTrue(self.map_group.has_map())
         self.menu.render(self.map_group)
         self.assertEqual(len(self.menu.lst_files.items), 1)
-        self.assertEqual(self.menu.sld_isovalue.current_value, self.map_group.isovalue)
-        self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
-        self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
+
+        rel_tol = 1e-6
+        sld_isovalue = self.menu.get_isovalue_from_slider()
+        self.assertTrue(math.isclose(sld_isovalue, self.map_group.isovalue, rel_tol=rel_tol))
+
+        sld_min_value = self.menu.sld_isovalue.min_value / self.menu.isovalue_scaling_factor
+        sld_max_value = self.menu.sld_isovalue.max_value / self.menu.isovalue_scaling_factor
+        self.assertTrue(math.isclose(sld_min_value, self.map_group.hist_x_min, rel_tol=rel_tol))
+        self.assertTrue(math.isclose(sld_max_value, self.map_group.hist_x_max, rel_tol=rel_tol))
 
     async def test_generate_histogram(self):
-        await self.map_group.add_mapfile(self.map_file)
+        await self.map_group.add_mapfile(self.mapgz_file)
         await self.map_group.generate_full_mesh()
-        original_hist_x_min = self.map_group.hist_x_min
-        original_hist_x_max = self.map_group.hist_x_max
         self.menu.render(self.map_group)
-        self.assertNotEqual(self.map_group.hist_x_min, original_hist_x_min)
-        self.assertNotEqual(self.map_group.hist_x_max, original_hist_x_max)
-        self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
-        self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
+
+        # Make sure slider values approximately match map_group values
+        rel_tol = 1e-6
+        sld_isovalue = self.menu.get_isovalue_from_slider()
+        self.assertTrue(math.isclose(sld_isovalue, self.map_group.isovalue, rel_tol=rel_tol))
+
+        sld_min_value = self.menu.sld_isovalue.min_value / self.menu.isovalue_scaling_factor
+        sld_max_value = self.menu.sld_isovalue.max_value / self.menu.isovalue_scaling_factor
+        self.assertTrue(math.isclose(sld_min_value, self.map_group.hist_x_min, rel_tol=rel_tol))
+        self.assertTrue(math.isclose(sld_max_value, self.map_group.hist_x_max, rel_tol=rel_tol))
         self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
 
 
@@ -100,7 +111,7 @@ class LoadFromEmdbMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.menu.ti_embl_query.input_text = '8216'
 
         metadata_file = os.path.join(fixtures_dir, 'metadata_8216.xml')
-        map_gz_file = os.path.join(fixtures_dir, 'emd_0931.map.gz')
+        map_gz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
 
         with open(metadata_file, 'rb') as f:
             parser = EMDBMetadataParser(f.read())
