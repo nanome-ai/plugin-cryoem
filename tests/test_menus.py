@@ -54,7 +54,7 @@ class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
 
     async def test_render_with_map(self):
-        await self.map_group.add_map_gz(self.map_file)
+        await self.map_group.add_mapfile(self.map_file)
         await self.map_group.generate_full_mesh()
         self.assertTrue(self.map_group.has_map())
         self.menu.render(self.map_group)
@@ -64,7 +64,7 @@ class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
 
     async def test_generate_histogram(self):
-        await self.map_group.add_map_gz(self.map_file)
+        await self.map_group.add_mapfile(self.map_file)
         await self.map_group.generate_full_mesh()
         original_hist_x_min = self.map_group.hist_x_min
         original_hist_x_max = self.map_group.hist_x_max

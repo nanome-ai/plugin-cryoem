@@ -723,7 +723,6 @@ class VaultMenu:
         extension = filename.split('.')[-1]
         if extension == 'gz':
             extension = '.'.join(filename.split('.')[-2:])
-
         suffix = f'.{extension}'
         map_file = tempfile.NamedTemporaryFile(suffix=suffix)
         self.vault_manager.get_file(path, key, map_file.name)

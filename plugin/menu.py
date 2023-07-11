@@ -390,7 +390,7 @@ class EditMeshMenu:
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
-        if map_group.map_gz_file:
+        if map_group.mapfile:
             map_comp = map_group.map_mesh.complex
             group_objs.append(map_comp)
         if map_group.model_complex:

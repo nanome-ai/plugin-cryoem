@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pyfqmr
 import randomcolor
+import shutil
 import tempfile
 import time
 from iotbx.data_manager import DataManager
@@ -19,7 +20,7 @@ from typing import List
 from nanome.api import shapes, structure
 from nanome.util import Color, Logs, enums
 
-from .utils import cpk_colors, create_hidden_complex
+from .utils import cpk_colors, create_hidden_complex, get_extension
 
 
 class EXTRACTION_TYPE(enum.Enum):
@@ -35,25 +36,25 @@ class MapMesh:
     Map mesh also exposes mesh attributes such as upload and color(s).
     """
 
-    def __init__(self, plugin, map_gz_file=None):
-        self.__map_gz_file: str = map_gz_file
+    def __init__(self, plugin, mapfile=None):
+        self.__mapfile: str = mapfile
         self._plugin = plugin
         self.complex: structure.Complex = None
         self.mesh: shapes.Mesh = shapes.Mesh()
         self.mesh_backface: shapes.Mesh = shapes.Mesh()
         self.backface = True
         self.map_manager: map_manager = None
-        if map_gz_file:
-            self.map_manager = self.load_map_file(map_gz_file)
+        if mapfile:
+            self.map_manager = self.load_mapfile(mapfile)
             self.complex = self.create_map_complex()
 
     @property
-    def map_gz_file(self):
-        return self.__map_gz_file
+    def mapfile(self):
+        return self.__mapfile
 
-    def add_map_gz_file(self, filepath: str):
-        self.__map_gz_file = filepath
-        self.map_manager = self.load_map_file(filepath)
+    def add_mapfile(self, filepath: str):
+        self.__mapfile = filepath
+        self.map_manager = self.load_mapfile(filepath)
         self.complex = self.create_map_complex(self.map_manager, filepath)
 
     @property
@@ -124,35 +125,46 @@ class MapMesh:
             anchor.anchor_type = enums.ShapeAnchorType.Complex
             anchor.target = self.complex.index
         else:
-            new_comp = self.create_map_complex(self.map_manager, self.map_gz_file)
+            new_comp = self.create_map_complex(self.map_manager, self.mapfile)
             comp_index = self.complex.index
             new_comp.index = comp_index
             self.complex = new_comp
             await self._plugin.client.update_structures_deep([self.complex])
 
     @staticmethod
-    def load_map_file(map_gz_file):
-        # Load map.gz file into map_manager
+    def load_mapfile(mapfile):
+        """Load map file into cctbx map manager.
+
+        Handles multiple file formats
+
+        for gz files, we need to unzip it
+        We are assuming any other file format can be renamed to mrc, and it will work.
+        """
         dm = DataManager()
+        extension = get_extension(mapfile)
         with tempfile.NamedTemporaryFile(suffix='.mrc') as mrc_file:
             mrc_filepath = mrc_file.name
-            with gzip.open(map_gz_file, 'rb') as f:
-                mrc_file.write(f.read())
-                map_manager = dm.get_real_map(mrc_filepath)
+            if extension.endswith('.gz'):
+                with gzip.open(mapfile, 'rb') as f:
+                    mrc_file.write(f.read())
+            else:
+                with open(mapfile, 'rb') as f:
+                    mrc_file.write(f.read())
+            map_manager = dm.get_real_map(mrc_filepath)
         return map_manager
 
     @staticmethod
-    def create_map_complex(map_manager, map_gz_file: str):
+    def create_map_complex(map_manager, mapfile: str):
         """Create complex which represents the map in the Entry list"""
         grid_min = map_manager.origin
         grid_max = map_manager.data.last()
         angstrom_min = map_manager.grid_units_to_cart(grid_min)
         angstrom_max = map_manager.grid_units_to_cart(grid_max)
         bounds = [angstrom_min, angstrom_max]
-        comp = create_hidden_complex(map_gz_file, bounds)
+        comp = create_hidden_complex(mapfile, bounds)
         comp.boxed = True
         comp.locked = True
-        comp.name = os.path.basename(map_gz_file)
+        comp.name = os.path.basename(mapfile)
         return comp
 
     @staticmethod
@@ -280,8 +292,8 @@ class MapGroup:
         return self.__model_complex
 
     @property
-    def map_gz_file(self):
-        return self.map_mesh.map_gz_file
+    def mapfile(self):
+        return self.map_mesh.mapfile
 
     @property
     def map_complex(self):
@@ -291,8 +303,8 @@ class MapGroup:
         dm = DataManager()
         self._model = dm.get_model(pdb_file)
 
-    async def add_map_gz(self, map_gz_file):
-        self.map_mesh.add_map_gz_file(map_gz_file)
+    async def add_mapfile(self, mapfile):
+        self.map_mesh.add_mapfile(mapfile)
 
     def add_model_complex(self, comp):
         self.__model_complex = comp

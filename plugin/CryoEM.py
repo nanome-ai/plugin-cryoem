@@ -104,7 +104,7 @@ class CryoEM(NanomePlugin):
             Logs.debug(f"Setting isovalue to {isovalue}")
             mapgroup.isovalue = isovalue
         mapgroup.metadata = metadata
-        await mapgroup.add_map_gz(map_gz_filepath)
+        await mapgroup.add_mapfile(map_gz_filepath)
         if mapgroup.model_complex:
             # Get latest position of model complex
             [deep_comp] = await self.client.request_complexes([mapgroup.model_complex.index])
@@ -133,8 +133,8 @@ class CryoEM(NanomePlugin):
             Logs.warning("Tried to delete a map group that doesn't exist.")
 
         # Delete map file if it exists.
-        if map_group.map_gz_file:
-            os.remove(map_group.map_gz_file)
+        if map_group.mapfile:
+            os.remove(map_group.mapfile)
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         await self.menu.render(selected_mapgroup=mapgroup)

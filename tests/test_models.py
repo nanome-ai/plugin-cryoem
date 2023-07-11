@@ -31,14 +31,14 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.map_group.add_pdb(self.pdb_file)
         self.assertTrue(isinstance(self.map_group._model, manager))
 
-    async def test_add_map_gz(self):
+    async def test_add_mapfile(self):
         # Set future result for request_complexes mock
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
-        # run add_map_gz, and make sure map_manager is created on internal map_manager
+        # run add_mapfile, and make sure map_manager is created on internal map_manager
         self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, type(None)))
-        await self.map_group.add_map_gz(self.map_file)
+        await self.map_group.add_mapfile(self.map_file)
         self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, map_manager))
 
     async def test_generate_full_mesh(self):
@@ -51,7 +51,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         expected_vertices = 108880
         # Make sure vertices are added to mesh
         self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
-        await self.map_group.add_map_gz(map_file)
+        await self.map_group.add_mapfile(map_file)
         await self.map_group.generate_full_mesh()
         self.assertEqual(len(self.map_group.map_mesh.computed_vertices), expected_vertices)
 
@@ -62,7 +62,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin.client.add_to_workspace.return_value = fut
 
         map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-        await self.map_group.add_map_gz(map_file)
+        await self.map_group.add_mapfile(map_file)
         await self.map_group.generate_full_mesh()
         with tempfile.TemporaryDirectory() as tmpdir:
             png_file = self.map_group.generate_histogram(tmpdir)
@@ -80,21 +80,21 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
 
         dm = DataManager()
         model = dm.get_model(self.pdb_file)
-        self.map_manager = self.map_mesh.load_map_file(self.map_file)
+        self.map_manager = self.map_mesh.load_mapfile(self.map_file)
         self.map_model_manager = map_model_manager(model=model, map_manager=self.map_manager)
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-    def test_add_map_gz_file(self):
+    def test_add_mapfile(self):
         # Set future result for request_complexes mock
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
-        # run add_map_gz, and make sure map_manager is created on internal map_manager
+        # run add_mapfile, and make sure map_manager is created on internal map_manager
         self.assertTrue(isinstance(self.map_mesh.map_manager, type(None)))
-        self.map_mesh.add_map_gz_file(self.map_file)
+        self.map_mesh.add_mapfile(self.map_file)
         self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
 
     async def test_load(self):
@@ -110,7 +110,7 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-        self.map_mesh.add_map_gz_file(self.map_file)
+        self.map_mesh.add_mapfile(self.map_file)
 
         mesh = self.map_mesh.mesh
         self.assertEqual(len(mesh.vertices), 0)
@@ -128,7 +128,7 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
         expected_vertices = 3255
         expected_normals = 3255
         expected_triangles = 5976
-        self.map_mesh.add_map_gz_file(map_file)
+        self.map_mesh.add_mapfile(map_file)
         isovalue = 0.2
         opacity = 0.65
 

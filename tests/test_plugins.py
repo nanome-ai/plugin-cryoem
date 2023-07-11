@@ -110,13 +110,13 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
 
         existing_group = self.plugin.groups[0]
         # Copy map file to temp file, because the test will delete it.
-        temp_map_file = tempfile.NamedTemporaryFile()
+        temp_map_file = tempfile.NamedTemporaryFile(suffix='.map.gz')
         with open(self.map_file, 'rb') as f:
             temp_map_file.write(f.read())
-        await existing_group.add_map_gz(temp_map_file.name)
-        self.assertTrue(os.path.exists(existing_group.map_gz_file))
+        await existing_group.add_mapfile(temp_map_file.name)
+        self.assertTrue(os.path.exists(existing_group.mapfile))
 
         await self.plugin.delete_mapgroup(existing_group)
         self.assertEqual(len(self.plugin.groups), 0)
         # Validate that the map file was deleted
-        self.assertFalse(os.path.exists(existing_group.map_gz_file))
+        self.assertFalse(os.path.exists(existing_group.mapfile))
