@@ -33,7 +33,7 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
 
         # Make temp copy of mapfile, because a test will delete it.
-        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
 
         shapes_mock = asyncio.Future()
         shapes_mock.set_result([MagicMock(), MagicMock()])

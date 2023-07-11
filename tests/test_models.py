@@ -22,7 +22,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.mapgz_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
 
         shapes_mock = asyncio.Future()
         shapes_mock.set_result([MagicMock(), MagicMock()])
@@ -48,8 +48,8 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-        map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
-        expected_vertices = 108880
+        map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
+        expected_vertices = 34027
         # Make sure vertices are added to mesh
         self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
         await self.map_group.add_mapfile(map_file)
@@ -62,7 +62,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-        map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
         await self.map_group.add_mapfile(map_file)
         await self.map_group.generate_full_mesh()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,13 +76,14 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
         super().setUp()
         self.plugin = MagicMock()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.mapgz_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
         self.map_mesh = MapMesh(self.plugin)
 
         dm = DataManager()
         model = dm.get_model(self.pdb_file)
         self.map_manager = self.map_mesh.load_mapfile(self.mapgz_file)
-        self.map_model_manager = map_model_manager(model=model, map_manager=self.map_manager)
+        self.map_model_manager = map_model_manager(
+            model=model, map_manager=self.map_manager, ignore_symmetry_conflicts=True)
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
@@ -116,9 +117,9 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_load(self):
         """Validate that running load() generates the MapMesh.
         """
-        expected_vertices = 285798
-        expected_normals = 537129
-        expected_triangles = 537129
+        expected_vertices = 37425
+        expected_normals = 64008
+        expected_triangles = 64008
         isovalue = 0.2
         opacity = 0.65
 
@@ -141,9 +142,9 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_load_selected_residues(self):
         """Validate that running load() generates the MapMesh."""
         map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
-        expected_vertices = 3255
-        expected_normals = 3255
-        expected_triangles = 5976
+        expected_vertices = 1305
+        expected_normals = 1305
+        expected_triangles = 1905
         self.map_mesh.add_mapfile(map_file)
         isovalue = 0.2
         opacity = 0.65
