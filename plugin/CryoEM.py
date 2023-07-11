@@ -90,7 +90,7 @@ class CryoEM(NanomePlugin):
         comp.locked = True
         return comp
 
-    async def add_mapgz_to_group(self, map_gz_filepath, isovalue=None, metadata=None):
+    async def add_mapfile_to_group(self, map_gz_filepath, isovalue=None, metadata=None):
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
         if not mapgroup:

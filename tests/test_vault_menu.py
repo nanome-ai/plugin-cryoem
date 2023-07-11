@@ -45,7 +45,7 @@ class VaultMenuTestCase(unittest.IsolatedAsyncioTestCase):
 
         fut = asyncio.Future()
         fut.set_result(MagicMock())
-        self.plugin_instance.add_mapgz_to_group = MagicMock(return_value=fut)
+        self.plugin_instance.add_mapfile_to_group = MagicMock(return_value=fut)
         await self.vault_menu.load_file(filename)
         self.vault_manager.get.assert_called_once()
-        self.plugin_instance.add_mapgz_to_group.assert_called_once()
+        self.plugin_instance.add_mapfile_to_group.assert_called_once()

@@ -126,7 +126,7 @@ class LoadFromEmdbMenu:
             btn.unusable = True
             self._plugin.client.update_content(btn)
 
-            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+            await self._plugin.add_mapfile_to_group(map_file, isovalue, metadata_parser)
 
             # Populate rcsb text input with pdb from metadata
             if metadata_parser.pdb_list:

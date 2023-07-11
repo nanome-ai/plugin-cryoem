@@ -727,4 +727,4 @@ class VaultMenu:
         suffix = f'.{extension}'
         map_file = tempfile.NamedTemporaryFile(suffix=suffix)
         self.vault_manager.get_file(path, key, map_file.name)
-        await self.plugin_instance.add_mapgz_to_group(map_file)
+        await self.plugin_instance.add_mapfile_to_group(map_file)
