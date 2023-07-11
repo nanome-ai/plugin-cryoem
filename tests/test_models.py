@@ -1,10 +1,11 @@
 import asyncio
+import gzip
 import os
 import tempfile
 import unittest
 
 from nanome.api import structure
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from iotbx.data_manager import DataManager
 from iotbx.map_manager import map_manager
 from iotbx.map_model_manager import map_model_manager
@@ -21,7 +22,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
 
         shapes_mock = asyncio.Future()
         shapes_mock.set_result([MagicMock(), MagicMock()])
@@ -38,7 +39,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin.client.add_to_workspace.return_value = fut
         # run add_mapfile, and make sure map_manager is created on internal map_manager
         self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, type(None)))
-        await self.map_group.add_mapfile(self.map_file)
+        await self.map_group.add_mapfile(self.mapgz_file)
         self.assertTrue(isinstance(self.map_group.map_mesh.map_manager, map_manager))
 
     async def test_generate_full_mesh(self):
@@ -75,27 +76,42 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
         super().setUp()
         self.plugin = MagicMock()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
         self.map_mesh = MapMesh(self.plugin)
 
         dm = DataManager()
         model = dm.get_model(self.pdb_file)
-        self.map_manager = self.map_mesh.load_mapfile(self.map_file)
+        self.map_manager = self.map_mesh.load_mapfile(self.mapgz_file)
         self.map_model_manager = map_model_manager(model=model, map_manager=self.map_manager)
 
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-    def test_add_mapfile(self):
+    def test_add_mapfile_mapgz(self):
+        """Test that add_mapfile works with .map.gz files."""
         # Set future result for request_complexes mock
         fut = asyncio.Future()
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
         # run add_mapfile, and make sure map_manager is created on internal map_manager
         self.assertTrue(isinstance(self.map_mesh.map_manager, type(None)))
-        self.map_mesh.add_mapfile(self.map_file)
+        self.map_mesh.add_mapfile(self.mapgz_file)
         self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
+
+    def test_add_mapfile_map(self):
+        """Test that add_mapfile works with .map files."""
+        # Set future result for request_complexes mock
+        fut = asyncio.Future()
+        fut.set_result([structure.Complex()])
+        self.plugin.client.add_to_workspace.return_value = fut
+        with tempfile.NamedTemporaryFile(suffix='.map') as map_file:
+            # Unzip map.gz to .map
+            with gzip.open(self.mapgz_file, 'rb') as f:
+                map_file.write(f.read())
+            self.assertTrue(isinstance(self.map_mesh.map_manager, type(None)))
+            self.map_mesh.add_mapfile(map_file.name)
+            self.assertTrue(isinstance(self.map_mesh.map_manager, map_manager))
 
     async def test_load(self):
         """Validate that running load() generates the MapMesh.
@@ -110,7 +126,7 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
         fut.set_result([structure.Complex()])
         self.plugin.client.add_to_workspace.return_value = fut
 
-        self.map_mesh.add_mapfile(self.map_file)
+        self.map_mesh.add_mapfile(self.mapgz_file)
 
         mesh = self.map_mesh.mesh
         self.assertEqual(len(mesh.vertices), 0)
@@ -124,7 +140,7 @@ class MapMeshTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_load_selected_residues(self):
         """Validate that running load() generates the MapMesh."""
-        map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
         expected_vertices = 3255
         expected_normals = 3255
         expected_triangles = 5976
