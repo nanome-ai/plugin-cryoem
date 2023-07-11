@@ -89,7 +89,7 @@ class LoadFromEmdbMenu:
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        await self._plugin.add_pdb_to_group(pdb_path)
+        await self._plugin.add_model_to_group(pdb_path)
 
         # Reenable embl search button
         self.btn_embl_submit.unusable = False

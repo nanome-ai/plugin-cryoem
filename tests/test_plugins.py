@@ -58,7 +58,7 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         mapgroup = self.plugin.get_group(fake_name)
         self.assertTrue(mapgroup is None)
 
-    async def test_add_pdb_to_group(self):
+    async def test_add_model_to_group(self):
         await self.plugin.menu.render()
         selected_mapgroup_name = self.plugin.menu.get_selected_mapgroup()
         selected_mapgroup = self.plugin.get_group(selected_mapgroup_name)
@@ -72,13 +72,13 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin.client.add_to_workspace = MagicMock(return_value=add_to_workspace_fut)
         self.assertTrue(selected_mapgroup.model_complex is None)
         self.assertTrue(selected_mapgroup is not None)
-        await self.plugin.add_pdb_to_group(self.pdb_file)
+        await self.plugin.add_model_to_group(self.pdb_file)
         self.assertTrue(isinstance(selected_mapgroup.model_complex, structure.Complex))
 
         # Make sure if no groups exist when this is called, a new one is created.
         self.plugin.groups = []
         self.assertEqual(len(self.plugin.groups), 0)
-        await self.plugin.add_pdb_to_group(self.pdb_file)
+        await self.plugin.add_model_to_group(self.pdb_file)
         self.assertEqual(len(self.plugin.groups), 1)
 
     async def test_add_mapfile_to_group(self):

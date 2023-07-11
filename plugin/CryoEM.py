@@ -56,7 +56,7 @@ class CryoEM(NanomePlugin):
             if group.group_name == group_name
         ), None)
 
-    async def add_pdb_to_group(self, filepath):
+    async def add_model_to_group(self, filepath):
         # Look for a MapGroup to add the model to
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)

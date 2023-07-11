@@ -724,15 +724,16 @@ class VaultMenu:
         if extension == 'gz':
             extension = '.'.join(filename.split('.')[-2:])
         suffix = f'.{extension}'
-        file_to_load = tempfile.NamedTemporaryFile(suffix=suffix)
 
-        self.vault_manager.get_file(path, key, file_to_load.name)
+        temp_dir = tempfile.TemporaryDirectory()
+        local_file = os.path.join(temp_dir.name, filename)
+        self.vault_manager.get_file(path, key, local_file)
 
         model_extensions = ['pdb']  # More formats need to be added
         map_extensions = ['map.gz', 'map', 'mrc', 'ccp4']
         if extension in model_extensions:
-            await self.plugin_instance.add_pdb_to_group(file_to_load.name)
+            await self.plugin_instance.add_model_to_group(local_file)
         elif extension in map_extensions:
-            await self.plugin_instance.add_mapfile_to_group(file_to_load.name)
+            await self.plugin_instance.add_mapfile_to_group(local_file)
         else:
             Logs.warning(f"Invalid file type. Cannot load .{extension} files")
