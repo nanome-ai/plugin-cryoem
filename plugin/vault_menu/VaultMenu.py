@@ -6,7 +6,7 @@ import urllib.parse
 from functools import partial
 
 import nanome
-from nanome.util import async_callback, Color
+from nanome.util import async_callback, Color, Logs
 from nanome.util.enums import ExportFormats
 
 
@@ -724,6 +724,15 @@ class VaultMenu:
         if extension == 'gz':
             extension = '.'.join(filename.split('.')[-2:])
         suffix = f'.{extension}'
-        map_file = tempfile.NamedTemporaryFile(suffix=suffix)
-        self.vault_manager.get_file(path, key, map_file.name)
-        await self.plugin_instance.add_mapfile_to_group(map_file.name)
+        file_to_load = tempfile.NamedTemporaryFile(suffix=suffix)
+
+        self.vault_manager.get_file(path, key, file_to_load.name)
+
+        model_extensions = ['pdb']  # More formats need to be added
+        map_extensions = ['map.gz', 'map', 'mrc', 'ccp4']
+        if extension in model_extensions:
+            await self.plugin_instance.add_pdb_to_group(file_to_load.name)
+        elif extension in map_extensions:
+            await self.plugin_instance.add_mapfile_to_group(file_to_load.name)
+        else:
+            Logs.warning(f"Invalid file type. Cannot load .{extension} files")
