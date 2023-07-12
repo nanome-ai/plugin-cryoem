@@ -729,7 +729,7 @@ class VaultMenu:
         local_file = os.path.join(temp_dir.name, filename)
         self.vault_manager.get_file(path, key, local_file)
 
-        model_extensions = ['pdb']  # More formats need to be added
+        model_extensions = ['pdb', 'sdf', 'cif', 'mmcif']  # More formats need to be added
         map_extensions = ['map.gz', 'map', 'mrc', 'ccp4']
         if extension in model_extensions:
             await self.plugin_instance.add_model_to_group(local_file)
