@@ -120,3 +120,18 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.plugin.groups), 0)
         # Validate that the map file was deleted
         self.assertFalse(os.path.exists(existing_group.mapfile))
+
+    async def test_create_model_complex(self):
+        # Test pdb file
+        model_complex = await self.plugin.create_model_complex(self.pdb_file)
+        self.assertTrue(isinstance(model_complex, structure.Complex))
+
+        # Test sdf file
+        sdf_file = os.path.join(fixtures_dir, 'Structure3D_CID_243.sdf')
+        sdf_complex = await self.plugin.create_model_complex(sdf_file)
+        self.assertTrue(isinstance(sdf_complex, structure.Complex))
+
+        # Test cif file
+        cif_file = os.path.join(fixtures_dir, '1fsv.cif')
+        cif_complex = await self.plugin.create_model_complex(cif_file)
+        self.assertTrue(isinstance(cif_complex, structure.Complex))

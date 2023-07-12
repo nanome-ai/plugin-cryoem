@@ -81,10 +81,18 @@ class CryoEM(NanomePlugin):
         if mapgroup:
             mapgroup.add_model_complex(created_comp)
 
-    async def create_model_complex(self, pdb_filepath: str):
-        comp = structure.Complex.io.from_pdb(path=pdb_filepath)
+    async def create_model_complex(self, model_filepath: str):
+        model_path = Path(model_filepath)
+        suffix = model_path.suffix
+        if suffix == ".pdb":
+            comp = structure.Complex.io.from_pdb(path=model_filepath)
+        elif suffix == '.sdf':
+            comp = structure.Complex.io.from_sdf(path=model_filepath)
+        elif suffix in ['.cif', 'mmcif']:
+            comp = structure.Complex.io.from_mmcif(path=model_filepath)
+
         # Get new complex, and associate to MapGroup
-        comp.name = Path(pdb_filepath).stem
+        comp.name = Path(model_filepath).stem
         self.client.add_bonds([comp])
         self.remove_hydrogens(comp)
         comp.locked = True
