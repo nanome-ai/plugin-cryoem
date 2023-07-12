@@ -264,7 +264,13 @@ class VaultMenu:
             self.add_item(folder, True)
 
         for file in files:
-            self.add_item(file, False)
+            supported_file_formats = ['pdb', 'sdf', 'cif', 'map', 'map.gz', 'ccp4']
+            extension = file['name'].split('.')[-1]
+            if extension == 'gz':
+                # Make sure we catch map.gz files
+                extension = '.'.join(file['name'].split('.')[-2:])
+            if extension in supported_file_formats:
+                self.add_item(file, False)
 
         self.session_client.update_content(self.lst_files)
 
