@@ -723,8 +723,8 @@ class VaultMenu:
         extension = filename.split('.')[-1]
         if extension == 'gz':
             extension = '.'.join(filename.split('.')[-2:])
-        suffix = f'.{extension}'
 
+        # Download file from Vault and save to temp directory
         temp_dir = tempfile.TemporaryDirectory()
         local_file = os.path.join(temp_dir.name, filename)
         self.vault_manager.get_file(path, key, local_file)
