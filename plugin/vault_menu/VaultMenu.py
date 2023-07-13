@@ -1,12 +1,14 @@
+import aiohttp
 import asyncio
 import os
 import sys
 import tempfile
+import time
 import urllib.parse
 from functools import partial
 
 import nanome
-from nanome.util import async_callback, Color, Logs
+from nanome.util import Color, Logs
 from nanome.util.enums import ExportFormats
 
 
@@ -181,6 +183,9 @@ class VaultMenu:
         self.lbl_upload_confirm = root.find_node('UploadConfirmLabel').get_content()
         btn_confirm = root.find_node('UploadConfirmButton').get_content()
         self.ui_manager.register_btn_pressed_callback(btn_confirm, self.confirm_upload)
+
+        self.ln_lb_vault_load = root.find_node('ln_lb_vault_load')
+        self.lb_vault_load = self.ln_lb_vault_load.get_content()
 
     def show_menu(self):
         self.lbl_instr.text_value = f'Visit {self.address} in browser to add files'
@@ -416,29 +421,6 @@ class VaultMenu:
         self.ln_unlock.enabled = False
         self.session_client.update_menu(self.menu)
 
-    @async_callback
-    async def load_files(self, button=None):
-        if not self.selected_items:
-            return
-
-        n = len(self.selected_items)
-        self.lst_files.parent.enabled = False
-        self.lbl_loading.parent.enabled = True
-        self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
-        self.session_client.update_node(self.ln_explorer)
-
-        load_requests = []
-        for btn in self.selected_items:
-            load_requests.append(self.load_file(btn.item_name))
-            btn.selected = False
-        await asyncio.gather(*load_requests)
-
-        self.selected_items = []
-        self.lst_files.parent.enabled = True
-        self.lbl_loading.parent.enabled = False
-        self.update_controls()
-        self.session_client.update_menu(self.menu)
-
     def on_action_pressed(self, button):
         if button.name == 'Open Website':
             path = urllib.parse.quote(self.replace_path(self.path, True))
@@ -632,7 +614,6 @@ class VaultMenu:
 
         self.session_client.update_menu(self.menu)
 
-    @async_callback
     async def upload_workspace(self, button=None):
         name = self.inp_workspace_name.input_text
         if not name:
@@ -645,7 +626,6 @@ class VaultMenu:
         self.ln_upload_workspace.enabled = False
         self.show_upload_confirm()
 
-    @async_callback
     async def show_upload_macro(self):
         def select_macro(button):
             self.upload_item = button.macro.logic
@@ -670,7 +650,6 @@ class VaultMenu:
         else:
             self.session_client.update_content(self.lst_upload)
 
-    @async_callback
     async def show_upload_complex(self):
         def select_complex(button):
             self.upload_item = button.complex
@@ -694,7 +673,6 @@ class VaultMenu:
         else:
             self.session_client.update_content(self.lst_upload)
 
-    @async_callback
     async def upload_complex(self, extension, format, button):
         results = await self.session_client.request_export(format, entities=[self.upload_item.index])
         self.upload_name = self.upload_item.name
@@ -723,6 +701,39 @@ class VaultMenu:
         self.toggle_upload(show=False)
         self.update()
 
+    async def load_files(self, button=None):
+        if not self.selected_items:
+            return
+
+        n = len(self.selected_items)
+        self.lst_files.parent.enabled = False
+        self.lbl_loading.parent.enabled = True
+        self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
+        self.session_client.update_node(self.ln_explorer)
+
+        self.ln_lb_vault_load.enabled = True
+        self.session_client.update_node(self.ln_lb_vault_load)
+
+        # Set up stats for loading bar
+        filenames = [btn.item_name for btn in self.selected_items]
+        filepaths = [os.path.join(self.path, filename) for filename in filenames]
+        download_size_kb = sum(self.vault_manager.get_filesize(path) for path in filepaths)
+        self.lb_vault_load.max_value = download_size_kb
+
+        load_requests = []
+        for btn in self.selected_items:
+            filename = btn.item_name
+            load_requests.append(self.load_file(filename))
+            btn.selected = False
+        await asyncio.gather(*load_requests)
+
+        self.selected_items = []
+        self.lst_files.parent.enabled = True
+        self.lbl_loading.parent.enabled = False
+        self.ln_lb_vault_load.enabled = False
+        self.update_controls()
+        self.session_client.update_menu(self.menu)
+
     async def load_file(self, filename):
         path = os.path.join(self.path, filename)
         key = self.folder_key
@@ -733,13 +744,67 @@ class VaultMenu:
         # Download file from Vault and save to temp directory
         temp_dir = tempfile.TemporaryDirectory()
         local_file = os.path.join(temp_dir.name, filename)
-        self.vault_manager.get_file(path, key, local_file)
+        await self.download_file_from_vault(path, local_file, key)
+        # self.vault_manager.get_file(path, key, local_file)
 
         model_extensions = ['pdb', 'sdf', 'cif', 'mmcif']  # More formats need to be added
         map_extensions = ['map.gz', 'map', 'mrc', 'ccp4']
         if extension in model_extensions:
             await self.plugin_instance.add_model_to_group(local_file)
         elif extension in map_extensions:
+            self.update_load_btn_text("Generating mesh...")
             await self.plugin_instance.add_mapfile_to_group(local_file)
+            self.update_load_btn_text("Load")
         else:
             Logs.warning(f"Invalid file type. Cannot load .{extension} files")
+
+    async def download_file_from_vault(self, urlpath, file_path: str, key=None):
+        Logs.message("Downloading file from Vault")
+        url = f"{self.vault_manager.server_url}/files/{urlpath}"
+        # Write the map to a .map file
+
+        # Set up loading bar
+        self.ln_lb_vault_load.enabled = True
+        self.session_client.update_node(self.ln_lb_vault_load)
+        loading_bar = self.lb_vault_load
+
+        headers = self.vault_manager.get_headers()
+        async with aiohttp.ClientSession() as session:
+            # Get content size from head request
+            response = await session.head(url, headers=headers)
+            file_size = int(response.headers['Content-Length']) / 1000
+
+            chunk_size = 8192
+            async with session.get(url, headers=headers) as response:
+                with open(file_path, 'wb') as file:
+                    start_time = time.time()
+                    data_check = start_time
+                    downloaded_chunks = 0
+                    while True:
+                        chunk = await response.content.read(chunk_size)
+                        if not chunk:
+                            break
+                        downloaded_chunks += len(chunk)
+                        file.write(chunk)
+                        now = time.time()
+                        # Update UI with download progress
+                        ui_update_interval = 1
+                        if now - data_check > ui_update_interval:
+                            kb_downloaded = downloaded_chunks / 1000
+                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
+                            loading_bar.percentage = kb_downloaded / file_size
+                            btn_text = f"{int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                            self.update_load_btn_text(btn_text)
+                            self.session_client.update_content(loading_bar)
+                            data_check = now
+            self.ln_lb_vault_load.enabled = False
+            self.session_client.update_node(self.ln_lb_vault_load)
+
+            self.lb_vault_load.percentage = 0
+            self.btn_load.text.value.set_all("Load")
+            self.session_client.update_content(self.btn_load, self.lb_vault_load)
+            Logs.message("Download Completed.")
+
+    def update_load_btn_text(self, text):
+        self.btn_load.text.value.set_all(text)
+        self.session_client.update_content(self.btn_load)
