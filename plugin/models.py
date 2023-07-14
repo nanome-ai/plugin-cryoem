@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pyfqmr
 import randomcolor
-import shutil
 import tempfile
 import time
 from iotbx.data_manager import DataManager
@@ -179,6 +178,7 @@ class MapMesh:
         # this makes sure the mesh is in the same coordinates as the molecule
         vertices += np.asarray(map_origin)
         # convert vertices from grid units to cartesian angstroms
+        Logs.debug(f"Vertices Count: {vertices.shape[0]}")
         for i in range(vertices.shape[0]):
             vertices[i] = map_manager.grid_units_to_cart(vertices[i])
 
@@ -192,6 +192,7 @@ class MapMesh:
         Logs.debug("Mesh Simplified")
         vertices, triangles, normals = mesh_simplifier.getMesh()
 
+        # Setting up mesh.
         mesh = shapes.Mesh()
         mesh.vertices = vertices.flatten()
         mesh.normals = normals.flatten()
@@ -351,8 +352,6 @@ class MapGroup:
             asyncio.create_task(self.map_mesh.upload())
 
     def create_map_model_manager(self):
-        # Compute iso-surface with marching cubes algorithm
-        Logs.message("Generating mesh...")
         # Set up map model manager
         kwargs = {
             'ignore_symmetry_conflicts': True
