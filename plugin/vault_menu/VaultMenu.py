@@ -772,7 +772,7 @@ class VaultMenu:
         async with aiohttp.ClientSession() as session:
             # Get content size from head request
             response = await session.head(url, headers=headers)
-            file_size = int(response.headers['Content-Length']) / 1000
+            file_size_mb = int(response.headers['Content-Length']) / (10 ** 6)
 
             chunk_size = 8192
             async with session.get(url, headers=headers) as response:
@@ -790,10 +790,10 @@ class VaultMenu:
                         # Update UI with download progress
                         ui_update_interval = 1
                         if now - data_check > ui_update_interval:
-                            kb_downloaded = downloaded_chunks / 1000
-                            Logs.debug(f"{int(now - start_time)} seconds: {kb_downloaded} / {file_size} kbs")
-                            loading_bar.percentage = kb_downloaded / file_size
-                            btn_text = f"{int(kb_downloaded/1000)}/{int(file_size/1000)} MB)"
+                            downloaded_mb = int(downloaded_chunks / 1000000)
+                            Logs.debug(f"{int(now - start_time)} seconds: {downloaded_mb} / {file_size_mb} mbs")
+                            loading_bar.percentage = downloaded_mb / file_size_mb
+                            btn_text = f"{int(downloaded_mb)}/{int(file_size_mb)} MB)"
                             self.update_load_btn_text(btn_text)
                             self.session_client.update_content(loading_bar)
                             data_check = now

@@ -289,6 +289,6 @@ class SessionClient:
             # Store future to receive any response required
             fut = asyncio.Future()
             self.request_futs[request_id] = fut
-        self.logger.debug(f'Sending Message: {message_type.name} Size: {len(pack)} bytes')
+        # self.logger.debug(f'Sending Message: {message_type.name} Size: {len(pack)} bytes')
         self.writer.write(pack)
         return request_id
