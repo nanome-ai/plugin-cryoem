@@ -317,8 +317,8 @@ class MainMenu:
             Logs.warning('Tried to open menu before adding map.')
             return
         Logs.message('Loading group details menu')
-        group_menu = EditMeshMenu(map_group, self._plugin)
-        group_menu.render(map_group)
+        edit_mesh_menu = EditMeshMenu(map_group, self._plugin)
+        edit_mesh_menu.render(map_group)
 
     async def delete_group(self, map_group, btn):
         Logs.message(f'Deleting group {map_group.group_name}')

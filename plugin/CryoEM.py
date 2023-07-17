@@ -37,7 +37,6 @@ class CryoEM(NanomePlugin):
         self.vault_manager = VaultManager(self.vault_api_key, self.vault_url)
         self.vault_menu = VaultMenu(self, self.vault_manager, org, user_id)
         self.vault_menu.create_menu()
-        # self.vault_menu.show_menu()
 
     def add_mapgroup(self):
         group_num = 1
@@ -125,13 +124,18 @@ class CryoEM(NanomePlugin):
         mapgroup.group_name = Path(map_gz_filepath).stem
         await self.menu.render(selected_mapgroup=mapgroup)
 
-    async def delete_mapgroup(self, map_group: MapGroup):
+    async def delete_mapgroup(self, map_group: MapGroup, current_comp_indices=None):
+        if not current_comp_indices:
+            current_comp_list = await self.client.request_complex_list()
+            current_comp_indices = [comp.index for comp in current_comp_list]
         map_comp = map_group.map_mesh.complex
         model_comp = map_group.model_complex
         comps_to_delete = []
-        if map_comp:
+        # Only try to delete comp if the index is in the current_comp_indices
+        # Otherwise, a new entry named 'complex' is added to the workspace.
+        if map_comp and map_comp.index in current_comp_indices:
             comps_to_delete.append(map_comp)
-        if model_comp:
+        if model_comp and model_comp.index in current_comp_indices:
             comps_to_delete.append(model_comp)
         if comps_to_delete:
             await self.client.remove_from_workspace(comps_to_delete)
@@ -168,4 +172,9 @@ class CryoEM(NanomePlugin):
             has_model = bool(mapgroup.model_complex) and mapgroup.model_complex.index in comp_indices
             has_map = mapgroup.map_complex and mapgroup.map_complex.index in comp_indices
             if not has_model and not has_map:
-                await self.delete_mapgroup(mapgroup)
+                await self.delete_mapgroup(mapgroup, comp_indices)
+                # Close menu if it's open
+                for menu in self.ui_manager._menus:
+                    if menu.title.startswith(mapgroup.group_name):
+                        menu.enabled = False
+                        self.client.update_menu(menu)
