@@ -725,7 +725,14 @@ class VaultMenu:
             filename = btn.item_name
             load_requests.append(self.load_file(filename))
             btn.selected = False
-        await asyncio.gather(*load_requests)
+
+        # Using .gather() is a nicer solution here when multiple files are being uploaded,
+        # but it causes a bug where redrawing the mesh after loading creates a new copy, instead
+        # of updating the original. Very weird, but getting rid of .gather() fixes it
+        # await asyncio.gather(*load_requests)
+        for coro in load_requests:
+            await coro
+
 
         self.selected_items = []
         self.lst_files.parent.enabled = True
