@@ -21,3 +21,6 @@ class NanomePlugin:
 
     async def on_stop(self):
         pass
+
+    async def on_complex_added_removed(self):
+        pass

@@ -7,7 +7,7 @@ import logging.config
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from nanome.api import control, ui
+from nanome.api import control, ui, structure
 from nanome_sdk.session import NanomePlugin
 from nanome_sdk import utils
 from nanome_sdk.logs import configure_session_logging
@@ -93,7 +93,13 @@ async def _route_incoming_payload(payload, plugin_instance):
         ui_manager = plugin_instance.ui_manager
         ui_command = ui_manager.find_command(command_hash)
         await ui_manager.handle_ui_command(ui_command, received_obj_list)
-
+    elif isinstance(message, structure.messages.ComplexAddedRemoved):
+        logger.debug("Complex Added/Removed")
+        task = asyncio.create_task(plugin_instance.on_complex_added_removed())
+        return task
+    else:
+        logger.warning(f"Unhandled message: {message.name()}")
+        pass
 
 if __name__ == "__main__":
     plugin_id = int(sys.argv[1])

@@ -159,3 +159,13 @@ class CryoEM(NanomePlugin):
     @property
     def request_futs(self):
         return self.client.request_futs
+
+    async def on_complex_added_removed(self):
+        # Check each mapgroup and delete any where the complex was deleted.
+        comp_list = await self.client.request_complex_list()
+        comp_indices = [cmp.index for cmp in comp_list]
+        for mapgroup in self.groups:
+            has_model = bool(mapgroup.model_complex) and mapgroup.model_complex.index in comp_indices
+            has_map = mapgroup.map_complex and mapgroup.map_complex.index in comp_indices
+            if not has_model and not has_map:
+                await self.delete_mapgroup(mapgroup)
