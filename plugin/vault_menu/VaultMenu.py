@@ -708,18 +708,18 @@ class VaultMenu:
         n = len(self.selected_items)
         self.lst_files.parent.enabled = False
         self.lbl_loading.parent.enabled = True
-        self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
-        self.session_client.update_node(self.ln_explorer)
+        self.update_lbl_loading_text(f'loading...\n{n} item{"s" if n > 1 else ""}')
 
+        # Set up loading bar
+        self.ln_lb_vault_load.enabled = True
+        self.session_client.update_node(self.ln_lb_vault_load)
+        loading_bar = self.ln_lb_vault_load.get_content()
+
+        self.session_client.update_node(self.ln_explorer, self.ln_lb_vault_load)
         self.ln_lb_vault_load.enabled = True
         self.session_client.update_node(self.ln_lb_vault_load)
 
-        # Set up stats for loading bar
-        filenames = [btn.item_name for btn in self.selected_items]
-        filepaths = [os.path.join(self.path, filename) for filename in filenames]
-        download_size_kb = sum(self.vault_manager.get_filesize(path) for path in filepaths)
-        self.lb_vault_load.max_value = download_size_kb
-
+        # Get all the selected files and setup coroutines to download
         load_requests = []
         for btn in self.selected_items:
             filename = btn.item_name
@@ -730,15 +730,25 @@ class VaultMenu:
         # but it causes a bug where redrawing the mesh after loading creates a new copy, instead
         # of updating the original. Very weird, but getting rid of .gather() fixes it
         # await asyncio.gather(*load_requests)
-        for coro in load_requests:
+        for i in range(0, len(load_requests)):
+            coro = load_requests[i]
+            self.update_lbl_loading_text(f'loading... ({i + 1}/{len(load_requests)})')
             await coro
 
+        self.lb_vault_load.percentage = 0
+        self.btn_load.text.value.set_all("Load")
+        self.session_client.update_content(self.btn_load, self.lb_vault_load)
 
         self.selected_items = []
         self.lst_files.parent.enabled = True
         self.lbl_loading.parent.enabled = False
         self.ln_lb_vault_load.enabled = False
         self.update_controls()
+
+        # Hide loading bar
+        self.ln_lb_vault_load.enabled = False
+        loading_bar = self.ln_lb_vault_load.get_content()
+        loading_bar.percentage = 0
         self.session_client.update_menu(self.menu)
 
     async def load_file(self, filename):
@@ -761,7 +771,6 @@ class VaultMenu:
         elif extension in map_extensions:
             self.update_load_btn_text("Generating mesh...")
             await self.plugin_instance.add_mapfile_to_group(local_file)
-            self.update_load_btn_text("Load")
         else:
             Logs.warning(f"Invalid file type. Cannot load .{extension} files")
 
@@ -769,12 +778,6 @@ class VaultMenu:
         Logs.message("Downloading file from Vault")
         url = f"{self.vault_manager.server_url}/files/{urlpath}"
         # Write the map to a .map file
-
-        # Set up loading bar
-        self.ln_lb_vault_load.enabled = True
-        self.session_client.update_node(self.ln_lb_vault_load)
-        loading_bar = self.lb_vault_load
-
         headers = self.vault_manager.get_headers()
         async with aiohttp.ClientSession() as session:
             # Get content size from head request
@@ -782,6 +785,7 @@ class VaultMenu:
             file_size_mb = int(response.headers['Content-Length']) / (10 ** 6)
 
             chunk_size = 8192
+            loading_bar = self.ln_lb_vault_load.get_content()
             async with session.get(url, headers=headers) as response:
                 with open(file_path, 'wb') as file:
                     start_time = time.time()
@@ -804,14 +808,15 @@ class VaultMenu:
                             self.update_load_btn_text(btn_text)
                             self.session_client.update_content(loading_bar)
                             data_check = now
+            self.update_load_btn_text("Load")
             self.ln_lb_vault_load.enabled = False
             self.session_client.update_node(self.ln_lb_vault_load)
-
-            self.lb_vault_load.percentage = 0
-            self.btn_load.text.value.set_all("Load")
-            self.session_client.update_content(self.btn_load, self.lb_vault_load)
             Logs.message("Download Completed.")
 
     def update_load_btn_text(self, text):
         self.btn_load.text.value.set_all(text)
         self.session_client.update_content(self.btn_load)
+
+    def update_lbl_loading_text(self, text):
+        self.lbl_loading.text_value = text
+        self.session_client.update_content(self.lbl_loading)
