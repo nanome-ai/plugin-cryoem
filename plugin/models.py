@@ -168,7 +168,7 @@ class MapMesh:
 
     @staticmethod
     def generate_mesh_from_map_manager(map_manager, isovalue):
-        Logs.debug("Generating Mesh from map...")
+        Logs.message("Generating Mesh from map...")
         Logs.debug("Marching Cubes...")
         map_origin = map_manager.origin
         map_data = map_manager.map_data().as_numpy_array()
@@ -384,10 +384,18 @@ class MapGroup:
         Logs.debug("Generating Map...")
         mmm.generate_map()
         Logs.debug("Map Generated")
+        map_data = mmm.map_manager().map_data().as_1d()
+        Logs.debug(f"Map Data length: {len(map_data)}")
         if self.isovalue is None:
             # Best guess isovalue is the mean of the map
-            map_data = mmm.map_manager().map_data().as_1d()
             self.isovalue = sum(map_data) / len(map_data)
+
+        # map_data_cutoff = 10 ** 8
+        # if len(map_data) > map_data_cutoff:
+        #     msg = f"Map is too large to load ({len(map_data)} > {map_data_cutoff})"
+        #     Logs.warning(msg)
+        #     self._plugin.client.send_notification(enums.NotificationType.error, msg)
+        #     return
 
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity)
