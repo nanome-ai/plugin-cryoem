@@ -398,8 +398,12 @@ class MapGroup:
         map_data = mmm.map_manager().map_data().as_1d()
         Logs.debug(f"Map Data length: {len(map_data)}")
         if self.isovalue is None:
-            # Best guess isovalue is the mean of the map
-            self.isovalue = sum(map_data) / len(map_data)
+            # Best guess isovalue is the mean + 1 standard deviation
+            mean = sum(map_data) / len(map_data)
+            stdev = map_data.standard_deviation_of_the_sample()
+            isovalue = mean + stdev
+            Logs.debug(f"Set Isovalue to {isovalue}")
+            self.isovalue = isovalue
 
         # map_data_cutoff = 10 ** 8
         # if len(map_data) > map_data_cutoff:
