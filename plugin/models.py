@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pyfqmr
 import randomcolor
+import sys
 import tempfile
 import time
 from iotbx.data_manager import DataManager
@@ -145,7 +146,10 @@ class MapMesh:
             mrc_filepath = mrc_file.name
             if extension.endswith('.gz'):
                 with gzip.open(mapfile, 'rb') as f:
-                    mrc_file.write(f.read())
+                    data = f.read()
+                    data_size_mb = round(sys.getsizeof(data) / 10 ** 6, 2)
+                    Logs.debug(f"Unzipped file size: {data_size_mb}MB")
+                    mrc_file.write(data)
             else:
                 with open(mapfile, 'rb') as f:
                     mrc_file.write(f.read())
@@ -172,15 +176,22 @@ class MapMesh:
         Logs.debug("Marching Cubes...")
         map_origin = map_manager.origin
         map_data = map_manager.map_data().as_numpy_array()
-        vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
+        grid_vertices, triangles = mcubes.marching_cubes(map_data, isovalue)
         Logs.debug("Cubes Marched")
         # offset the vertices using the map origin
         # this makes sure the mesh is in the same coordinates as the molecule
-        vertices += np.asarray(map_origin)
+        grid_vertices += np.asarray(map_origin)
         # convert vertices from grid units to cartesian angstroms
-        Logs.debug(f"Vertices Count: {vertices.shape[0]}")
-        for i in range(vertices.shape[0]):
-            vertices[i] = map_manager.grid_units_to_cart(vertices[i])
+        Logs.debug(f"Vertices Count: {grid_vertices.shape[0]}")
+        Logs.debug("Converting vertices to cartesian coordinates...")
+        start_time = time.time()
+        vertices_map = map(map_manager.grid_units_to_cart, grid_vertices)
+        # Convert the map object to a 1D numpy array
+        arr = np.fromiter((item for sublist in vertices_map for item in sublist), dtype=np.float64)
+        # Reshape the array to the desired shape
+        vertices = arr.reshape(-1, 3)
+        end_time = time.time()
+        Logs.debug(f"Vertices converted to cartesian in {round(end_time - start_time, 1)} seconds")
 
         Logs.debug("Simplifying mesh...")
         decimation_factor = 5
