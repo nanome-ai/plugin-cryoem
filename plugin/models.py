@@ -405,13 +405,6 @@ class MapGroup:
             Logs.debug(f"Set Isovalue to {isovalue}")
             self.isovalue = isovalue
 
-        # map_data_cutoff = 10 ** 8
-        # if len(map_data) > map_data_cutoff:
-        #     msg = f"Map is too large to load ({len(map_data)} > {map_data_cutoff})"
-        #     Logs.warning(msg)
-        #     self._plugin.client.send_notification(enums.NotificationType.error, msg)
-        #     return
-
         await self.map_mesh.load(
             mmm.map_manager(), self.isovalue, self.opacity)
         self.color_by_scheme(self.map_mesh, self.color_scheme)
