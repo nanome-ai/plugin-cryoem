@@ -108,6 +108,10 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         remove_from_workspace_fut.set_result([structure.Complex()])
         self.plugin.client.remove_from_workspace = MagicMock(return_value=remove_from_workspace_fut)
 
+        request_complex_list = asyncio.Future()
+        request_complex_list.set_result([structure.Complex()])
+        self.plugin.client.request_complex_list = MagicMock(return_value=request_complex_list)
+
         existing_group = self.plugin.groups[0]
         # Copy map file to temp file, because the test will delete it.
         temp_map_file = tempfile.NamedTemporaryFile(suffix='.map.gz')

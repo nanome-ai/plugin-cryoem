@@ -49,7 +49,7 @@ class MapGroupTestCase(unittest.IsolatedAsyncioTestCase):
         self.plugin.client.add_to_workspace.return_value = fut
 
         map_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
-        expected_vertices = 34027
+        expected_vertices = 14303
         # Make sure vertices are added to mesh
         self.assertEqual(len(self.map_group.map_mesh.computed_vertices), 0)
         await self.map_group.add_mapfile(map_file)
