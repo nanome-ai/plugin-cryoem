@@ -217,3 +217,11 @@ def create_hidden_complex(comp_name=None, bounds=None):
         atom.position.set(x, y, z)
         residue.add_atom(atom)
     return comp
+
+
+def get_extension(filepath):
+    """Get file extension, accounting for .gz."""
+    extension = filepath.split('.')[-1]
+    if extension == 'gz':
+        extension = '.'.join(filepath.split('.')[-2:])
+    return extension

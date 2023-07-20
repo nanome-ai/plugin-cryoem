@@ -7,7 +7,7 @@ import logging.config
 import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
-from nanome.api import control, ui
+from nanome.api import control, ui, structure
 from nanome_sdk.session import NanomePlugin
 from nanome_sdk import utils
 from nanome_sdk.logs import configure_session_logging
@@ -49,6 +49,7 @@ async def _start_session_loop(plugin_instance):
         packet = utils.convert_bytes_to_packet(received_bytes)
         routing_task = asyncio.create_task(_route_incoming_payload(packet.payload, plugin_instance))
         routing_tasks.append(routing_task)
+        # Clear completed tasks from memory
         for i in range(len(routing_tasks) - 1, -1, -1):
             routing_task = routing_tasks[i]
             if routing_task.done():
@@ -92,6 +93,10 @@ async def _route_incoming_payload(payload, plugin_instance):
         ui_manager = plugin_instance.ui_manager
         ui_command = ui_manager.find_command(command_hash)
         await ui_manager.handle_ui_command(ui_command, received_obj_list)
+    elif isinstance(message, structure.messages.ComplexAddedRemoved):
+        logger.debug("Complex Added/Removed")
+        task = asyncio.create_task(plugin_instance.on_complex_added_removed())
+        return task
 
 
 if __name__ == "__main__":

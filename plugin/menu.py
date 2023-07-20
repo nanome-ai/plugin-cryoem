@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+import math
 import nanome
 import os
 import requests
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 ASSETS_PATH = os.path.join(os.path.dirname(f'{os.path.realpath(__file__)}'), 'assets')
 MAIN_MENU_PATH = os.path.join(ASSETS_PATH, 'main_menu.json')
+LOAD_FROM_EMDB_MENU_PATH = os.path.join(ASSETS_PATH, 'emdb_load_menu.json')
 EDIT_MESH_MENU_PATH = os.path.join(ASSETS_PATH, 'edit_mesh_menu.json')
 GROUP_ITEM_PATH = os.path.join(ASSETS_PATH, 'group_item.json')
 DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
@@ -28,21 +30,16 @@ MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
 __all__ = ['MainMenu', 'EditMeshMenu']
 
 
-class MainMenu:
+class LoadFromEmdbMenu:
 
     def __init__(self, plugin_instance: nanome.PluginInstance):
         ui_manager = plugin_instance.ui_manager
-        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
+        self._menu = ui_manager.create_new_menu(LOAD_FROM_EMDB_MENU_PATH)
+        self._menu.index = 120  # arbitrary
         self._plugin = plugin_instance
-
-        self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
-        self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
+        self.client = plugin_instance.client
 
         root: ui.LayoutNode = self._menu.root
-        self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
-
-        self.btn_add_group: ui.LayoutNode = root.find_node('ln_btn_add_group').get_content()
-        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
 
         self.btn_rcsb_submit: ui.Button = root.find_node('btn_rcsb_submit').get_content()
         self.btn_embl_submit: ui.Button = root.find_node('btn_embl_submit').get_content()
@@ -64,95 +61,21 @@ class MainMenu:
         self.btn_browse_emdb: ui.Button = root.find_node('ln_btn_browse_emdb').get_content()
         ui_manager.register_btn_pressed_callback(self.btn_browse_emdb, self.on_browse_emdb)
 
-    async def render(self, force_enable=False, selected_mapgroup=None):
-        if force_enable:
-            self._menu.enabled = True
+    def render(self):
+        self._menu.enabled = True
+        self.client.update_menu(self._menu)
 
-        groups = self._plugin.groups
-        # By default, select the first group
-        if groups and not selected_mapgroup:
-            selected_mapgroup = groups[0]
-        self.render_map_groups(groups, selected_mapgroup)
-        self._plugin.client.update_menu(self._menu)
-
-    @property
-    def temp_dir(self):
-        return self._plugin.temp_dir.name
-
-    def add_mapgroup(self, btn):
-        Logs.message('Adding new map group')
-        self._plugin.add_mapgroup()
-        asyncio.create_task(self.render())
-
-    def render_map_groups(self, mapgroups, selected_mapgroup=None):
-        self.lst_groups.items.clear()
-        for map_group in mapgroups:
-            ln: ui.LayoutNode = self.pfb_group_item.clone()
-            lbl: ui.Label = ln.find_node('Label').get_content()
-
-            btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
-            btn_add_to_map.toggle_on_press = True
-            self._plugin.ui_manager.register_btn_pressed_callback(
-                btn_add_to_map, self.select_mapgroup)
-            btn_add_to_map.selected = map_group == selected_mapgroup
-            lbl.text_value = map_group.group_name
-
-            ln_group_details = ln.find_node('ln_group_details')
-            edit_mesh_btn: ui.Button = ln_group_details.get_content()
-            self._plugin.ui_manager.register_btn_pressed_callback(
-                edit_mesh_btn,
-                partial(self.open_edit_mesh_menu, map_group))
-
-            btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
-            self._plugin.ui_manager.register_btn_pressed_callback(
-                btn_delete,
-                partial(self.delete_group, map_group))
-
-            btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
-            btn_toggle.icon.value.set_all(
-                VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-            self._plugin.ui_manager.register_btn_pressed_callback(
-                btn_toggle,
-                partial(self.toggle_group, map_group))
-
-            self.lst_groups.items.append(ln)
-        self._plugin.client.update_content(self.lst_groups)
-
-    def select_mapgroup(self, selected_btn: ui.Button):
-        Logs.message('Selecting map group')
-        for item in self.lst_groups.items:
-            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
-            btn.selected = btn._content_id == selected_btn._content_id
-        self._plugin.client.update_content(self.lst_groups)
-
-    def get_selected_mapgroup(self):
-        for item in self.lst_groups.items:
-            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
-            if btn.selected:
-                label = item.find_node('Label').get_content()
-                return label.text_value
-
-    async def open_edit_mesh_menu(self, map_group, btn=None):
-        if not map_group.has_map():
-            msg = "Please add Map from EMDB before opening menu"
-            await self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
-            Logs.warning('Tried to open menu before adding map.')
-            return
-        Logs.message('Loading group details menu')
-        group_menu = EditMeshMenu(map_group, self._plugin)
-        group_menu.render(map_group)
-
-    async def delete_group(self, map_group, btn):
-        Logs.message(f'Deleting group {map_group.group_name}')
-        await self._plugin.delete_mapgroup(map_group)
-
-    def toggle_group(self, map_group, btn: ui.Button):
-        Logs.message('Toggling group')
-        map_group.visible = not map_group.visible
-        btn.icon.value.set_all(
-            VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
-        self._plugin.client.update_content(btn)
-        self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
+    def on_browse_emdb(self, btn):
+        """Open the EMDB website in the user's browser"""
+        base_search_url = "www.ebi.ac.uk/emdb/search"
+        # query only low molecular weight maps, because download speeds are really bad.
+        query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
+        query_params = urllib.parse.urlencode({
+            'rows': 10,
+            'sort': 'release_date desc'
+        })
+        url = f"{base_search_url}/{query}?{query_params}"
+        self._plugin.client.open_url(url)
 
     async def on_rcsb_submit(self, btn):
         pdb_id = self.ti_rcsb_query.input_text
@@ -166,7 +89,7 @@ class MainMenu:
         pdb_path = self.download_pdb_from_rcsb(pdb_id)
         if not pdb_path:
             return
-        await self._plugin.add_pdb_to_group(pdb_path)
+        await self._plugin.add_model_to_group(pdb_path)
 
         # Reenable embl search button
         self.btn_embl_submit.unusable = False
@@ -203,7 +126,7 @@ class MainMenu:
             btn.unusable = True
             self._plugin.client.update_content(btn)
 
-            await self._plugin.add_mapgz_to_group(map_file, isovalue, metadata_parser)
+            await self._plugin.add_mapfile_to_group(map_file, isovalue, metadata_parser)
 
             # Populate rcsb text input with pdb from metadata
             if metadata_parser.pdb_list:
@@ -218,6 +141,10 @@ class MainMenu:
         btn.text.value.unusable = "Downloading..."
         btn.unusable = False
         self._plugin.client.update_content(self.btn_rcsb_submit, btn)
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
 
     def download_pdb_from_rcsb(self, pdb_id):
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -284,17 +211,126 @@ class MainMenu:
         self._plugin.client.update_node(self.lb_embl_download)
         return file_path
 
-    def on_browse_emdb(self, btn):
-        """Open the EMDB website in the user's browser"""
-        base_search_url = "www.ebi.ac.uk/emdb/search"
-        # query only low molecular weight maps, because download speeds are really bad.
-        query = urllib.parse.quote('* AND overall_molecular_weight:{0 TO 50000]')
-        query_params = urllib.parse.urlencode({
-            'rows': 10,
-            'sort': 'release_date desc'
-        })
-        url = f"{base_search_url}/{query}?{query_params}"
-        self._plugin.client.open_url(url)
+
+class MainMenu:
+
+    def __init__(self, plugin_instance: nanome.PluginInstance):
+        ui_manager = plugin_instance.ui_manager
+        self._menu = ui_manager.create_new_menu(MAIN_MENU_PATH)
+        self._plugin = plugin_instance
+
+        self.pfb_group_item: ui.LayoutNode = ui.LayoutNode.io.from_json(GROUP_ITEM_PATH)
+        self.pfb_group_item.find_node('Button Delete').get_content().icon.value.set_all(DELETE_ICON)
+
+        root: ui.LayoutNode = self._menu.root
+        self.lst_groups: ui.UIList = root.find_node('lst_groups').get_content()
+
+        self.btn_add_group: ui.Button = root.find_node('ln_btn_add_group').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_add_group, self.add_mapgroup)
+
+        self.btn_load_from_emdb: ui.Button = root.find_node('ln_btn_load_from_emdb').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_load_from_emdb, self.open_emdb_menu)
+
+        self.btn_load_from_vault: ui.Button = root.find_node('ln_btn_load_from_vault').get_content()
+        ui_manager.register_btn_pressed_callback(self.btn_load_from_vault, self.open_vault_menu)
+
+    async def render(self, force_enable=False, selected_mapgroup=None):
+        if force_enable:
+            self._menu.enabled = True
+
+        groups = self._plugin.groups
+        # By default, select the first group
+        if groups and not selected_mapgroup:
+            selected_mapgroup = groups[0]
+        self.render_map_groups(groups, selected_mapgroup)
+        self._plugin.client.update_menu(self._menu)
+
+    def open_emdb_menu(self, btn):
+        self.emdb_menu = LoadFromEmdbMenu(self._plugin)
+        self.emdb_menu.render()
+        pass
+
+    def open_vault_menu(self, btn):
+        self._plugin.vault_menu.show_menu()
+
+    @property
+    def temp_dir(self):
+        return self._plugin.temp_dir.name
+
+    def add_mapgroup(self, btn):
+        Logs.message('Adding new map group')
+        self._plugin.add_mapgroup()
+        asyncio.create_task(self.render())
+
+    def render_map_groups(self, mapgroups, selected_mapgroup=None):
+        self.lst_groups.items.clear()
+        for map_group in mapgroups:
+            ln: ui.LayoutNode = self.pfb_group_item.clone()
+            lbl: ui.Label = ln.find_node('Label').get_content()
+
+            btn_add_to_map: ui.Button = ln.find_node('ln_btn_add_to_map').get_content()
+            btn_add_to_map.toggle_on_press = True
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_add_to_map, self.select_mapgroup)
+            btn_add_to_map.selected = map_group == selected_mapgroup
+            lbl.text_value = map_group.group_name
+
+            ln_group_details = ln.find_node('ln_group_details')
+            edit_mesh_btn: ui.Button = ln_group_details.get_content()
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                edit_mesh_btn,
+                partial(self.open_edit_mesh_menu, map_group))
+
+            btn_delete: ui.Button = ln.find_node('Button Delete').get_content()
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_delete,
+                partial(self.delete_group, map_group))
+
+            btn_toggle: ui.Button = ln.find_node('Button Toggle').get_content()
+            btn_toggle.icon.value.set_all(
+                VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
+            self._plugin.ui_manager.register_btn_pressed_callback(
+                btn_toggle,
+                partial(self.toggle_group, map_group))
+
+            self.lst_groups.items.append(ln)
+        self._plugin.client.update_content(self.lst_groups)
+
+    def select_mapgroup(self, selected_btn: ui.Button):
+        Logs.message('Selecting map group')
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            btn.selected = btn._content_id == selected_btn._content_id
+        self._plugin.client.update_content(self.lst_groups)
+
+    def get_selected_mapgroup(self):
+        for item in self.lst_groups.items:
+            btn: ui.Button = item.find_node('ln_btn_add_to_map').get_content()
+            if btn.selected:
+                label = item.find_node('Label').get_content()
+                return label.text_value
+
+    async def open_edit_mesh_menu(self, map_group, btn=None):
+        if not map_group.has_map():
+            msg = "Please add Map from EMDB before opening menu"
+            await self._plugin.client.send_notification(enums.NotificationTypes.warning, msg)
+            Logs.warning('Tried to open menu before adding map.')
+            return
+        Logs.message('Loading group details menu')
+        edit_mesh_menu = EditMeshMenu(map_group, self._plugin)
+        edit_mesh_menu.render(map_group)
+
+    async def delete_group(self, map_group, btn):
+        Logs.message(f'Deleting group {map_group.group_name}')
+        await self._plugin.delete_mapgroup(map_group)
+
+    def toggle_group(self, map_group, btn: ui.Button):
+        Logs.message('Toggling group')
+        map_group.visible = not map_group.visible
+        btn.icon.value.set_all(
+            VISIBLE_ICON if map_group.visible else INVISIBLE_ICON)
+        self._plugin.client.update_content(btn)
+        self._plugin.client.update_structures_shallow([map_group.map_mesh.complex, map_group.model_complex])
 
 
 class EditMeshMenu:
@@ -349,11 +385,12 @@ class EditMeshMenu:
             self.btn_box_around_selection, self.box_map_around_selection)
 
     def render(self, map_group: MapGroup):
-        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(map_group.isovalue, 3)})'
+        isovalue = map_group.isovalue or 0
+        self._menu.title = f'{map_group.group_name} Map (Primary Contour: {round(isovalue, 3)})'
         # Populate file list
         self.lst_files.items.clear()
         group_objs = []
-        if map_group.map_gz_file:
+        if map_group.mapfile:
             map_comp = map_group.map_mesh.complex
             group_objs.append(map_comp)
         if map_group.model_complex:
@@ -498,7 +535,14 @@ class EditMeshMenu:
     def set_isovalue_slider_min_max(self, map_group):
         min_value = map_group.hist_x_min
         max_value = map_group.hist_x_max
-        current_value = map_group.isovalue
+        # Handle weird slider edge cases where isovalue isn't set, or min/max are infinite
+        if map_group.isovalue is not None:
+            current_value = map_group.isovalue
+        elif not math.isinf(min_value) and not math.isinf(max_value):
+            current_value = (min_value + max_value) / 2
+        else:
+            current_value = 0
+        # Scale isovalue if histogram range is too small for UI slider to handle
         if map_group.has_small_histogram_range():
             min_value = min_value * self.isovalue_scaling_factor
             max_value = max_value * self.isovalue_scaling_factor

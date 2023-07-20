@@ -46,8 +46,9 @@ class PluginServer:
             await self.poll_nts_task
         except Exception as e:
             logger.error(e)
-            raise e
         finally:
+            self.keep_alive_task.cancel()
+            self.poll_nts_task.cancel()
             self.nts_writer.close()
 
     async def poll_nts(self):
@@ -57,9 +58,8 @@ class PluginServer:
             unpacked = Packet.header_unpack(received_bytes)
             payload_length = unpacked[4]
             received_bytes += await self.nts_reader.readexactly(payload_length)
-            logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
+            # logger.debug(f"Received Data from NTS. Size {len(received_bytes)}")
             await self.route_bytes(received_bytes)
-            # await self.nts_writer.drain()
 
     async def connect_plugin(self, name, description):
         """Send a packet to NTS to register plugin."""
@@ -119,7 +119,7 @@ class PluginServer:
                 await self.start_session_process(version_table, packet, self.plugin_class)
             else:
                 process = self._sessions[session_id]
-                logger.debug(f"Writing line to session {session_id}: {len(received_bytes)} bytes")
+                # logger.debug(f"Writing line to session {session_id}: {len(received_bytes)} bytes")
                 process.stdin.write(received_bytes)
                 await process.stdin.drain()
 
@@ -141,10 +141,8 @@ class PluginServer:
         session_id = packet.session_id
         logger.info(f"Starting process for Session {session_id}")
         env = {
+            **os.environ,
             'NANOME_VERSION_TABLE': json.dumps(version_table),
-            'PLUGIN_VERBOSE': os.environ.get('PLUGIN_VERBOSE', 'False'),
-            'PLUGIN_REMOTE_LOGGING': os.environ.get('PLUGIN_REMOTE_LOGGING', 'False'),
-            'PATH': os.environ.get('PATH', ''),
         }
         plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
         session_process = await asyncio.create_subprocess_exec(
@@ -162,7 +160,7 @@ class PluginServer:
         payload_length = unpacked[4]
 
         connect_data += await session_process.stdout.readexactly(payload_length)
-        logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
+        # logger.debug(f"Writing line to NTS: {len(connect_data)} bytes")
         self.nts_writer.write(connect_data)
         self._sessions[session_id] = session_process
         self.polling_tasks[session_id] = asyncio.create_task(self.poll_session(session_process))
@@ -188,7 +186,7 @@ class PluginServer:
             if packet.packet_type == PacketTypes.live_logs:
                 asyncio.create_task(self.handle_session_log_packet(packet))
             else:
-                logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
+                # logger.debug(f"Writing line to NTS: {len(outgoing_bytes)} bytes")
                 self.nts_writer.write(outgoing_bytes)
 
     async def handle_session_log_packet(self, packet):
@@ -215,4 +213,3 @@ class PluginServer:
             session_logger.handle(logrecord)
             if PLUGIN_REMOTE_LOGGING:
                 self.nts_writer.write(packet.pack())
-                # await self.nts_writer.drain()

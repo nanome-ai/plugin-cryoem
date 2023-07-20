@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from nanome_sdk.session import UIManager
 import tempfile
@@ -7,22 +8,15 @@ import unittest
 from nanome.api import structure, ui
 from unittest.mock import MagicMock
 
+import plugin
 from plugin import models, menu
+from plugin.utils import EMDBMetadataParser
 import threading
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
 
-def run_awaitable(awaitable, *args, **kwargs):
-    loop = asyncio.get_event_loop()
-    if loop.is_running:
-        loop = asyncio.new_event_loop()
-    result = loop.run_until_complete(awaitable(*args, **kwargs))
-    loop.close()
-    return result
-
-
-class EditMeshMenuTestCase(unittest.TestCase):
+class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         super().setUp()
@@ -31,7 +25,7 @@ class EditMeshMenuTestCase(unittest.TestCase):
         self.plugin.client = MagicMock()
         self.plugin.ui_manager = UIManager()
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
-        self.map_file = os.path.join(fixtures_dir, 'emd_30288.map.gz')
+        self.mapgz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
         self.map_group = models.MapGroup(self.plugin)
         self.menu = menu.EditMeshMenu(self.map_group, self.plugin)
 
@@ -54,37 +48,85 @@ class EditMeshMenuTestCase(unittest.TestCase):
                 pass
         self.plugin.temp_dir.cleanup()
 
-    def test_render_no_map(self):
+    async def test_render_no_map(self):
+        self.menu.render(self.map_group)
+        self.assertTrue(self.map_group.group_name in self.menu._menu.title)
+        self.assertEqual(len(self.menu.lst_files.items), 0)
+        self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
 
-        async def validate_render_no_map():
-            self.menu.render(self.map_group)
-            self.assertTrue(self.map_group.group_name in self.menu._menu.title)
-            self.assertEqual(len(self.menu.lst_files.items), 0)
-            self.assertEqual(self.menu.sld_isovalue.current_value, self.map_group.isovalue)
-            self.assertEqual(self.menu.sld_opacity.current_value, self.map_group.opacity)
-        run_awaitable(validate_render_no_map)
+    async def test_render_with_map(self):
+        await self.map_group.add_mapfile(self.mapgz_file)
+        await self.map_group.generate_full_mesh()
+        self.assertTrue(self.map_group.has_map())
+        self.menu.render(self.map_group)
+        self.assertEqual(len(self.menu.lst_files.items), 1)
 
-    def test_render_with_map(self):
-        async def validate_render_with_map():
-            await self.map_group.add_map_gz(self.map_file)
-            await self.map_group.generate_full_mesh()
-            self.assertTrue(self.map_group.has_map())
-            self.menu.render(self.map_group)
-            self.assertEqual(len(self.menu.lst_files.items), 1)
-            self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
-            self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
-        run_awaitable(validate_render_with_map)
+        rel_tol = 1e-6
+        sld_isovalue = self.menu.get_isovalue_from_slider()
+        self.assertTrue(math.isclose(sld_isovalue, self.map_group.isovalue, rel_tol=rel_tol))
 
-    def test_generate_histogram(self):
-        async def validate_generate_histogram():
-            await self.map_group.add_map_gz(self.map_file)
-            await self.map_group.generate_full_mesh()
-            original_hist_x_min = self.map_group.hist_x_min
-            original_hist_x_max = self.map_group.hist_x_max
-            self.menu.render(self.map_group)
-            self.assertNotEqual(self.map_group.hist_x_min, original_hist_x_min)
-            self.assertNotEqual(self.map_group.hist_x_max, original_hist_x_max)
-            self.assertEqual(self.menu.sld_isovalue.min_value, self.map_group.hist_x_min)
-            self.assertEqual(self.menu.sld_isovalue.max_value, self.map_group.hist_x_max)
-            self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
-        run_awaitable(validate_generate_histogram)
+        sld_min_value = self.menu.sld_isovalue.min_value / self.menu.isovalue_scaling_factor
+        sld_max_value = self.menu.sld_isovalue.max_value / self.menu.isovalue_scaling_factor
+        self.assertTrue(math.isclose(sld_min_value, self.map_group.hist_x_min, rel_tol=rel_tol))
+        self.assertTrue(math.isclose(sld_max_value, self.map_group.hist_x_max, rel_tol=rel_tol))
+
+    async def test_generate_histogram(self):
+        await self.map_group.add_mapfile(self.mapgz_file)
+        await self.map_group.generate_full_mesh()
+        self.menu.render(self.map_group)
+
+        # Make sure slider values approximately match map_group values
+        rel_tol = 1e-6
+        sld_isovalue = self.menu.get_isovalue_from_slider()
+        self.assertTrue(math.isclose(sld_isovalue, self.map_group.isovalue, rel_tol=rel_tol))
+
+        sld_min_value = self.menu.sld_isovalue.min_value / self.menu.isovalue_scaling_factor
+        sld_max_value = self.menu.sld_isovalue.max_value / self.menu.isovalue_scaling_factor
+        self.assertTrue(math.isclose(sld_min_value, self.map_group.hist_x_min, rel_tol=rel_tol))
+        self.assertTrue(math.isclose(sld_max_value, self.map_group.hist_x_max, rel_tol=rel_tol))
+        self.assertTrue(isinstance(self.menu.ln_img_histogram.get_content(), ui.Image))
+
+
+class LoadFromEmdbMenuTestCase(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.plugin = plugin.CryoEM()
+        self.plugin.client = MagicMock()
+        self.menu = menu.LoadFromEmdbMenu(self.plugin)
+        self.menu._menu.enabled = False
+
+    def test_render(self):
+        self.assertEqual(self.menu._menu.enabled, False)
+        self.menu.render()
+        self.assertEqual(self.menu._menu.enabled, True)
+
+    def test_on_browse_emdb(self):
+        btn = MagicMock()
+        open_url_mock = MagicMock()
+        self.plugin.client.open_url = open_url_mock
+        self.menu.on_browse_emdb(btn)
+        open_url_mock.assert_called_once()
+
+    async def test_on_emdb_submit(self):
+        self.menu.ti_embl_query.input_text = '8216'
+
+        metadata_file = os.path.join(fixtures_dir, 'metadata_8216.xml')
+        map_gz_file = os.path.join(fixtures_dir, 'emd_8216.map.gz')
+
+        with open(metadata_file, 'rb') as f:
+            parser = EMDBMetadataParser(f.read())
+
+        metadata_mock = MagicMock(return_value=parser)
+        self.menu.download_metadata_from_emdbid = metadata_mock
+
+        fut = asyncio.Future()
+        fut.set_result(map_gz_file)
+        mapgz_download_mock = MagicMock(return_value=fut)
+        self.menu.download_mapgz_from_emdbid = mapgz_download_mock
+
+        btn = MagicMock()
+        await self.menu.on_emdb_submit(btn)
+
+        # Make sure mocks were called.
+        metadata_mock.assert_called_once()
+        mapgz_download_mock.assert_called_once()
