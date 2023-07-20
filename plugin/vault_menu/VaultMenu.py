@@ -1,5 +1,5 @@
 import aiohttp
-import asyncio
+import gzip
 import os
 import sys
 import tempfile
@@ -8,8 +8,10 @@ import urllib.parse
 from functools import partial
 
 import nanome
-from nanome.util import Color, Logs
+from nanome.util import Color, Logs, enums
 from nanome.util.enums import ExportFormats
+
+from plugin.utils import get_extension
 
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -20,6 +22,9 @@ LOCK_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'lock.png')
 
 ACCOUNT_FOLDER = 'account'
 ORG_FOLDER = 'my org'
+
+
+MAX_MAP_SIZE_MB = os.environ.get('MAX_MAP_SIZE_MB', 300)
 
 
 class VaultMenu:
@@ -762,8 +767,16 @@ class VaultMenu:
         temp_dir = tempfile.TemporaryDirectory()
         local_file = os.path.join(temp_dir.name, filename)
         await self.download_file_from_vault(path, local_file, key)
-        # self.vault_manager.get_file(path, key, local_file)
 
+        # Validate file size
+        valid = await self.validate_filesize(local_file)
+        if not valid:
+            unzipped_filesize = self.get_unzipped_filesize_mb(local_file)
+            msg = f"{'Unzipped' if extension == '.gz' else ''} Map file is too large: {unzipped_filesize}MB > {MAX_MAP_SIZE_MB}MB"
+            await self.session_client.send_notification(enums.NotificationTypes.error, msg)
+            Logs.error(msg)
+            Logs.warning(f"File too large. Cannot load {filename}")
+            return
         model_extensions = ['pdb', 'sdf', 'cif', 'mmcif']  # More formats need to be added
         map_extensions = ['map.gz', 'map', 'mrc', 'ccp4']
         if extension in model_extensions:
@@ -779,39 +792,42 @@ class VaultMenu:
         url = f"{self.vault_manager.server_url}/files/{urlpath}"
         # Write the map to a .map file
         headers = self.vault_manager.get_headers()
-        async with aiohttp.ClientSession() as session:
-            # Get content size from head request
-            response = await session.head(url, headers=headers)
-            file_size_mb = int(response.headers['Content-Length']) / (10 ** 6)
+        session = aiohttp.ClientSession()
 
-            chunk_size = 8192
-            loading_bar = self.ln_lb_vault_load.get_content()
-            async with session.get(url, headers=headers) as response:
-                with open(file_path, 'wb') as file:
-                    start_time = time.time()
-                    data_check = start_time
-                    downloaded_chunks = 0
-                    while True:
-                        chunk = await response.content.read(chunk_size)
-                        if not chunk:
-                            break
-                        downloaded_chunks += len(chunk)
-                        file.write(chunk)
-                        now = time.time()
-                        # Update UI with download progress
-                        ui_update_interval = 1
-                        if now - data_check > ui_update_interval:
-                            downloaded_mb = int(downloaded_chunks / 1000000)
-                            Logs.debug(f"{int(now - start_time)} seconds: {downloaded_mb} / {file_size_mb} mbs")
-                            loading_bar.percentage = downloaded_mb / file_size_mb
-                            btn_text = f"{int(downloaded_mb)}/{int(file_size_mb)} MB)"
-                            self.update_load_btn_text(btn_text)
-                            self.session_client.update_content(loading_bar)
-                            data_check = now
-            self.update_load_btn_text("Load")
-            self.ln_lb_vault_load.enabled = False
-            self.session_client.update_node(self.ln_lb_vault_load)
-            Logs.message("Download Completed.")
+        # Get content size from head request
+        response = await session.head(url, headers=headers)
+        file_size_mb = int(response.headers['Content-Length']) / (10 ** 6)
+
+        chunk_size = 8192
+        loading_bar = self.ln_lb_vault_load.get_content()
+        response = await session.get(url, headers=headers)
+        with open(file_path, 'wb') as file:
+            start_time = time.time()
+            data_check = start_time
+            downloaded_chunks = 0
+            while True:
+                chunk = await response.content.read(chunk_size)
+                if not chunk:
+                    break
+                downloaded_chunks += len(chunk)
+                file.write(chunk)
+                now = time.time()
+                # Update UI with download progress
+                ui_update_interval = 1
+                if now - data_check > ui_update_interval:
+                    downloaded_mb = int(downloaded_chunks / 1000000)
+                    Logs.debug(f"{int(now - start_time)} seconds: {downloaded_mb} / {file_size_mb} mbs")
+                    loading_bar.percentage = downloaded_mb / file_size_mb
+                    btn_text = f"{int(downloaded_mb)}/{int(file_size_mb)} MB)"
+                    self.update_load_btn_text(btn_text)
+                    self.session_client.update_content(loading_bar)
+                    data_check = now
+        # Ensure the session is closed when you're done
+        await session.close()
+        self.update_load_btn_text("Load")
+        self.ln_lb_vault_load.enabled = False
+        self.session_client.update_node(self.ln_lb_vault_load)
+        Logs.message("Download Completed.")
 
     def update_load_btn_text(self, text):
         self.btn_load.text.value.set_all(text)
@@ -820,3 +836,21 @@ class VaultMenu:
     def update_lbl_loading_text(self, text):
         self.lbl_loading.text_value = text
         self.session_client.update_content(self.lbl_loading)
+
+    @staticmethod
+    def get_unzipped_filesize_mb(filepath):
+        """Get filesize, unzip if necessary."""
+        extension = get_extension(filepath)
+        # use gzip.open to unpack file when opening
+        open_fn = open if extension != 'map.gz' else gzip.open
+        with open_fn(filepath, 'rb') as f:
+            data = f.read()
+        data_size_mb = round(sys.getsizeof(data) / 10 ** 6, 2)
+        return data_size_mb
+
+    @classmethod
+    async def validate_filesize(cls, filepath):
+        """Make sure downloaded file is not too large"""
+        data_size_mb = cls.get_unzipped_filesize_mb(filepath)
+        valid_filesize = data_size_mb <= MAX_MAP_SIZE_MB
+        return valid_filesize
