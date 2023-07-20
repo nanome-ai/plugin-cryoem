@@ -145,7 +145,7 @@ class CryoEM(NanomePlugin):
             Logs.warning("Tried to delete a map group that doesn't exist.")
 
         # Delete map file if it exists.
-        if map_group.mapfile:
+        if map_group.mapfile and os.path.exists(map_group.mapfile):
             os.remove(map_group.mapfile)
         selected_mapgroup_name = self.menu.get_selected_mapgroup()
         mapgroup = self.get_group(selected_mapgroup_name)
