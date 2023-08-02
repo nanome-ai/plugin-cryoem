@@ -24,7 +24,7 @@ ACCOUNT_FOLDER = 'account'
 ORG_FOLDER = 'my org'
 
 
-MAX_MAP_SIZE_MB = os.environ.get('MAX_MAP_SIZE_MB', 300)
+MAX_MAP_SIZE_MB = os.environ.get('MAX_MAP_SIZE_MB', 350)
 
 
 class VaultMenu:

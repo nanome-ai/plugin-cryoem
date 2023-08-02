@@ -25,7 +25,7 @@ DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
 VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
 
-MAX_MAP_SIZE_KB = os.environ.get('MAX_MAP_SIZE_KB', 500000)
+MAX_MAP_SIZE_MB = os.environ.get('MAX_MAP_SIZE_MB', 350)
 
 __all__ = ['MainMenu', 'EditMeshMenu']
 
@@ -107,7 +107,8 @@ class LoadFromEmdbMenu:
         try:
             metadata_parser = self.download_metadata_from_emdbid(embid_id)
             # Validate file size is within limit.
-            if metadata_parser.map_filesize > MAX_MAP_SIZE_KB:
+            max_map_size_kb = MAX_MAP_SIZE_MB * 1000
+            if metadata_parser.map_filesize > max_map_size_kb:
                 raise Exception
         except requests.exceptions.HTTPError:
             msg = "EMDB ID not found"
