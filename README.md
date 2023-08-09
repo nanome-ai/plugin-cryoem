@@ -24,9 +24,9 @@ Use the following environment variables to configure the plugin:
 `NTS_KEY` - Specifies a key file or key string to use to connect to NTS<br>
 `PLUGIN_NAME` - Optional custom name to display in the Nanome stacks Menu <br>
 `PLUGIN_VERBOSE` - Enable verbose mode, to display Logs.debug<br>
-`VAULT_URL`: URL to use for Vault Integration<br>
-`VAULT_API_KEY`: API Key access Vault.<br>
-`MAX_MAP_SIZE`: Maximum size of map to load (in MB). Default: 350MB)<br>
+`VAULT_URL` - URL to use for Vault Integration<br>
+`VAULT_API_KEY` - API Key access Vault.<br>
+`MAX_MAP_SIZE` - Maximum size of map to load (in MB). Default: 350MB)<br>
 
 ## License
 
