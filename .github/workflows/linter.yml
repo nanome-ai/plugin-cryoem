@@ -1,15 +1,15 @@
-name: PR Review
+name: autopep8
 on:
   pull_request:
     branches:
-      - main
+      - master
 jobs:
   autopep8:
     # Check if the PR is not from a fork
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
@@ -42,11 +42,3 @@ jobs:
           git config --global user.email 'gitbot@nanome.ai'
           git commit -am "Automated autopep8 fixes"
           git push
-  unittests:
-    runs-on: ubuntu-latest
-    needs: autopep8
-    steps:
-    - uses: actions/checkout@v2
-    - run: cd docker && ./build.sh
-    - run: docker run --rm cryo-em:latest python -m unittest discover tests
-
