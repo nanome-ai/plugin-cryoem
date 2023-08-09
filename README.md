@@ -2,16 +2,11 @@
 
 Nanome plugin to load Cryo-EM maps and display them in Nanome as surfaces
 
+![cryoem_img](cryoem_img.png)
 ## Dependencies
-
-[Docker](https://docs.docker.com/get-docker/)
-
-**TODO**: Provide instructions on how to install and link any external dependencies for this plugin.
-
-**TODO**: Update docker/Dockerfile to install any necessary dependencies.
+The plugin is built on top of Computational Crystallography Toolbox ([cctbx](https://cci.lbl.gov/docs/cctbx/))
 
 ## Usage
-
 To run Cryo-EM in a Docker container:
 
 ```sh
@@ -20,43 +15,18 @@ $ ./build.sh
 $ ./deploy.sh [run_args]
 ```
 
-### Run args
+### Environment Variables
 
-These args are passed to deploy.sh, and then forwarded to the Plugin's run.py command
+Use the following environment variables to configure the plugin:
 
-```sh
-usage: run.py [-h] [-a HOST] [-p PORT] [-r] [-v] [-n NAME] [-k KEYFILE]
-              [-i IGNORE] [--write-log-file WRITE_LOG_FILE]
-
-Starts a Nanome Plugin.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -a HOST, --host HOST  connects to NTS at the specified IP address
-  -p PORT, --port PORT  connects to NTS at the specified port
-  -r, --auto-reload     Restart plugin automatically if a .py or .json file in
-                        current directory changes
-  -v, --verbose         enable verbose mode, to display Logs.debug
-  -n NAME, --name NAME  Name to display for this plugin in Nanome
-  -k KEYFILE, --keyfile KEYFILE
-                        Specifies a key file or key string to use to connect
-                        to NTS
-  -i IGNORE, --ignore IGNORE
-                        To use with auto-reload. All paths matching this
-                        pattern will be ignored, use commas to specify
-                        several. Supports */?/[seq]/[!seq]
-  --write-log-file WRITE_LOG_FILE
-                        Enable or disable writing logs to .log file
-
-```
-
-## Development
-To run Cryo-EM with autoreload:
-
-```sh
-$ python3 -m pip install -r requirements.txt
-$ python3 run.py -r [run_args]
-```
+`NTS_HOST` - Sets the Plugin Server host<br>
+`NTS_PORT` - Sets the Plugin Server port<br>
+`NTS_KEY` - Specifies a key file or key string to use to connect to NTS<br>
+`PLUGIN_NAME` - Optional custom name to display in the Nanome stacks Menu <br>
+`PLUGIN_VERBOSE` - Enable verbose mode, to display Logs.debug<br>
+`VAULT_URL`: URL to use for Vault Integration<br>
+`VAULT_API_KEY`: API Key access Vault.<br>
+`MAX_MAP_SIZE`: Maximum size of map to load (in MB). Default: 350MB)<br>
 
 ## License
 
