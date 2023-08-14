@@ -28,15 +28,16 @@ class NanomePlugin:
         if func is not None:
             self.handlers['on_start'] = func
 
-    def on_stop(self):
-        pass
-
-    async def on_complex_added_removed(self):
-        pass
+    def on_stop(self, func=None):
+        if func is not None:
+            self.handlers['on_stop'] = func
 
     def on_run(self, func=None):
         if func is not None:
             self.handlers['on_run'] = func
+
+    async def on_complex_added_removed(self):
+        pass
 
     @property
     def request_futs(self):

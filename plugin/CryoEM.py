@@ -19,9 +19,6 @@ __all__ = ['CryoEM']
 
 class CryoEM():
 
-    async def on_stop(self):
-        self.temp_dir.cleanup()
-
     def add_mapgroup(self):
         group_num = 1
         existing_group_names = [group.group_name for group in self.groups]
@@ -187,3 +184,8 @@ async def on_run():
     cryo_app.vault_manager = VaultManager(cryo_app.vault_api_key, cryo_app.vault_url)
     cryo_app.vault_menu = VaultMenu(cryo_app, cryo_app.vault_manager, org, user_id)
     cryo_app.vault_menu.create_menu()
+
+
+@app.on_stop
+def on_stop(self):
+    self.temp_dir.cleanup()
