@@ -14,29 +14,13 @@ from nanome_sdk import NanomePlugin
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
+__all__ = ['CryoEM']
 
-class CryoEM(NanomePlugin):
 
-    def __init__(self):
-        super().__init__()
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.menu = MainMenu(self)
-        self.groups = []
-        self.add_mapgroup()
-        self.vault_url = os.environ.get("VAULT_URL")
-        self.vault_api_key = os.environ.get("VAULT_API_KEY")
+class CryoEM():
 
     async def on_stop(self):
         self.temp_dir.cleanup()
-
-    async def on_run(self):
-        await self.menu.render(force_enable=True)
-        presenter_info = await self.client.request_presenter_info()
-        org = f'org-{presenter_info.org_id}'
-        user_id = presenter_info.account_id
-        self.vault_manager = VaultManager(self.vault_api_key, self.vault_url)
-        self.vault_menu = VaultMenu(self, self.vault_manager, org, user_id)
-        self.vault_menu.create_menu()
 
     def add_mapgroup(self):
         group_num = 1
@@ -160,10 +144,6 @@ class CryoEM(NanomePlugin):
             for bond in atom.bonds:
                 residue.remove_bond(bond)
 
-    @property
-    def request_futs(self):
-        return self.client.request_futs
-
     async def on_complex_added_removed(self):
         # Check each mapgroup and delete any where the complex was deleted.
         comp_list = await self.client.request_complex_list()
@@ -178,3 +158,32 @@ class CryoEM(NanomePlugin):
                     if menu.title.startswith(mapgroup.group_name):
                         menu.enabled = False
                         self.client.update_menu(menu)
+
+
+app = NanomePlugin()
+
+cryo_app = CryoEM()
+cryo_app.client = app.client
+cryo_app.ui_manager = app.ui_manager
+
+
+@app.on_start
+def on_start():
+    logging.info("CryoEM plugin started")
+    cryo_app.temp_dir = tempfile.TemporaryDirectory()
+    cryo_app.menu = MainMenu(cryo_app)
+    cryo_app.groups = []
+    cryo_app.add_mapgroup()
+    cryo_app.vault_url = os.environ.get("VAULT_URL")
+    cryo_app.vault_api_key = os.environ.get("VAULT_API_KEY")
+
+
+@app.on_run
+async def on_run():
+    await cryo_app.menu.render(force_enable=True)
+    presenter_info = await cryo_app.client.request_presenter_info()
+    org = f'org-{presenter_info.org_id}'
+    user_id = presenter_info.account_id
+    cryo_app.vault_manager = VaultManager(cryo_app.vault_api_key, cryo_app.vault_url)
+    cryo_app.vault_menu = VaultMenu(cryo_app, cryo_app.vault_manager, org, user_id)
+    cryo_app.vault_menu.create_menu()

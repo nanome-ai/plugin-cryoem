@@ -2,7 +2,7 @@ __version__ = '1.1.1'
 
 from . import *
 
-from .CryoEM import CryoEM
+from .CryoEM import app
 
 
-plugin_class = CryoEM
+plugin_class = app

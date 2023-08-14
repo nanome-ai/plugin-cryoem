@@ -4,7 +4,7 @@ import os
 import nanome
 
 from nanome_sdk.plugin_server import PluginServer
-from plugin import CryoEM
+from plugin import app
 
 
 def create_parser():
@@ -47,8 +47,7 @@ def main():
     port = int(os.environ['NTS_PORT'])
     name = "Cryo-EM"
     description = "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces"
-    plugin_class = CryoEM
-    asyncio.run(server.run(host, port, name, description, plugin_class))
+    asyncio.run(server.run(host, port, name, description, app))
 
 
 if __name__ == "__main__":

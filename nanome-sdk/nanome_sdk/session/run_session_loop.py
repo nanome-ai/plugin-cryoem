@@ -8,14 +8,13 @@ import sys
 from nanome._internal.network import Packet
 from nanome.api.serializers import CommandMessageSerializer
 from nanome.api import control, ui, structure
-from nanome_sdk.session import NanomePlugin
 from nanome_sdk import utils
 from nanome_sdk.logs import configure_session_logging
-
+from nanome_sdk.session import NanomePlugin
+ 
 # Make sure plugin folder is in path
 # Bold assumption that plugin is always in `plugin` folder
 # in working directory
-breakpoint()
 plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
 from plugin import plugin_class  # noqa: E402
@@ -38,7 +37,7 @@ async def start_session(plugin_instance, plugin_name, plugin_id, session_id, ver
 
 
 async def _start_session_loop(plugin_instance):
-    await plugin_instance.on_start()
+    plugin_instance._run_handler("on_start")
     reader = plugin_instance.client.reader
     routing_tasks = []
     tasks = []
@@ -86,7 +85,7 @@ async def _route_incoming_payload(payload, plugin_instance):
     # Handle Different types of messages.
     if isinstance(message, control.messages.Run):
         logger.debug("on_run_called")
-        task = asyncio.create_task(plugin_instance.on_run())
+        task = plugin_instance._run_handler("on_run")
         return task
     elif type(message) in ui_messages:
         logger.debug("UI Content Clicked.")
@@ -106,7 +105,7 @@ if __name__ == "__main__":
     plugin_name = sys.argv[3]
     plugin_class_filepath = sys.argv[4]
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
-    plugin_instance = plugin_class()
+    plugin_instance = plugin_class
     session_coro = start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)
