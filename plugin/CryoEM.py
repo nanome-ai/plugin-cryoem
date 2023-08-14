@@ -17,6 +17,37 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 __all__ = ['CryoEM']
 
 
+def get_plugin_class():
+    return CryoEM
+
+
+app = NanomePlugin()
+cryo_app = get_plugin_class()
+
+
+@app.on_start
+def on_start():
+    cryo_app.client = app.client
+    cryo_app.ui_manager = app.ui_manager
+    cryo_app.menu = MainMenu(cryo_app)
+
+
+@app.on_run
+async def on_run():
+    await cryo_app.menu.render(force_enable=True)
+    presenter_info = await cryo_app.client.request_presenter_info()
+    org = f'org-{presenter_info.org_id}'
+    user_id = presenter_info.account_id
+    cryo_app.vault_manager = VaultManager(cryo_app.vault_api_key, cryo_app.vault_url)
+    cryo_app.vault_menu = VaultMenu(cryo_app, cryo_app.vault_manager, org, user_id)
+    cryo_app.vault_menu.create_menu()
+
+
+@app.on_stop
+def on_stop() -> None:
+    cryo_app.temp_dir.cleanup()
+
+
 class CryoEM(NanomePlugin):
 
     def __init__(self):
@@ -163,29 +194,3 @@ class CryoEM(NanomePlugin):
                     if menu.title.startswith(mapgroup.group_name):
                         menu.enabled = False
                         self.client.update_menu(menu)
-
-
-app = NanomePlugin()
-cryo_app = CryoEM()
-
-
-@app.on_start
-def on_start():
-    cryo_app.client = app.client
-    cryo_app.ui_manager = app.ui_manager
-    cryo_app.menu = MainMenu(cryo_app)
-
-@app.on_run
-async def on_run():
-    await cryo_app.menu.render(force_enable=True)
-    presenter_info = await cryo_app.client.request_presenter_info()
-    org = f'org-{presenter_info.org_id}'
-    user_id = presenter_info.account_id
-    cryo_app.vault_manager = VaultManager(cryo_app.vault_api_key, cryo_app.vault_url)
-    cryo_app.vault_menu = VaultMenu(cryo_app, cryo_app.vault_manager, org, user_id)
-    cryo_app.vault_menu.create_menu()
-
-
-@app.on_stop
-def on_stop(self):
-    self.temp_dir.cleanup()
