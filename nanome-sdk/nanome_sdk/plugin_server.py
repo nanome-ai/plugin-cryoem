@@ -29,11 +29,11 @@ class PluginServer:
     def __init__(self):
         self.plugin_id = None
         self._sessions = {}
-        self.plugin_class = None
+        self.app = None
         self.polling_tasks = {}
 
-    async def run(self, nts_host, nts_port, plugin_name, description, plugin_class):
-        self.plugin_class = plugin_class
+    async def run(self, nts_host, nts_port, plugin_name, description, app):
+        self.app = app
         self.plugin_name = os.environ.get("PLUGIN_NAME") or plugin_name
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
@@ -116,7 +116,7 @@ class PluginServer:
             if session_id not in self._sessions:
                 received_version_table, _, _ = serializer.deserialize_command(packet.payload, None)
                 version_table = TypeSerializer.get_best_version_table(received_version_table)
-                await self.start_session_process(version_table, packet, self.plugin_class)
+                await self.start_session_process(version_table, packet, self.app)
             else:
                 process = self._sessions[session_id]
                 # logger.debug(f"Writing line to session {session_id}: {len(received_bytes)} bytes")
@@ -136,7 +136,7 @@ class PluginServer:
         elif packet_type == PacketTypes.plugin_list:
             logger.info("Plugin list happening?")
 
-    async def start_session_process(self, version_table, packet, plugin_class):
+    async def start_session_process(self, version_table, packet, app):
         plugin_id = packet.plugin_id
         session_id = packet.session_id
         logger.info(f"Starting process for Session {session_id}")
@@ -144,9 +144,9 @@ class PluginServer:
             **os.environ,
             'NANOME_VERSION_TABLE': json.dumps(version_table),
         }
-        plugin_class_filepath = os.path.abspath(sys.modules[plugin_class.__module__].__file__)
+        app_import_module = app.import_module
         session_process = await asyncio.create_subprocess_exec(
-            sys.executable, run_session_loop_py, str(plugin_id), str(session_id), self.plugin_name, plugin_class_filepath,
+            sys.executable, run_session_loop_py, str(plugin_id), str(session_id), self.plugin_name, app_import_module,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             cwd=os.getcwd(),

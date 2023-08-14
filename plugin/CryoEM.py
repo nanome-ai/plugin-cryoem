@@ -158,15 +158,13 @@ class CryoEM():
 
 
 app = NanomePlugin()
-
 cryo_app = CryoEM()
-cryo_app.client = app.client
-cryo_app.ui_manager = app.ui_manager
 
 
 @app.on_start
 def on_start():
-    logging.info("CryoEM plugin started")
+    cryo_app.client = app.client
+    cryo_app.ui_manager = app.ui_manager
     cryo_app.temp_dir = tempfile.TemporaryDirectory()
     cryo_app.menu = MainMenu(cryo_app)
     cryo_app.groups = []

@@ -1,6 +1,7 @@
+import inspect
+import logging
 from .session_client import SessionClient
 from .ui_manager import UIManager
-import logging
 from .utils import run_function_or_coroutine
 
 logging.basicConfig(level=logging.DEBUG)
@@ -18,6 +19,12 @@ class NanomePlugin:
 
     def __init__(self):
         self.handlers = {}
+
+        # Getting the previous frame in the call stack
+        # This allows us to recreate the app in subprocesses.
+        # Experimental
+        frame = inspect.currentframe().f_back
+        self.import_module = inspect.getmodule(frame).__name__
 
     def set_client(self, plugin_id, session_id, version_table):
         """Used internally by the PluginServer."""

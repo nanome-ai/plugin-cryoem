@@ -11,13 +11,11 @@ from nanome.api import control, ui, structure
 from nanome_sdk import utils
 from nanome_sdk.logs import configure_session_logging
 from nanome_sdk.session import NanomePlugin
- 
-# Make sure plugin folder is in path
-# Bold assumption that plugin is always in `plugin` folder
-# in working directory
+
+# Make sure current working directory is importable
+# This helps us find the plugin app object below
 plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
-from plugin import plugin_class  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -100,12 +98,16 @@ async def _route_incoming_payload(payload, plugin_instance):
 
 
 if __name__ == "__main__":
+    import importlib
     plugin_id = int(sys.argv[1])
     session_id = int(sys.argv[2])
     plugin_name = sys.argv[3]
-    plugin_class_filepath = sys.argv[4]
+    # Get app object from command line argument
+    app_import_module_str = sys.argv[4]
+    app_module = importlib.import_module(app_import_module_str, )
+    app = app_module.app
+
     version_table = json.loads(os.environ['NANOME_VERSION_TABLE'])
-    plugin_instance = plugin_class
-    session_coro = start_session(plugin_instance, plugin_name, plugin_id, session_id, version_table)
+    session_coro = start_session(app_module.app, plugin_name, plugin_id, session_id, version_table)
     loop = asyncio.get_event_loop()
     session_loop = loop.run_until_complete(session_coro)

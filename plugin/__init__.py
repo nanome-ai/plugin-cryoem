@@ -4,5 +4,4 @@ from . import *
 
 from .CryoEM import app
 
-
-plugin_class = app
+plugin_instance = app
