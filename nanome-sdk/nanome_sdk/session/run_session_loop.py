@@ -15,6 +15,7 @@ from nanome_sdk.logs import configure_session_logging
 # Make sure plugin folder is in path
 # Bold assumption that plugin is always in `plugin` folder
 # in working directory
+breakpoint()
 plugin_path = os.getcwd()  # Starting directory (/app)
 sys.path.append(plugin_path)
 from plugin import plugin_class  # noqa: E402

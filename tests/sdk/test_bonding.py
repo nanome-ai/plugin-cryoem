@@ -1,7 +1,8 @@
 import nanome
 import sys
 import unittest
-from nanome_sdk.session.bonding import Bonding, NANOBABEL_PATH, OBABEL_PATH
+from nanome._internal.process.bonding import NANOBABEL_PATH, OBABEL_PATH
+from nanome_sdk.session.bonding import Bonding
 from nanome.api import structure
 import os
 
@@ -37,7 +38,7 @@ class BondingTestCase(unittest.TestCase):
         bonding.start(complex_list)
 
         # Looks like nanobabel and openbabel return different bond counts :pika-shock:
-        expected_bond_count = 2132 if NANOBABEL_PATH else 2134
+        expected_bond_count = 2134 if OBABEL_PATH else 2132
         bond_count = sum(1 for _ in comp.bonds)
         self.assertEqual(bond_count, expected_bond_count)
 
