@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 from plugin.vault_menu import VaultMenu
-from plugin import CryoEM
+from plugin.CryoEM import CryoEM
 from plugin.vault_manager import VaultManager
 
 
@@ -19,6 +19,7 @@ class VaultMenuTestCase(unittest.IsolatedAsyncioTestCase):
         self.vault_manager = VaultManager(api_key, server_url)
         self.plugin_instance = CryoEM()
         self.plugin_instance.client = MagicMock()
+        self.plugin_instance.ui_manager = MagicMock()
         org = 'test_org'
         account_id = 'user-xxxx'
         self.vault_menu = VaultMenu(self.plugin_instance, self.vault_manager, org, account_id)

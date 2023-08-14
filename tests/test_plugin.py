@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import tempfile
 import unittest
@@ -10,7 +9,6 @@ from unittest.mock import MagicMock
 from plugin.CryoEM import CryoEM
 from plugin.models import MapGroup
 
-from distutils.spawn import find_executable
 
 fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -20,15 +18,8 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         super().setUp()
         self.plugin = CryoEM()
-        plugin_id = 1
-        session_id = 1
-        version_table_file = os.path.join(fixtures_dir, "version_table_1_24_2.json")
-        with open(version_table_file, 'r') as f:
-            version_table = json.load(f)
-        self.plugin.set_client(plugin_id, session_id, version_table)
         self.plugin.client = MagicMock()
-        # self.plugin.client.reader = MagicMock()
-        # self.plugin.client.writer = MagicMock()
+        self.plugin.ui_manager = MagicMock()
         self.map_group = MapGroup(self.plugin)
         self.pdb_file = os.path.join(fixtures_dir, '7c4u.pdb')
 
@@ -39,9 +30,9 @@ class CryoEMPluginTestCase(unittest.IsolatedAsyncioTestCase):
         shapes_mock.set_result([MagicMock(), MagicMock()])
         self.plugin.client.shapes_upload_multiple = MagicMock(return_value=shapes_mock)
 
-    def tearDown(self):
-        super().tearDown()
-        self.plugin.temp_dir.cleanup()
+    # def tearDown(self):
+    #     super().tearDown()
+    #     self.plugin.temp_dir.cleanup()
 
     def test_add_mapgroup(self):
         self.assertEqual(len(self.plugin.groups), 1)

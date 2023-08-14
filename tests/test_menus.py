@@ -90,7 +90,7 @@ class EditMeshMenuTestCase(unittest.IsolatedAsyncioTestCase):
 class LoadFromEmdbMenuTestCase(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        self.plugin = plugin.CryoEM()
+        self.plugin = plugin.CryoEM.CryoEM()
         self.plugin.client = MagicMock()
         self.menu = menu.LoadFromEmdbMenu(self.plugin)
         self.menu._menu.enabled = False

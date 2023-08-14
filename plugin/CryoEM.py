@@ -17,7 +17,15 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 __all__ = ['CryoEM']
 
 
-class CryoEM():
+class CryoEM(NanomePlugin):
+
+    def __init__(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.groups = []
+        self.add_mapgroup()
+        self.vault_url = os.environ.get("VAULT_URL")
+        self.vault_api_key = os.environ.get("VAULT_API_KEY")
+        self.menu = MainMenu(self)
 
     def add_mapgroup(self):
         group_num = 1
@@ -165,13 +173,7 @@ cryo_app = CryoEM()
 def on_start():
     cryo_app.client = app.client
     cryo_app.ui_manager = app.ui_manager
-    cryo_app.temp_dir = tempfile.TemporaryDirectory()
     cryo_app.menu = MainMenu(cryo_app)
-    cryo_app.groups = []
-    cryo_app.add_mapgroup()
-    cryo_app.vault_url = os.environ.get("VAULT_URL")
-    cryo_app.vault_api_key = os.environ.get("VAULT_API_KEY")
-
 
 @app.on_run
 async def on_run():
