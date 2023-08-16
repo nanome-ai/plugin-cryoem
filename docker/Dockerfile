@@ -8,9 +8,10 @@ ARG CACHEBUST
 COPY environment.yml .
 # COPY nanome-sdk nanome-sdk
 RUN conda env update
-
-COPY nanome-sdk nanome-sdk
-RUN pip install -e nanome-sdk
+RUN echo "hello"
+RUN pip install git+https://github.com/nanome-ai/nanome-lib@beta-folder
+# COPY nanome-sdk nanome-sdk
+# RUN pip install -e nanome-sdk
 
 # Add conda bin to PATH 
 ENV PATH=/opt/conda/bin/:$PATH

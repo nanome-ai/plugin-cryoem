@@ -6,7 +6,7 @@ dependencies:
   - openbabel=3.1.1
   - pip
   - pip:
-      - nanome==0.40.3
+      # - git+https://github.com/nanome-ai/nanome-lib@beta-folder
       - griddataformats==0.7.0
       - PyMCubes==0.1.2
       - pyfqmr==0.1.2
@@ -16,6 +16,3 @@ dependencies:
       - matplotlib==3.5.3
       - requests==2.28.1
       - aiohttp
-      # - -e ./nanome-sdk
-      
-

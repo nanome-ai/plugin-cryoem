@@ -1,7 +1,7 @@
 import asyncio
 import math
 import os
-from nanome_sdk.session import UIManager
+from nanome.beta.nanome_sdk.session import UIManager
 import tempfile
 import unittest
 

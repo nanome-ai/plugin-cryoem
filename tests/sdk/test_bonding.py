@@ -1,7 +1,7 @@
 import nanome
 import sys
 import unittest
-from nanome_sdk.session.bonding import Bonding, NANOBABEL_PATH, OBABEL_PATH
+from nanome.beta.nanome_sdk.session.bonding import Bonding, NANOBABEL_PATH, OBABEL_PATH
 from nanome.api import structure
 import os
 
