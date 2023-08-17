@@ -3,7 +3,7 @@ import asyncio
 import os
 import nanome
 
-from nanome_sdk.plugin_server import PluginServer
+from nanome.beta.nanome_sdk.plugin_server import PluginServer
 from plugin import CryoEM
 
 

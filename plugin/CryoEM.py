@@ -9,7 +9,7 @@ from .models import MapGroup
 from .vault_manager import VaultManager
 from .vault_menu import VaultMenu
 
-from nanome_sdk import NanomePlugin
+from nanome.beta.nanome_sdk import NanomePlugin
 
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
