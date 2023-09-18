@@ -6,7 +6,7 @@ dependencies:
   - openbabel=3.1.1
   - pip
   - pip:
-      - nanome==0.41.1
+      - nanome==0.41.5
       - griddataformats==0.7.0
       - PyMCubes==0.1.2
       - pyfqmr==0.1.2
