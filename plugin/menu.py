@@ -25,7 +25,7 @@ DELETE_ICON = os.path.join(ASSETS_PATH, 'delete.png')
 VISIBLE_ICON = os.path.join(ASSETS_PATH, 'visible.png')
 INVISIBLE_ICON = os.path.join(ASSETS_PATH, 'invisible.png')
 
-MAX_MAP_SIZE_MB = os.environ.get('MAX_MAP_SIZE_MB', 350)
+MAX_MAP_SIZE_MB = int(os.environ.get('MAX_MAP_SIZE_MB', 350))
 
 __all__ = ['MainMenu', 'EditMeshMenu']
 
