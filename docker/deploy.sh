@@ -10,7 +10,7 @@ if [ -n "$existing" ]; then
 fi
 
 docker run -d \
---name cryo-em \
+--name cryoem \
 --restart unless-stopped \
 -e ARGS="$*" \
-cryo-em
+cryoem
