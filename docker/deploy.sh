@@ -3,7 +3,7 @@
 echo "./deploy.sh $*" > redeploy.sh
 chmod +x redeploy.sh
 
-existing=$(docker ps -aqf name=cryo-em)
+existing=$(docker ps -aqf name=cryoem)
 if [ -n "$existing" ]; then
     echo "removing existing container"
     docker rm -f $existing
