@@ -43,8 +43,8 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
     server = PluginServer()
-    host = os.environ['NTS_HOST']
-    port = int(os.environ['NTS_PORT'])
+    host = args.host or os.environ.get('NTS_HOST', None)
+    port = args.port or int(os.environ.get('NTS_PORT', 8888))
     name = "Cryo-EM"
     description = "Nanome plugin to load Cryo-EM maps and display them in Nanome as iso-surfaces"
     plugin_class = CryoEM
